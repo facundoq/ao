@@ -59,9 +59,6 @@ This domain handles kernel, operating system updates, power management, and high
   * **Arguments:** `reboot`, `shutdown`, `suspend`, `hibernate`.
   * **Behavior:** Initiates system power state transitions, safely wrapping `systemctl reboot/poweroff/suspend/hibernate`.
   * **Flags:** `--force` to bypass normal init procedures (wraps `reboot -f`), `--now` to execute immediately.
-* `ao sys update`
-  * **Behavior:** Updates the system package tree and applies available upgrades. Wraps the underlying package manager (`apt update && apt upgrade -y`, `dnf update`, `pacman -Syu`).
-  * **Flags:** `--dry-run` to list what would be updated without executing.
 * `ao sys time <action>`
   * **Actions:** `status`, `set`, `sync`.
   * **Behavior:** Modifies or views the system time and timezone. Maps to `timedatectl`. E.g., `ao sys time set "America/New_York"`.
@@ -100,6 +97,11 @@ Simplifies `useradd`, `usermod`, `passwd`, and `groupmod` into an intuitive inte
   * **Behavior:** Modifies user properties. E.g., `ao user mod john add-group docker` wraps `usermod -aG docker john`.
 * `ao user passwd <username>`
   * **Behavior:** Initiates an interactive password reset prompt for the user. Maps to `passwd <username>`.
+* **Groups Sub-domain (`ao group`)**
+  * `ao group list` (Lists all groups on the system via `/etc/group`).
+  * `ao group add <groupname>` (Creates a new group via `groupadd <groupname>`).
+  * `ao group del <groupname>` (Deletes a group via `groupdel <groupname>`).
+  * `ao group mod <groupname> --gid <id>` (Modifies an existing group).
 
 ### 4.4 Networking (`ao net`)
 Replaces the disparate suite of `ip`, `ping`, `ss`, and firewall tools.
@@ -144,6 +146,9 @@ Replaces `lsblk`, `df`, `du`, `mount`, and `umount`.
 ### 4.6 Packages (`ao pkg`)
 Dynamically abstracts over `apt`, `dnf`, `pacman`, `zypper`, and `apk`.
 
+* `ao pkg update`
+  * **Behavior:** Updates the system package tree and applies available upgrades. Wraps the underlying package manager (`apt update && apt upgrade -y`, `dnf update`, `pacman -Syu`).
+  * **Flags:** `--dry-run` to list what would be updated without executing.
 * `ao pkg install <name...>`
   * **Behavior:** Installs one or more packages.
 * `ao pkg remove <name...>`
@@ -220,16 +225,22 @@ Abstracts management of Docker, Podman, and KVM/libvirt.
   * **Behavior:** Tails the logs of a running container.
 
 ### 4.12 Security & Permissions (`ao sec`)
-Manages system-level security contexts, capabilities, and file permissions.
+Manages system-level security contexts, capabilities,
 
 * `ao sec audit`
   * **Behavior:** Runs a basic security audit. Checks for open privileged ports, files with SUID bits set, and active firewall status.
 * `ao sec context`
   * **Behavior:** Outputs the current state of SELinux or AppArmor (e.g., Enforcing, Permissive, Disabled). Maps to `sestatus` or `aa-status`.
-* `ao sec chown <user>:<group> <path>`
-  * **Behavior:** Recursively changes ownership of a path. Wraps `chown -R`.
-* `ao sec chmod <perms> <path>`
-  * **Behavior:** Modifies file permissions. Wraps `chmod`.
+
+### 4.13 Distributions (`ao distro`)
+Manages the lifecycle and major version upgrades of the host operating system.
+
+* `ao distro info`
+  * **Behavior:** Outputs detailed release information, architecture, and end-of-life status for the current distribution.
+* `ao distro upgrade`
+  * **Behavior:** Initiates a major version upgrade of the host OS. This wraps complex, distribution-specific tooling gracefully (e.g., `do-release-upgrade` on Ubuntu, `dnf system-upgrade` on Fedora).
+  * **Flags:** `--check-only` to verify if a new release is available, `--devel` to upgrade to a pre-release version.
+
 
 ## 5. Parameter Handling Proposal
 
