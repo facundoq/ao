@@ -338,3 +338,53 @@ When `ao user add` executes, the parameter resolution order is:
 3.  **Hardcoded Program Default** (e.g., `/bin/bash`).
 
 This hierarchical parameter resolution ensures `ao` is predictable, configurable, and significantly faster to use than raw Linux commands.
+
+
+## 6. Cross-Platform Abstraction Conflicts
+
+While `ao` strives to provide a Grand Unified Wrapper, true abstraction across fragmented Unix-like systems requires resolving deep architectural conflicts. The following outlines the major friction points when mapping `ao`'s declarative grammar to the imperative realities of Ubuntu, Linux Mint, Fedora, Arch Linux, FreeBSD, and macOS.
+
+### 6.1 Service Management (`ao svc`)
+
+*   **Systemd Hegemony:** `ao svc` maps cleanly to `systemctl` on Ubuntu, Linux Mint, Fedora, and Arch Linux. However, this model breaks down completely on BSD and macOS.
+*   **macOS (`launchd`):** Services on macOS are managed by `launchd` via `launchctl`. The concepts of `enable`/`disable` vs `start`/`stop` map differently. `launchctl load/unload` handles both registration and execution simultaneously in older macOS versions, while `bootstrap/bootout` handle it in newer ones.
+*   **FreeBSD (`rc.d`):** FreeBSD relies on the traditional `rc.d` init system. Enabling a service requires modifying `/etc/rc.conf` (e.g., `sysrc nginx_enable="YES"`), and starting it requires invoking the script directly (`service nginx start`).
+
+### 6.2 Package Semantics (`ao pkg`)
+
+*   **Dependency Resolution vs. Ports:** Ubuntu/Mint (`apt`), Fedora (`dnf`), and Arch (`pacman`) all rely on pre-compiled binary repositories with automated dependency resolution. `ao pkg install` maps cleanly.
+*   **FreeBSD:** While `pkg` exists for binary packages, many FreeBSD administrators rely on compiling from source via the Ports tree (`/usr/ports`). `ao pkg` would need distinct strategies to determine if it should invoke `pkg install` or `make install clean`.
+*   **macOS (`Homebrew` vs `MacPorts`):** macOS lacks a native open-source package manager. `ao pkg` must rely on third-party tools like Homebrew. However, Homebrew distinguishes between CLI tools (`brew install`) and GUI applications (`brew install --cask`), a distinction that `ao pkg install` must somehow abstract or expose via flags.
+
+### 6.3 Network Persistence (`ao net`)
+
+*   **The Network Manager Chaos:** Linux networking configuration is highly fragmented.
+    *   **Ubuntu:** Modern Ubuntu Server uses `Netplan` (YAML configurations). Desktop uses NetworkManager.
+    *   **Linux Mint:** Relies heavily on NetworkManager for UI integration.
+    *   **Fedora:** Uses NetworkManager natively.
+    *   **Arch Linux:** Users might use `systemd-networkd`, NetworkManager, or raw `iproute2`.
+*   **Conflict:** `ao net ip add` can wrap `ip addr add` for transient changes, but making an IP static *persistently* requires knowing the active network renderer. `ao` must dynamically detect if it should write a Netplan YAML, manipulate an nmconnection file, or alter BSD's `/etc/rc.conf`.
+*   **FreeBSD/macOS:** Neither system uses `iproute2`. FreeBSD uses `ifconfig` and `route`. macOS also uses `ifconfig` and the `networksetup` CLI.
+
+### 6.4 Storage and Filesystems (`ao disk`)
+
+*   **Block Devices vs. ZFS/APFS:** `ao disk list` easily maps to `lsblk` on Linux.
+*   **macOS:** `lsblk` does not exist. macOS uses APFS. Storage must be queried and manipulated via `diskutil`.
+*   **FreeBSD:** FreeBSD does not have `lsblk`. Furthermore, FreeBSD is heavily geared towards ZFS. Abstractions for standard partitioning (fdisk/gpart) vs. ZFS zpool/zfs management create vastly different workflows that are hard to unify under a single `ao disk` command without losing powerful ZFS-specific features.
+
+### 6.5 Desktop Environments & GUI (`ao gui`)
+
+*   **Wayland vs. X11 vs. Quartz:** `ao gui display set` can wrap `xrandr` for X11 or `wlr-randr` for Wayland compositors (Sway/Hyprland) on Linux distributions like Arch and Fedora.
+*   **macOS:** macOS uses its own proprietary windowing system (Quartz Compositor). Screen resolutions and arrangements cannot be manipulated via `xrandr`. `ao gui` would require complex bindings to Apple's native CoreGraphics API or bridging to a tool like `displayplacer`.
+*   **Headless vs Desktop:** Linux Mint and Ubuntu Desktop provide native UI tools, while servers provide none. `ao gui` must gracefully degrade or fail if invoked on a headless FreeBSD server or Ubuntu cloud instance.
+
+### 6.6 Security & Permissions (`ao sec`)
+
+*   **SELinux vs AppArmor:** `ao sec context` must map to `sestatus` on Fedora/RHEL, but map to `aa-status` on Ubuntu/Mint. Arch Linux users might have neither.
+*   **macOS (SIP/Gatekeeper):** macOS security is governed by System Integrity Protection (SIP) and Gatekeeper. `ao sec audit` on a Mac would involve querying `csrutil status` and `spctl --status`, concepts entirely alien to Linux.
+*   **FreeBSD (Jails & MAC):** FreeBSD relies on Jails for isolation and Mandatory Access Control (MAC) frameworks.
+
+### Conclusion on Feasibility
+
+Attempting to force macOS and FreeBSD into the Linux `ao` syntax tree risks breaking the "Zero Overhead" and "Safe Execution" tenets.
+**Resolution:** `ao` should strictly target Linux systems (Debian, Fedora, Arch) where paradigms (systemd, iproute2, `/sys`) are roughly homologous. If macOS or FreeBSD support is mandated, `ao` must be split into fundamentally different backends (`src/os/macos.rs`, `src/os/freebsd.rs`) with command subsets gracefully disabled when concepts (like SELinux or `lsblk`) do not map.
