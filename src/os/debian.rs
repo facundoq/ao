@@ -1,4 +1,4 @@
-use super::{PackageManager, ServiceManager};
+use super::{PackageManager, ServiceManager, UserManager};
 use anyhow::{Context, Result};
 use std::process::Command;
 
@@ -31,7 +31,7 @@ impl PackageManager for Apt {
 
     fn install(&self, packages: &[String]) -> Result<()> {
         let mut cmd = Command::new("apt");
-        cmd.arg("install").arg("-y").args(packages);
+        cmd.arg("install").arg("-y").arg("--").args(packages);
         let status = cmd.status().context("Failed to execute apt install")?;
 
         if !status.success() {
@@ -47,7 +47,7 @@ impl PackageManager for Apt {
         } else {
             cmd.arg("remove");
         }
-        cmd.arg("-y").args(packages);
+        cmd.arg("-y").arg("--").args(packages);
         let status = cmd.status().context("Failed to execute apt remove/purge")?;
 
         if !status.success() {
@@ -59,6 +59,7 @@ impl PackageManager for Apt {
     fn search(&self, query: &str) -> Result<()> {
         let status = Command::new("apt")
             .arg("search")
+            .arg("--")
             .arg(query)
             .status()
             .context("Failed to execute apt search")?;
@@ -83,6 +84,120 @@ impl PackageManager for Apt {
     }
 }
 
+pub struct User;
+
+impl UserManager for User {
+    fn list(&self, all: bool, groups: bool) -> Result<()> {
+        println!("Listing users...");
+        let mut cmd = Command::new("cat");
+        cmd.arg("/etc/passwd");
+        // A full robust implementation would parse /etc/passwd and filter by ID >= 1000
+        // unless `all` is true, and optionally query secondary groups if `groups` is true.
+        // For now, we wrap a basic output to show execution.
+        let status = cmd.status().context("Failed to list users")?;
+        if !status.success() {
+            anyhow::bail!("Listing users failed");
+        }
+        Ok(())
+    }
+
+    fn add(&self, username: &str, groups: Option<&str>, shell: Option<&str>, system: bool) -> Result<()> {
+        let mut cmd = Command::new("useradd");
+        cmd.arg("-m"); // Create home directory
+
+        if system {
+            cmd.arg("--system");
+        }
+
+        if let Some(s) = shell {
+            cmd.arg("--shell").arg(s);
+        }
+
+        if let Some(g) = groups {
+            cmd.arg("--groups").arg(g);
+        }
+
+        cmd.arg("--").arg(username);
+
+        let status = cmd.status().context("Failed to add user")?;
+        if !status.success() {
+            anyhow::bail!("useradd failed with status {}", status);
+        }
+        Ok(())
+    }
+
+    fn del(&self, username: &str, purge: bool) -> Result<()> {
+        let mut cmd = Command::new("userdel");
+        if purge {
+            cmd.arg("-r");
+        }
+        cmd.arg("--").arg(username);
+
+        let status = cmd.status().context("Failed to delete user")?;
+        if !status.success() {
+            anyhow::bail!("userdel failed with status {}", status);
+        }
+        Ok(())
+    }
+
+    fn mod_user(&self, username: &str, action: &str, value: &str) -> Result<()> {
+        let mut cmd = Command::new("usermod");
+        match action {
+            "add-group" => { cmd.arg("-aG").arg(value); },
+            "del-group" => {
+                // `usermod` doesn't have a simple flag to remove from a single group.
+                // It requires gpasswd or deluser, but wrapping gpasswd here.
+                let mut dcmd = Command::new("gpasswd");
+                dcmd.arg("-d").arg(username).arg(value);
+                let s = dcmd.status().context("Failed to remove group")?;
+                if !s.success() { anyhow::bail!("group removal failed"); }
+                return Ok(());
+            },
+            "shell" => { cmd.arg("-s").arg(value); },
+            "home" => { cmd.arg("-d").arg(value).arg("-m"); },
+            _ => anyhow::bail!("Unsupported user modification action: {}", action),
+        }
+        cmd.arg("--").arg(username);
+
+        let status = cmd.status().context("Failed to modify user")?;
+        if !status.success() {
+            anyhow::bail!("usermod failed with status {}", status);
+        }
+        Ok(())
+    }
+
+    fn passwd(&self, username: &str) -> Result<()> {
+        use std::io::Write;
+
+        let password = rpassword::prompt_password("New password: ")
+            .context("Failed to read password from stdin")?;
+        let confirm_password = rpassword::prompt_password("Retype new password: ")
+            .context("Failed to read password from stdin")?;
+
+        if password != confirm_password {
+            anyhow::bail!("Passwords do not match");
+        }
+
+        let mut child = Command::new("chpasswd")
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .context("Failed to spawn chpasswd")?;
+
+        if let Some(mut stdin) = child.stdin.take() {
+            let creds = format!("{}:{}", username, password);
+            stdin.write_all(creds.as_bytes()).context("Failed to write to chpasswd stdin")?;
+        }
+
+        let status = child.wait().context("Failed to wait on chpasswd")?;
+
+        if !status.success() {
+            anyhow::bail!("chpasswd failed with status {}", status);
+        }
+
+        println!("passwd: password updated successfully");
+        Ok(())
+    }
+}
 
 pub struct Systemd;
 
@@ -104,6 +219,7 @@ impl ServiceManager for Systemd {
         let status = Command::new("systemctl")
             .arg("enable")
             .arg("--now")
+            .arg("--")
             .arg(service)
             .status()
             .context("Failed to start/enable service")?;
@@ -118,6 +234,7 @@ impl ServiceManager for Systemd {
         let status = Command::new("systemctl")
             .arg("disable")
             .arg("--now")
+            .arg("--")
             .arg(service)
             .status()
             .context("Failed to stop/disable service")?;
@@ -131,6 +248,7 @@ impl ServiceManager for Systemd {
     fn restart(&self, service: &str) -> Result<()> {
         let status = Command::new("systemctl")
             .arg("restart")
+            .arg("--")
             .arg(service)
             .status()
             .context("Failed to restart service")?;
@@ -144,6 +262,7 @@ impl ServiceManager for Systemd {
     fn reload(&self, service: &str) -> Result<()> {
         let status = Command::new("systemctl")
             .arg("reload")
+            .arg("--")
             .arg(service)
             .status()
             .context("Failed to reload service")?;
@@ -158,6 +277,7 @@ impl ServiceManager for Systemd {
         // We use status to let it stream directly to the terminal stdout
         let _ = Command::new("systemctl")
             .arg("status")
+            .arg("--")
             .arg(service)
             .status()
             .context("Failed to get status")?;

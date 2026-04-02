@@ -21,3 +21,12 @@ pub trait ServiceManager {
     fn reload(&self, service: &str) -> Result<()>;
     fn status(&self, service: &str) -> Result<()>;
 }
+
+/// Abstracts system user management operations.
+pub trait UserManager {
+    fn list(&self, all: bool, groups: bool) -> Result<()>;
+    fn add(&self, username: &str, groups: Option<&str>, shell: Option<&str>, system: bool) -> Result<()>;
+    fn del(&self, username: &str, purge: bool) -> Result<()>;
+    fn mod_user(&self, username: &str, action: &str, value: &str) -> Result<()>;
+    fn passwd(&self, username: &str) -> Result<()>;
+}

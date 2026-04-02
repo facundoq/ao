@@ -19,6 +19,54 @@ pub enum Commands {
         #[command(subcommand)]
         action: SvcAction,
     },
+    /// Manage users
+    User {
+        #[command(subcommand)]
+        action: UserAction,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum UserAction {
+    /// Lists users
+    List {
+        #[arg(long)]
+        all: bool,
+        #[arg(long)]
+        groups: bool,
+    },
+    /// Creates a new user
+    Add {
+        #[arg(required = true)]
+        username: String,
+        #[arg(long)]
+        groups: Option<String>,
+        #[arg(long)]
+        shell: Option<String>,
+        #[arg(long)]
+        system: bool,
+    },
+    /// Deletes a user
+    Del {
+        #[arg(required = true)]
+        username: String,
+        #[arg(long, short)]
+        purge: bool,
+    },
+    /// Modifies a user
+    Mod {
+        #[arg(required = true)]
+        username: String,
+        #[arg(required = true)]
+        action: String,
+        #[arg(required = true)]
+        value: String,
+    },
+    /// Changes a user's password interactively
+    Passwd {
+        #[arg(required = true)]
+        username: String,
+    },
 }
 
 #[derive(Subcommand)]
