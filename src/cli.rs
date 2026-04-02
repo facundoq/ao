@@ -5,6 +5,14 @@ use clap::{Parser, Subcommand};
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
+
+    /// Print the underlying command without running it
+    #[arg(global = true, long)]
+    pub print: bool,
+
+    /// Print the command and simulate execution (no system changes)
+    #[arg(global = true, long)]
+    pub dry_run: bool,
 }
 
 #[derive(Subcommand)]
@@ -18,6 +26,122 @@ pub enum Commands {
     Svc {
         #[command(subcommand)]
         action: SvcAction,
+    },
+    /// Manage users
+    User {
+        #[command(subcommand)]
+        action: UserAction,
+    },
+    /// Manage groups
+    Group {
+        #[command(subcommand)]
+        action: GroupAction,
+    },
+    /// Manage disks and storage
+    Disk {
+        #[command(subcommand)]
+        action: DiskAction,
+    },
+    /// Monitor live system stats
+    Monitor,
+}
+
+#[derive(Subcommand)]
+pub enum DiskAction {
+    /// Lists all block devices and usage
+    List,
+    /// Mounts a block device to a directory
+    Mount {
+        #[arg(required = true)]
+        device: String,
+        #[arg(required = true)]
+        path: String,
+        #[arg(long, short)]
+        fstype: Option<String>,
+        #[arg(long, short)]
+        options: Option<String>,
+    },
+    /// Safely unmounts a device
+    Unmount {
+        #[arg(required = true)]
+        target: String,
+        #[arg(long, short)]
+        lazy: bool,
+        #[arg(long, short)]
+        force: bool,
+    },
+    /// Calculates directory size
+    Usage {
+        #[arg(required = true)]
+        path: String,
+        #[arg(long)]
+        depth: Option<u32>,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum GroupAction {
+    /// Lists all groups
+    List,
+    /// Creates a new group
+    Add {
+        #[arg(required = true)]
+        groupname: String,
+    },
+    /// Deletes a group
+    Del {
+        #[arg(required = true)]
+        groupname: String,
+    },
+    /// Modifies a group
+    Mod {
+        #[arg(required = true)]
+        groupname: String,
+        #[arg(long)]
+        gid: u32,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum UserAction {
+    /// Lists users
+    List {
+        #[arg(long)]
+        all: bool,
+        #[arg(long)]
+        groups: bool,
+    },
+    /// Creates a new user
+    Add {
+        #[arg(required = true)]
+        username: String,
+        #[arg(long)]
+        groups: Option<String>,
+        #[arg(long)]
+        shell: Option<String>,
+        #[arg(long)]
+        system: bool,
+    },
+    /// Deletes a user
+    Del {
+        #[arg(required = true)]
+        username: String,
+        #[arg(long, short)]
+        purge: bool,
+    },
+    /// Modifies a user
+    Mod {
+        #[arg(required = true)]
+        username: String,
+        #[arg(required = true)]
+        action: String,
+        #[arg(required = true)]
+        value: String,
+    },
+    /// Changes a user's password interactively
+    Passwd {
+        #[arg(required = true)]
+        username: String,
     },
 }
 
