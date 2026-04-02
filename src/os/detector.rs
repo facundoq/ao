@@ -1,5 +1,7 @@
-use super::debian::{Apt, Systemd, User, Group, Disk, Monitor};
-use super::{PackageManager, ServiceManager, UserManager, GroupManager, DiskManager, MonitorManager};
+use super::debian::{Apt, Disk, Group, Monitor, Systemd, User};
+use super::{
+    DiskManager, GroupManager, MonitorManager, PackageManager, ServiceManager, UserManager,
+};
 use anyhow::{Result, bail};
 use std::fs;
 

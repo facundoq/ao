@@ -5,6 +5,14 @@ use clap::{Parser, Subcommand};
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
+
+    /// Print the underlying command without running it
+    #[arg(global = true, long)]
+    pub print: bool,
+
+    /// Print the command and simulate execution (no system changes)
+    #[arg(global = true, long)]
+    pub dry_run: bool,
 }
 
 #[derive(Subcommand)]
