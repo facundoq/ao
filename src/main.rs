@@ -94,6 +94,9 @@ fn main() -> Result<()> {
                 system.disk.usage(&path, depth)?;
             }
         },
+        Commands::Monitor => {
+            system.monitor.live_stats()?;
+        }
     }
 
     Ok(())

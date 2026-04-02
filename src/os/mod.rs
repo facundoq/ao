@@ -46,3 +46,8 @@ pub trait DiskManager {
     fn unmount(&self, target: &str, lazy: bool, force: bool) -> Result<()>;
     fn usage(&self, path: &str, depth: Option<u32>) -> Result<()>;
 }
+
+/// Abstracts system monitoring operations.
+pub trait MonitorManager {
+    fn live_stats(&self) -> Result<()>;
+}

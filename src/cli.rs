@@ -34,6 +34,8 @@ pub enum Commands {
         #[command(subcommand)]
         action: DiskAction,
     },
+    /// Monitor live system stats
+    Monitor,
 }
 
 #[derive(Subcommand)]

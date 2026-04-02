@@ -1,6 +1,7 @@
-use super::{PackageManager, ServiceManager, UserManager, GroupManager, DiskManager};
+use super::{PackageManager, ServiceManager, UserManager, GroupManager, DiskManager, MonitorManager};
 use anyhow::{Context, Result};
 use std::process::Command;
+use sysinfo::{Components, Disks, Networks, System};
 
 pub struct Apt;
 
@@ -80,6 +81,51 @@ impl PackageManager for Apt {
         if !status.success() {
             anyhow::bail!("apt list failed with status {}", status);
         }
+        Ok(())
+    }
+}
+
+pub struct Monitor;
+
+impl MonitorManager for Monitor {
+    fn live_stats(&self) -> Result<()> {
+        let mut sys = System::new_all();
+        // Wait a bit to get accurate CPU usage
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        sys.refresh_all();
+
+        println!("=== System Monitor ===");
+        println!("CPU usage: {:.1}%", sys.global_cpu_usage());
+
+        let components = Components::new_with_refreshed_list();
+        for comp in &components {
+            if comp.label().to_lowercase().contains("cpu") || comp.label().to_lowercase().contains("core") {
+                if let Some(temp) = comp.temperature() {
+                    println!("Temperature ({}): {:.1}°C", comp.label(), temp);
+                }
+            }
+        }
+
+        println!("RAM: {} / {} bytes", sys.used_memory(), sys.total_memory());
+        println!("Swap: {} / {} bytes", sys.used_swap(), sys.total_swap());
+
+        let networks = Networks::new_with_refreshed_list();
+        println!("\n=== Networks ===");
+        for (interface_name, data) in &networks {
+            println!("{}: RX {} bytes, TX {} bytes", interface_name, data.total_received(), data.total_transmitted());
+        }
+
+        let disks = Disks::new_with_refreshed_list();
+        println!("\n=== Disks ===");
+        for disk in &disks {
+            println!(
+                "{:?}: {} / {} bytes",
+                disk.name(),
+                disk.total_space() - disk.available_space(),
+                disk.total_space()
+            );
+        }
+
         Ok(())
     }
 }
