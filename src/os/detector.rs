@@ -1,5 +1,5 @@
-use super::debian::{Apt, Systemd, User};
-use super::{PackageManager, ServiceManager, UserManager};
+use super::debian::{Apt, Systemd, User, Group};
+use super::{PackageManager, ServiceManager, UserManager, GroupManager};
 use anyhow::{Result, bail};
 use std::fs;
 
@@ -7,6 +7,7 @@ pub struct DetectedSystem {
     pub pkg: Box<dyn PackageManager>,
     pub svc: Box<dyn ServiceManager>,
     pub user: Box<dyn UserManager>,
+    pub group: Box<dyn GroupManager>,
 }
 
 pub fn detect_system() -> Result<DetectedSystem> {
@@ -19,6 +20,7 @@ pub fn detect_system() -> Result<DetectedSystem> {
             pkg: Box::new(Apt),
             svc: Box::new(Systemd),
             user: Box::new(User),
+            group: Box::new(Group),
         });
     }
 

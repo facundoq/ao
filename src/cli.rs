@@ -24,6 +24,34 @@ pub enum Commands {
         #[command(subcommand)]
         action: UserAction,
     },
+    /// Manage groups
+    Group {
+        #[command(subcommand)]
+        action: GroupAction,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum GroupAction {
+    /// Lists all groups
+    List,
+    /// Creates a new group
+    Add {
+        #[arg(required = true)]
+        groupname: String,
+    },
+    /// Deletes a group
+    Del {
+        #[arg(required = true)]
+        groupname: String,
+    },
+    /// Modifies a group
+    Mod {
+        #[arg(required = true)]
+        groupname: String,
+        #[arg(long)]
+        gid: u32,
+    },
 }
 
 #[derive(Subcommand)]

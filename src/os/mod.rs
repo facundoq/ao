@@ -30,3 +30,11 @@ pub trait UserManager {
     fn mod_user(&self, username: &str, action: &str, value: &str) -> Result<()>;
     fn passwd(&self, username: &str) -> Result<()>;
 }
+
+/// Abstracts system group management operations.
+pub trait GroupManager {
+    fn list(&self) -> Result<()>;
+    fn add(&self, groupname: &str) -> Result<()>;
+    fn del(&self, groupname: &str) -> Result<()>;
+    fn mod_group(&self, groupname: &str, gid: u32) -> Result<()>;
+}

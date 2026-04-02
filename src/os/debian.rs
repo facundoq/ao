@@ -1,4 +1,4 @@
-use super::{PackageManager, ServiceManager, UserManager};
+use super::{PackageManager, ServiceManager, UserManager, GroupManager};
 use anyhow::{Context, Result};
 use std::process::Command;
 
@@ -79,6 +79,62 @@ impl PackageManager for Apt {
 
         if !status.success() {
             anyhow::bail!("apt list failed with status {}", status);
+        }
+        Ok(())
+    }
+}
+
+pub struct Group;
+
+impl GroupManager for Group {
+    fn list(&self) -> Result<()> {
+        println!("Listing groups...");
+        let mut cmd = Command::new("cat");
+        cmd.arg("/etc/group");
+        let status = cmd.status().context("Failed to list groups")?;
+        if !status.success() {
+            anyhow::bail!("Listing groups failed");
+        }
+        Ok(())
+    }
+
+    fn add(&self, groupname: &str) -> Result<()> {
+        let status = Command::new("groupadd")
+            .arg("--")
+            .arg(groupname)
+            .status()
+            .context("Failed to execute groupadd")?;
+
+        if !status.success() {
+            anyhow::bail!("groupadd failed with status {}", status);
+        }
+        Ok(())
+    }
+
+    fn del(&self, groupname: &str) -> Result<()> {
+        let status = Command::new("groupdel")
+            .arg("--")
+            .arg(groupname)
+            .status()
+            .context("Failed to execute groupdel")?;
+
+        if !status.success() {
+            anyhow::bail!("groupdel failed with status {}", status);
+        }
+        Ok(())
+    }
+
+    fn mod_group(&self, groupname: &str, gid: u32) -> Result<()> {
+        let status = Command::new("groupmod")
+            .arg("--gid")
+            .arg(gid.to_string())
+            .arg("--")
+            .arg(groupname)
+            .status()
+            .context("Failed to execute groupmod")?;
+
+        if !status.success() {
+            anyhow::bail!("groupmod failed with status {}", status);
         }
         Ok(())
     }

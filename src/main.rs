@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use cli::{Cli, Commands, PkgAction, SvcAction, UserAction};
+use cli::{Cli, Commands, PkgAction, SvcAction, UserAction, GroupAction};
 
 pub mod cli;
 pub mod os;
@@ -64,6 +64,20 @@ fn main() -> Result<()> {
             }
             UserAction::Passwd { username } => {
                 system.user.passwd(&username)?;
+            }
+        },
+        Commands::Group { action } => match action {
+            GroupAction::List => {
+                system.group.list()?;
+            }
+            GroupAction::Add { groupname } => {
+                system.group.add(&groupname)?;
+            }
+            GroupAction::Del { groupname } => {
+                system.group.del(&groupname)?;
+            }
+            GroupAction::Mod { groupname, gid } => {
+                system.group.mod_group(&groupname, gid)?;
             }
         },
     }
