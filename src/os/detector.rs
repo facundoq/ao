@@ -3,7 +3,8 @@ use super::{
     DiskManager, GroupManager, MonitorManager, PackageManager, ServiceManager, UserManager,
 };
 use anyhow::{Result, bail};
-use std::fs;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 
 pub struct DetectedSystem {
     pub pkg: Box<dyn PackageManager>,
@@ -16,7 +17,8 @@ pub struct DetectedSystem {
 
 pub fn detect_system() -> Result<DetectedSystem> {
     // Read /etc/os-release to determine the distribution
-    let os_release = fs::read_to_string("/etc/os-release").unwrap_or_default();
+    if let Ok(file) = File::open("/etc/os-release") {
+        let reader = BufReader::new(file);
 
     // Check if it's Debian/Ubuntu based
     if os_release.contains("ID=ubuntu") || os_release.contains("ID=debian") {
