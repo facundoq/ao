@@ -1,5 +1,5 @@
-use super::{PackageManager, ServiceManager};
 use super::debian::{Apt, Systemd};
+use super::{PackageManager, ServiceManager};
 use anyhow::{Result, bail};
 use std::fs;
 
