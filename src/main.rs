@@ -1,6 +1,6 @@
+use anyhow::Result;
 use clap::Parser;
 use cli::{Cli, Commands, PkgAction, SvcAction};
-use anyhow::Result;
 
 pub mod cli;
 pub mod os;

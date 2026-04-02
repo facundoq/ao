@@ -31,7 +31,7 @@ impl PackageManager for Apt {
 
     fn install(&self, packages: &[String]) -> Result<()> {
         let mut cmd = Command::new("apt");
-        cmd.arg("install").arg("-y").args(packages);
+        cmd.arg("install").arg("-y").arg("--").args(packages);
         let status = cmd.status().context("Failed to execute apt install")?;
 
         if !status.success() {
@@ -47,7 +47,7 @@ impl PackageManager for Apt {
         } else {
             cmd.arg("remove");
         }
-        cmd.arg("-y").args(packages);
+        cmd.arg("-y").arg("--").args(packages);
         let status = cmd.status().context("Failed to execute apt remove/purge")?;
 
         if !status.success() {
@@ -59,6 +59,7 @@ impl PackageManager for Apt {
     fn search(&self, query: &str) -> Result<()> {
         let status = Command::new("apt")
             .arg("search")
+            .arg("--")
             .arg(query)
             .status()
             .context("Failed to execute apt search")?;
@@ -83,7 +84,6 @@ impl PackageManager for Apt {
     }
 }
 
-
 pub struct Systemd;
 
 impl ServiceManager for Systemd {
@@ -104,6 +104,7 @@ impl ServiceManager for Systemd {
         let status = Command::new("systemctl")
             .arg("enable")
             .arg("--now")
+            .arg("--")
             .arg(service)
             .status()
             .context("Failed to start/enable service")?;
@@ -118,6 +119,7 @@ impl ServiceManager for Systemd {
         let status = Command::new("systemctl")
             .arg("disable")
             .arg("--now")
+            .arg("--")
             .arg(service)
             .status()
             .context("Failed to stop/disable service")?;
@@ -131,6 +133,7 @@ impl ServiceManager for Systemd {
     fn restart(&self, service: &str) -> Result<()> {
         let status = Command::new("systemctl")
             .arg("restart")
+            .arg("--")
             .arg(service)
             .status()
             .context("Failed to restart service")?;
@@ -144,6 +147,7 @@ impl ServiceManager for Systemd {
     fn reload(&self, service: &str) -> Result<()> {
         let status = Command::new("systemctl")
             .arg("reload")
+            .arg("--")
             .arg(service)
             .status()
             .context("Failed to reload service")?;
@@ -158,6 +162,7 @@ impl ServiceManager for Systemd {
         // We use status to let it stream directly to the terminal stdout
         let _ = Command::new("systemctl")
             .arg("status")
+            .arg("--")
             .arg(service)
             .status()
             .context("Failed to get status")?;
