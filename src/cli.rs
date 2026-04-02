@@ -29,6 +29,44 @@ pub enum Commands {
         #[command(subcommand)]
         action: GroupAction,
     },
+    /// Manage disks and storage
+    Disk {
+        #[command(subcommand)]
+        action: DiskAction,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum DiskAction {
+    /// Lists all block devices and usage
+    List,
+    /// Mounts a block device to a directory
+    Mount {
+        #[arg(required = true)]
+        device: String,
+        #[arg(required = true)]
+        path: String,
+        #[arg(long, short)]
+        fstype: Option<String>,
+        #[arg(long, short)]
+        options: Option<String>,
+    },
+    /// Safely unmounts a device
+    Unmount {
+        #[arg(required = true)]
+        target: String,
+        #[arg(long, short)]
+        lazy: bool,
+        #[arg(long, short)]
+        force: bool,
+    },
+    /// Calculates directory size
+    Usage {
+        #[arg(required = true)]
+        path: String,
+        #[arg(long)]
+        depth: Option<u32>,
+    },
 }
 
 #[derive(Subcommand)]

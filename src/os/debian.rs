@@ -1,4 +1,4 @@
-use super::{PackageManager, ServiceManager, UserManager, GroupManager};
+use super::{PackageManager, ServiceManager, UserManager, GroupManager, DiskManager};
 use anyhow::{Context, Result};
 use std::process::Command;
 
@@ -79,6 +79,77 @@ impl PackageManager for Apt {
 
         if !status.success() {
             anyhow::bail!("apt list failed with status {}", status);
+        }
+        Ok(())
+    }
+}
+
+pub struct Disk;
+
+impl DiskManager for Disk {
+    fn list(&self) -> Result<()> {
+        // lsblk provides block devices, df provides usage. For simple testing we wrap lsblk.
+        let status = Command::new("lsblk")
+            .status()
+            .context("Failed to execute lsblk")?;
+        if !status.success() {
+            anyhow::bail!("lsblk failed with status {}", status);
+        }
+        Ok(())
+    }
+
+    fn mount(&self, device: &str, path: &str, fstype: Option<&str>, options: Option<&str>) -> Result<()> {
+        let mut cmd = Command::new("mount");
+
+        if let Some(fs) = fstype {
+            cmd.arg("-t").arg(fs);
+        }
+        if let Some(opts) = options {
+            cmd.arg("-o").arg(opts);
+        }
+
+        // Use double dash to separate options from paths
+        cmd.arg("--").arg(device).arg(path);
+
+        let status = cmd.status().context("Failed to execute mount")?;
+        if !status.success() {
+            anyhow::bail!("mount failed with status {}", status);
+        }
+        Ok(())
+    }
+
+    fn unmount(&self, target: &str, lazy: bool, force: bool) -> Result<()> {
+        let mut cmd = Command::new("umount");
+
+        if lazy {
+            cmd.arg("-l");
+        }
+        if force {
+            cmd.arg("-f");
+        }
+
+        cmd.arg("--").arg(target);
+
+        let status = cmd.status().context("Failed to execute umount")?;
+        if !status.success() {
+            anyhow::bail!("umount failed with status {}", status);
+        }
+        Ok(())
+    }
+
+    fn usage(&self, path: &str, depth: Option<u32>) -> Result<()> {
+        let mut cmd = Command::new("du");
+        cmd.arg("-sh"); // human readable
+
+        if let Some(d) = depth {
+            cmd.arg(format!("--max-depth={}", d));
+        }
+
+        cmd.arg("--").arg(path);
+
+        let status = cmd.status().context("Failed to execute du")?;
+        if !status.success() {
+            anyhow::bail!("du failed with status {}", status);
         }
         Ok(())
     }

@@ -38,3 +38,11 @@ pub trait GroupManager {
     fn del(&self, groupname: &str) -> Result<()>;
     fn mod_group(&self, groupname: &str, gid: u32) -> Result<()>;
 }
+
+/// Abstracts system disk management operations.
+pub trait DiskManager {
+    fn list(&self) -> Result<()>;
+    fn mount(&self, device: &str, path: &str, fstype: Option<&str>, options: Option<&str>) -> Result<()>;
+    fn unmount(&self, target: &str, lazy: bool, force: bool) -> Result<()>;
+    fn usage(&self, path: &str, depth: Option<u32>) -> Result<()>;
+}

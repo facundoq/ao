@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use cli::{Cli, Commands, PkgAction, SvcAction, UserAction, GroupAction};
+use cli::{Cli, Commands, PkgAction, SvcAction, UserAction, GroupAction, DiskAction};
 
 pub mod cli;
 pub mod os;
@@ -78,6 +78,20 @@ fn main() -> Result<()> {
             }
             GroupAction::Mod { groupname, gid } => {
                 system.group.mod_group(&groupname, gid)?;
+            }
+        },
+        Commands::Disk { action } => match action {
+            DiskAction::List => {
+                system.disk.list()?;
+            }
+            DiskAction::Mount { device, path, fstype, options } => {
+                system.disk.mount(&device, &path, fstype.as_deref(), options.as_deref())?;
+            }
+            DiskAction::Unmount { target, lazy, force } => {
+                system.disk.unmount(&target, lazy, force)?;
+            }
+            DiskAction::Usage { path, depth } => {
+                system.disk.usage(&path, depth)?;
             }
         },
     }
