@@ -38,110 +38,173 @@ This matrix tracks the current implementation status of the syntax tree defined 
 ## Command Tree
 
 ```mermaid
-graph TD
-    A[ao] --> B(pkg)
-    A --> C(svc)
-    A --> D(user)
-    A --> E(group)
-    A --> F(disk)
-    A --> G(sys)
-    A --> H(log)
-    A --> I(distro)
-    A --> J(net)
-    A --> K(boot)
-    A --> L(gui)
-    A --> M(dev)
-    A --> N(virt)
-    A --> O(sec)
-    A --> P(completions)
+graph LR
+    subgraph ao
+        ao_root(ao) --> pkg
+        ao_root --> svc
+        ao_root --> user
+        ao_root --> group
+        ao_root --> disk
+        ao_root --> sys
+        ao_root --> log
+        ao_root --> distro
+        ao_root --> net
+        ao_root --> boot
+        ao_root --> gui
+        ao_root --> dev
+        ao_root --> virt
+        ao_root --> sec
+        ao_root --> completions
+        ao_root --> monitor
+    end
 
-    B --> B1(update)
-    B --> B2(install)
-    B --> B3(remove)
-    B --> B4(search)
-    B --> B5(list)
+    subgraph pkg
+        pkg_root(pkg) --> pkg_update(update)
+        pkg_root --> pkg_install(install)
+        pkg_root --> pkg_remove(remove)
+        pkg_root --> pkg_search(search)
+        pkg_root --> pkg_list(list)
+    end
 
-    C --> C1(list)
-    C --> C2(up)
-    C --> C3(down)
-    C --> C4(restart)
-    C --> C5(reload)
-    C --> C6(status)
+    subgraph svc
+        svc_root(svc) --> svc_list(list)
+        svc_root --> svc_up(up)
+        svc_root --> svc_down(down)
+        svc_root --> svc_restart(restart)
+        svc_root --> svc_reload(reload)
+        svc_root --> svc_status(status)
+    end
 
-    D --> D1(list)
-    D --> D2(add)
-    D --> D3(del)
-    D --> D4(mod)
-    D --> D5(passwd)
+    subgraph user
+        user_root(user) --> user_list(list)
+        user_root --> user_add(add)
+        user_root --> user_del(del)
+        user_root --> user_mod(mod)
+        user_root --> user_passwd(passwd)
+    end
 
-    E --> E1(list)
-    E --> E2(add)
-    E --> E3(del)
-    E --> E4(mod)
+    subgraph group
+        group_root(group) --> group_list(list)
+        group_root --> group_add(add)
+        group_root --> group_del(del)
+        group_root --> group_mod(mod)
+    end
 
-    F --> F1(list)
-    F --> F2(mount)
-    F --> F3(unmount)
-    F --> F4(usage)
+    subgraph disk
+        disk_root(disk) --> disk_list(list)
+        disk_root --> disk_mount(mount)
+        disk_root --> disk_unmount(unmount)
+        disk_root --> disk_usage(usage)
+    end
 
-    G --> G1(info)
-    G --> G2(power)
-    G --> G3(time)
+    subgraph sys
+        sys_root(sys) --> sys_info(info)
+        sys_root --> sys_power(power)
+        sys_root --> sys_time(time)
+    end
 
-    H --> H1(tail)
-    H --> H2(sys)
-    H --> H3(file)
+    subgraph log
+        log_root(log) --> log_tail(tail)
+        log_root --> log_sys(sys)
+        log_root --> log_file(file)
+    end
 
-    I --> I1(info)
-    I --> I2(upgrade)
+    subgraph distro
+        distro_root(distro) --> distro_info(info)
+        distro_root --> distro_upgrade(upgrade)
+    end
 
-    J --> J1(interfaces)
-    J --> J2(ips)
-    J --> J3(routes)
-    J --> J4(fw)
-    J --> J5(wifi)
+    subgraph net
+        net_root(net) --> net_interfaces(interfaces)
+        net_root --> net_ips(ips)
+        net_root --> net_routes(routes)
+        net_root --> fw
+        net_root --> wifi
+    end
 
-    J4 --> J4_1(status)
-    J4 --> J4_2(allow)
-    J4 --> J4_3(deny)
+    subgraph fw
+        fw_root(fw) --> fw_status(status)
+        fw_root --> fw_allow(allow)
+        fw_root --> fw_deny(deny)
+    end
 
-    J5 --> J5_1(scan)
-    J5 --> J5_2(connect)
+    subgraph wifi
+        wifi_root(wifi) --> wifi_scan(scan)
+        wifi_root --> wifi_connect(connect)
+    end
 
-    K --> K1(list)
-    K --> K2(mod)
+    subgraph boot
+        boot_root(boot) --> boot_list(list)
+        boot_root --> boot_mod(mod)
+    end
+    
+    subgraph boot_mod
+        boot_mod_root(mod) --> boot_mod_list(list)
+        boot_mod_root --> boot_mod_load(load)
+        boot_mod_root --> boot_mod_unload(unload)
+    end
 
-    K2 --> K2_1(list)
-    K2 --> K2_2(load)
-    K2 --> K2_3(unload)
+    subgraph gui
+        gui_root(gui) --> gui_info(info)
+        gui_root --> gui_display(display)
+    end
 
-    L --> L1(info)
-    L --> L2(display)
+    subgraph gui_display
+        gui_display_root(display) --> gui_display_list(list)
+    end
 
-    L2 --> L2_1(list)
+    subgraph dev
+        dev_root(dev) --> dev_list(list)
+        dev_root --> dev_pci(pci)
+        dev_root --> dev_usb(usb)
+        dev_root --> bt
+        dev_root --> print
+    end
+    
+    subgraph bt
+        bt_root(bt) --> bt_status(status)
+        bt_root --> bt_scan(scan)
+        bt_root --> bt_pair(pair)
+        bt_root --> bt_connect(connect)
+    end
 
-    M --> M1(list)
-    M --> M2(pci)
-    M --> M3(usb)
-    M --> M4(bt)
-    M --> M5(print)
+    subgraph print
+        print_root(print) --> print_list(list)
+    end
+    
+    subgraph virt
+        virt_root(virt) --> virt_ps(ps)
+        virt_root --> virt_start(start)
+        virt_root --> virt_stop(stop)
+        virt_root --> virt_rm(rm)
+        virt_root --> virt_logs(logs)
+    end
 
-    M4 --> M4_1(status)
-    M4 --> M4_2(scan)
-    M4 --> M4_3(pair)
-    M4 --> M4_4(connect)
-    M5 --> M5_1(list)
+    subgraph sec
+        sec_root(sec) --> sec_audit(audit)
+        sec_root --> sec_context(context)
+    end
 
-    N --> N1(ps)
-    N --> N2(start)
-    N --> N3(stop)
-    N --> N4(rm)
-    N --> N5(logs)
+    subgraph completions
+        completions_root(completions) --> completions_generate(generate)
+        completions_root --> completions_install(install)
+        completions_root --> completions_setup(setup)
+    end
 
-    O --> O1(audit)
-    O --> O2(context)
-
-    P --> P1(generate)
-    P --> P2(install)
-    P --> P3(setup)
+    linkStyle 0 stroke-width:2px,fill:none,stroke:red;
+    linkStyle 1 stroke-width:2px,fill:none,stroke:orange;
+    linkStyle 2 stroke-width:2px,fill:none,stroke:yellow;
+    linkStyle 3 stroke-width:2px,fill:none,stroke:green;
+    linkStyle 4 stroke-width:2px,fill:none,stroke:blue;
+    linkStyle 5 stroke-width:2px,fill:none,stroke:indigo;
+    linkStyle 6 stroke-width:2px,fill:none,stroke:violet;
+    linkStyle 7 stroke-width:2px,fill:none,stroke:red;
+    linkStyle 8 stroke-width:2px,fill:none,stroke:orange;
+    linkStyle 9 stroke-width:2px,fill:none,stroke:yellow;
+    linkStyle 10 stroke-width:2px,fill:none,stroke:green;
+    linkStyle 11 stroke-width:2px,fill:none,stroke:blue;
+    linkStyle 12 stroke-width:2px,fill:none,stroke:indigo;
+    linkStyle 13 stroke-width:2px,fill:none,stroke:violet;
+    linkStyle 14 stroke-width:2px,fill:none,stroke:red;
+    linkStyle 15 stroke-width:2px,fill:none,stroke:orange;
 ```
