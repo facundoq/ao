@@ -1,105 +1,118 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, Args, ValueHint};
+use clap_complete::Shell;
+use anyhow::Result;
+use crate::os::ExecutableCommand;
+
+#[derive(clap::ValueEnum, Clone, Copy, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum OutputFormat {
+    Table,
+    Json,
+    Yaml,
+    Original,
+}
 
 #[derive(Parser)]
-#[command(name = "ao", version = "0.1.0", about = "Admin Operations - Grand Unified Wrapper", long_about = None)]
+#[command(name = "ao", version = "0.1.1", about = "Admin Operation", long_about = None)]
 pub struct Cli {
-    #[command(subcommand)]
-    pub command: Commands,
-
     /// Print the underlying command without running it
-    #[arg(global = true, long)]
+    #[arg(global = true, long, hide = true)]
     pub print: bool,
 
     /// Print the command and simulate execution (no system changes)
-    #[arg(global = true, long)]
+    #[arg(global = true, long, hide = true)]
     pub dry_run: bool,
 }
 
-#[derive(Subcommand)]
-pub enum Commands {
-    /// Manage packages (install, remove, update)
-    Pkg {
-        #[command(subcommand)]
-        action: PkgAction,
-    },
-    /// Manage services (start, stop, restart)
-    Svc {
-        #[command(subcommand)]
-        action: SvcAction,
-    },
-    /// Manage users
-    User {
-        #[command(subcommand)]
-        action: UserAction,
-    },
-    /// Manage groups
-    Group {
-        #[command(subcommand)]
-        action: GroupAction,
-    },
-    /// Manage disks and storage
-    Disk {
-        #[command(subcommand)]
-        action: DiskAction,
-    },
-    /// Monitor live system stats
-    Monitor,
+#[derive(Args)]
+pub struct PkgArgs {
+    #[command(subcommand)]
+    pub action: PkgAction,
 }
 
 #[derive(Subcommand)]
-pub enum DiskAction {
-    /// Lists all block devices and usage
-    List,
-    /// Mounts a block device to a directory
-    Mount {
-        #[arg(required = true)]
-        device: String,
-        #[arg(required = true)]
-        path: String,
-        #[arg(long, short)]
-        fstype: Option<String>,
-        #[arg(long, short)]
-        options: Option<String>,
+pub enum PkgAction {
+    /// Update the system package tree and applies available upgrades.
+    Update,
+    /// Installs one or more packages.
+    Install {
+        /// Packages to install
+        #[arg(required = true, value_hint = ValueHint::Other)]
+        packages: Vec<String>,
     },
-    /// Safely unmounts a device
-    Unmount {
-        #[arg(required = true)]
-        target: String,
+    /// Uninstalls packages.
+    Remove {
+        /// Packages to remove
+        #[arg(required = true, value_hint = ValueHint::Other)]
+        packages: Vec<String>,
+        /// Completely remove configuration files alongside the binary.
         #[arg(long, short)]
-        lazy: bool,
-        #[arg(long, short)]
-        force: bool,
+        purge: bool,
     },
-    /// Calculates directory size
-    Usage {
-        #[arg(required = true)]
-        path: String,
-        #[arg(long)]
-        depth: Option<u32>,
+    /// Searches the upstream package repositories.
+    Search {
+        /// The query to search for
+        #[arg(required = true, value_hint = ValueHint::Other)]
+        query: String,
+    },
+    /// Lists all explicitly installed user packages.
+    List {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
     },
 }
 
+#[derive(Args)]
+pub struct SvcArgs {
+    #[command(subcommand)]
+    pub action: SvcAction,
+}
+
 #[derive(Subcommand)]
-pub enum GroupAction {
-    /// Lists all groups
-    List,
-    /// Creates a new group
-    Add {
-        #[arg(required = true)]
-        groupname: String,
+pub enum SvcAction {
+    /// Lists all active and failed services on the system.
+    List {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
     },
-    /// Deletes a group
-    Del {
-        #[arg(required = true)]
-        groupname: String,
+    /// Starts and enables a service to start on boot.
+    Up {
+        /// The service name
+        #[arg(required = true, value_hint = ValueHint::Other)]
+        name: String,
     },
-    /// Modifies a group
-    Mod {
-        #[arg(required = true)]
-        groupname: String,
-        #[arg(long)]
-        gid: u32,
+    /// Stops and disables a service from starting on boot.
+    Down {
+        /// The service name
+        #[arg(required = true, value_hint = ValueHint::Other)]
+        name: String,
     },
+    /// Restarts the specified service.
+    Restart {
+        /// The service name
+        #[arg(required = true, value_hint = ValueHint::Other)]
+        name: String,
+    },
+    /// Reloads the service configuration without fully stopping it.
+    Reload {
+        /// The service name
+        #[arg(required = true, value_hint = ValueHint::Other)]
+        name: String,
+    },
+    /// Displays detailed status for the service.
+    Status {
+        /// The service name
+        #[arg(required = true, value_hint = ValueHint::Other)]
+        name: String,
+    },
+}
+
+#[derive(Args)]
+pub struct UserArgs {
+    #[command(subcommand)]
+    pub action: UserAction,
 }
 
 #[derive(Subcommand)]
@@ -110,28 +123,31 @@ pub enum UserAction {
         all: bool,
         #[arg(long)]
         groups: bool,
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
     },
     /// Creates a new user
     Add {
-        #[arg(required = true)]
+        #[arg(required = true, value_hint = ValueHint::Other)]
         username: String,
-        #[arg(long)]
+        #[arg(long, value_hint = ValueHint::Other)]
         groups: Option<String>,
-        #[arg(long)]
+        #[arg(long, value_hint = ValueHint::Other)]
         shell: Option<String>,
         #[arg(long)]
         system: bool,
     },
     /// Deletes a user
     Del {
-        #[arg(required = true)]
+        #[arg(required = true, value_hint = ValueHint::Other)]
         username: String,
         #[arg(long, short)]
         purge: bool,
     },
     /// Modifies a user
     Mod {
-        #[arg(required = true)]
+        #[arg(required = true, value_hint = ValueHint::Other)]
         username: String,
         #[arg(required = true)]
         action: String,
@@ -140,72 +156,429 @@ pub enum UserAction {
     },
     /// Changes a user's password interactively
     Passwd {
-        #[arg(required = true)]
+        #[arg(required = true, value_hint = ValueHint::Other)]
         username: String,
     },
 }
 
-#[derive(Subcommand)]
-pub enum PkgAction {
-    /// Update the system package tree and applies available upgrades.
-    Update,
-    /// Installs one or more packages.
-    Install {
-        /// Packages to install
-        #[arg(required = true)]
-        packages: Vec<String>,
-    },
-    /// Uninstalls packages.
-    Remove {
-        /// Packages to remove
-        #[arg(required = true)]
-        packages: Vec<String>,
-        /// Completely remove configuration files alongside the binary.
-        #[arg(long, short)]
-        purge: bool,
-    },
-    /// Searches the upstream package repositories.
-    Search {
-        /// The query to search for
-        #[arg(required = true)]
-        query: String,
-    },
-    /// Lists all explicitly installed user packages.
-    List,
+#[derive(Args)]
+pub struct GroupArgs {
+    #[command(subcommand)]
+    pub action: GroupAction,
 }
 
 #[derive(Subcommand)]
-pub enum SvcAction {
-    /// Lists all active and failed services on the system.
-    List,
-    /// Starts and enables a service to start on boot.
-    Up {
+pub enum GroupAction {
+    /// Lists all groups
+    List {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Creates a new group
+    Add {
+        #[arg(required = true, value_hint = ValueHint::Other)]
+        groupname: String,
+    },
+    /// Deletes a group
+    Del {
+        #[arg(required = true, value_hint = ValueHint::Other)]
+        groupname: String,
+    },
+    /// Modifies a group
+    Mod {
+        #[arg(required = true, value_hint = ValueHint::Other)]
+        groupname: String,
+        #[arg(long)]
+        gid: u32,
+    },
+}
+
+#[derive(Args)]
+pub struct DiskArgs {
+    #[command(subcommand)]
+    pub action: DiskAction,
+}
+
+impl DiskArgs {
+    pub fn run(&self, _system: &crate::os::detector::DetectedSystem) -> Result<Box<dyn ExecutableCommand>> {
+        anyhow::bail!("DiskArgs::run is no longer used in the unified Domain architecture")
+    }
+}
+
+#[derive(Subcommand)]
+pub enum DiskAction {
+    /// Lists all block devices and usage
+    List {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Mounts a block device to a directory
+    Mount {
+        #[arg(required = true, value_hint = ValueHint::Other)]
+        device: String,
+        #[arg(required = true, value_hint = ValueHint::DirPath)]
+        path: String,
+        #[arg(long, short)]
+        fstype: Option<String>,
+        #[arg(long, short)]
+        options: Option<String>,
+    },
+    /// Safely unmounts a device
+    Unmount {
+        #[arg(required = true, value_hint = ValueHint::Other)]
+        target: String,
+        #[arg(long, short)]
+        lazy: bool,
+        #[arg(long, short)]
+        force: bool,
+    },
+    /// Calculates directory size
+    Usage {
+        #[arg(required = true, value_hint = ValueHint::DirPath)]
+        path: String,
+        #[arg(long)]
+        depth: Option<u32>,
+    },
+}
+
+#[derive(Args)]
+pub struct SysArgs {
+    #[command(subcommand)]
+    pub action: SysAction,
+}
+
+#[derive(Subcommand)]
+pub enum SysAction {
+    /// Retrieves OS info, kernel version, uptime, etc.
+    Info {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Initiates system power state transitions.
+    Power {
+        /// The power state transition (reboot, shutdown, suspend, hibernate)
+        #[arg(required = true)]
+        state: String,
+        /// Execute immediately
+        #[arg(long)]
+        now: bool,
+        /// Bypass normal init procedures
+        #[arg(long)]
+        force: bool,
+    },
+    /// Modifies or views the system time and timezone.
+    Time {
+        /// The time action (status, set, sync)
+        #[arg(required = true)]
+        action: String,
+        /// The value to set (e.g. timezone)
+        value: Option<String>,
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+}
+
+#[derive(Args)]
+pub struct LogArgs {
+    #[command(subcommand)]
+    pub action: LogAction,
+}
+
+#[derive(Subcommand)]
+pub enum LogAction {
+    /// Tails the live logs of a specific service.
+    Tail {
         /// The service name
         #[arg(required = true)]
         name: String,
+        /// Number of lines to show
+        #[arg(long, short, default_value = "50")]
+        lines: u32,
     },
-    /// Stops and disables a service from starting on boot.
-    Down {
-        /// The service name
-        #[arg(required = true)]
-        name: String,
+    /// Tails the system-wide kernel and boot logs.
+    Sys {
+        /// Number of lines to show
+        #[arg(long, short, default_value = "50")]
+        lines: u32,
     },
-    /// Restarts the specified service.
-    Restart {
-        /// The service name
-        #[arg(required = true)]
-        name: String,
+    /// Tails a specific log file from disk.
+    File {
+        /// Path to the log file
+        #[arg(required = true, value_hint = ValueHint::FilePath)]
+        path: String,
+        /// Number of lines to show
+        #[arg(long, short, default_value = "50")]
+        lines: u32,
     },
-    /// Reloads the service configuration without fully stopping it.
-    Reload {
-        /// The service name
-        #[arg(required = true)]
-        name: String,
+}
+
+#[derive(Args)]
+pub struct DistroArgs {
+    #[command(subcommand)]
+    pub action: DistroAction,
+}
+
+#[derive(Subcommand)]
+pub enum DistroAction {
+    /// Shows detailed distribution metadata.
+    Info {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
     },
-    /// Displays detailed status for the service.
+    /// Upgrades the entire distribution to the next major release.
+    Upgrade,
+}
+
+#[derive(Args)]
+pub struct NetArgs {
+    #[command(subcommand)]
+    pub action: NetAction,
+}
+
+#[derive(Subcommand)]
+pub enum NetAction {
+    /// Lists all network interfaces
+    Interfaces {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Shows assigned IP addresses
+    Ips {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Shows routing table
+    Routes {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Firewall management
+    Fw {
+        #[command(subcommand)]
+        action: FwAction,
+    },
+    /// Wi-Fi management
+    Wifi {
+        #[command(subcommand)]
+        action: WifiAction,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum FwAction {
+    /// Shows firewall status
     Status {
-        /// The service name
-        #[arg(required = true)]
-        name: String,
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Allows traffic on a port/service
+    Allow { rule: String },
+    /// Denies traffic on a port/service
+    Deny { rule: String },
+}
+
+#[derive(Subcommand)]
+pub enum WifiAction {
+    /// Scans for available Wi-Fi networks
+    Scan,
+    /// Connects to a Wi-Fi network
+    Connect { ssid: String },
+}
+
+#[derive(Args)]
+pub struct BootArgs {
+    #[command(subcommand)]
+    pub action: BootAction,
+}
+
+#[derive(Subcommand)]
+pub enum BootAction {
+    /// Lists boot entries
+    List {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Kernel module management
+    Mod {
+        #[command(subcommand)]
+        action: BootModAction,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum BootModAction {
+    /// Lists loaded kernel modules
+    List {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Loads a kernel module
+    Load { name: String },
+    /// Unloads a kernel module
+    Unload { name: String },
+}
+
+#[derive(Args)]
+pub struct GuiArgs {
+    #[command(subcommand)]
+    pub action: GuiAction,
+}
+
+#[derive(Subcommand)]
+pub enum GuiAction {
+    /// Displays GUI session info (Wayland/X11)
+    Info,
+    /// Display and monitor management
+    Display {
+        #[command(subcommand)]
+        action: GuiDisplayAction,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum GuiDisplayAction {
+    /// Lists connected displays and resolutions
+    List {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+}
+
+#[derive(Args)]
+pub struct DevArgs {
+    #[command(subcommand)]
+    pub action: DevAction,
+}
+
+#[derive(Subcommand)]
+pub enum DevAction {
+    /// Summarizes connected PCI and USB devices
+    List {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Lists detailed PCI devices
+    Pci {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Lists detailed USB devices
+    Usb {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Bluetooth management
+    Bt {
+        #[command(subcommand)]
+        action: BtAction,
+    },
+    /// Printer management
+    Print {
+        #[command(subcommand)]
+        action: PrintAction,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum BtAction {
+    /// Checks bluetooth status
+    Status,
+    /// Scans for nearby devices
+    Scan,
+    /// Pairs with a device
+    Pair { address: String },
+    /// Connects to a paired device
+    Connect { address: String },
+}
+
+#[derive(Subcommand)]
+pub enum PrintAction {
+    /// Lists configured printers
+    List {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+}
+
+#[derive(Args)]
+pub struct VirtArgs {
+    #[command(subcommand)]
+    pub action: VirtAction,
+}
+
+#[derive(Subcommand)]
+pub enum VirtAction {
+    /// Lists all running containers and active VMs
+    Ps {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Starts a stopped container or VM
+    Start { name: String },
+    /// Stops a running container or VM
+    Stop { name: String },
+    /// Removes a container or VM
+    Rm { name: String },
+    /// Tails the logs of a running container
+    Logs { name: String },
+}
+
+#[derive(Args)]
+pub struct SecArgs {
+    #[command(subcommand)]
+    pub action: SecAction,
+}
+
+#[derive(Subcommand)]
+pub enum SecAction {
+    /// Runs a basic security audit
+    Audit {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Outputs the current state of SELinux or AppArmor
+    Context,
+}
+
+#[derive(Args)]
+pub struct CompletionsArgs {
+    #[command(subcommand)]
+    pub action: CompletionsAction,
+}
+
+#[derive(Subcommand)]
+pub enum CompletionsAction {
+    /// Generate shell completions to stdout
+    Generate {
+        /// The shell to generate completions for
+        shell: Shell,
+    },
+    /// Install shell completions into your shell's configuration file
+    Install {
+        /// The shell to install completions for
+        shell: Shell,
+    },
+    /// Print the command to source completions in the current session
+    Setup {
+        /// The shell to setup completions for
+        shell: Shell,
     },
 }

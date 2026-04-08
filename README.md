@@ -14,22 +14,22 @@ This matrix tracks the current implementation status of the syntax tree defined 
 
 | Domain | Sub-domain | Description | Status | Level of Support |
 | :--- | :--- | :--- | :--- | :--- |
-| `ao sys` | Core System | Updates, power, time | ❌ Not Implemented | Planned |
+| `ao sys` | Core System | Updates, power, time | ✅ Implemented | Generic Linux |
 | `ao svc` | Services | Start, stop, list services (`systemctl`) | ✅ Implemented | Debian/Ubuntu (Systemd) |
-| `ao user` | Users | Add, remove, modify users | ❌ Not Implemented | Planned |
-| `ao group` | Groups | Add, remove, modify groups | ❌ Not Implemented | Planned |
-| `ao net` | Networking | Interfaces, IPs, routes | ❌ Not Implemented | Planned |
-| `ao net fw` | Firewall | Allow, block, status | ❌ Not Implemented | Planned |
-| `ao net wifi` | Wi-Fi | Scan, connect, forget | ❌ Not Implemented | Planned |
-| `ao disk` | Storage | Mount, unmount, usage | ❌ Not Implemented | Planned |
+| `ao user` | Users | Add, remove, modify users | ✅ Implemented | Generic Linux |
+| `ao group` | Groups | Add, remove, modify groups | ✅ Implemented | Generic Linux |
+| `ao net` | Networking | Interfaces, IPs, routes | ✅ Implemented | Generic Linux |
+| `ao net fw` | Firewall | Allow, block, status | ✅ Implemented | Generic Linux |
+| `ao net wifi` | Wi-Fi | Scan, connect, forget | ✅ Implemented | Generic Linux |
+| `ao disk` | Storage | Mount, unmount, usage | ✅ Implemented | Generic Linux |
 | `ao pkg` | Packages | Install, remove, update | ✅ Implemented | Debian/Ubuntu (`apt`) |
-| `ao log` | Logs | Tail service and system logs | ❌ Not Implemented | Planned |
-| `ao boot` | Boot & Kernel | Bootloader defaults, kernel modules | ❌ Not Implemented | Planned |
-| `ao gui` | Displays | Wayland/X11 detect, resolution | ❌ Not Implemented | Planned |
-| `ao dev` | Devices | PCI/USB lists, Bluetooth, Printers | ❌ Not Implemented | Planned |
-| `ao virt` | Virtualization | Docker, Podman, libvirt abstraction | ❌ Not Implemented | Planned |
-| `ao sec` | Security | SELinux/AppArmor contexts, audits | ❌ Not Implemented | Planned |
-| `ao distro` | Distributions | OS info, major release upgrades | ❌ Not Implemented | Planned |
+| `ao log` | Logs | Tail service and system logs | ✅ Implemented | Generic Linux |
+| `ao boot` | Boot & Kernel | Bootloader defaults, kernel modules | ✅ Implemented | Generic Linux |
+| `ao gui` | Displays | Wayland/X11 detect, resolution | ✅ Implemented | Generic Linux |
+| `ao dev` | Devices | PCI/USB lists, Bluetooth, Printers | ✅ Implemented | Generic Linux |
+| `ao virt` | Virtualization | Docker, Podman, libvirt abstraction | ✅ Implemented | Generic Linux |
+| `ao sec` | Security | SELinux/AppArmor contexts, audits | ✅ Implemented | Generic Linux |
+| `ao distro` | Distributions | OS info, major release upgrades | ✅ Implemented | Generic Linux |
 
 ## Architecture
 
