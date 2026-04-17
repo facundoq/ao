@@ -1,17 +1,23 @@
-use anyhow::Result;
-use clap::{ArgMatches, Command as ClapCommand, FromArgMatches, Args};
-use crate::os::{DistroManager, ExecutableCommand, Domain, DistroInfo, OutputFormat};
-use crate::cli::{DistroArgs, DistroAction};
 use super::common::SystemCommand;
+use crate::cli::{DistroAction, DistroArgs};
+use crate::os::{DistroInfo, DistroManager, Domain, ExecutableCommand, OutputFormat};
+use anyhow::Result;
+use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
 
 pub struct StandardDistro;
 
 impl Domain for StandardDistro {
-    fn name(&self) -> &'static str { "distro" }
+    fn name(&self) -> &'static str {
+        "distro"
+    }
     fn command(&self) -> ClapCommand {
         DistroArgs::augment_args(ClapCommand::new("distro").about("Manage distributions"))
     }
-    fn execute(&self, matches: &ArgMatches, _app: &ClapCommand) -> Result<Box<dyn ExecutableCommand>> {
+    fn execute(
+        &self,
+        matches: &ArgMatches,
+        _app: &ClapCommand,
+    ) -> Result<Box<dyn ExecutableCommand>> {
         let args = DistroArgs::from_arg_matches(matches)?;
         match &args.action {
             DistroAction::Info { format } => self.info(*format),
@@ -29,14 +35,20 @@ impl DistroManager for StandardDistro {
         if std::path::Path::new("/usr/bin/do-release-upgrade").exists() {
             Ok(Box::new(SystemCommand::new("do-release-upgrade")))
         } else if std::path::Path::new("/usr/bin/dnf").exists() {
-            Ok(Box::new(SystemCommand::new("dnf").arg("system-upgrade").arg("reboot")))
+            Ok(Box::new(
+                SystemCommand::new("dnf")
+                    .arg("system-upgrade")
+                    .arg("reboot"),
+            ))
         } else {
             anyhow::bail!("Distribution upgrade tool not found")
         }
     }
 }
 
-pub struct DistroInfoCommand { pub format: OutputFormat }
+pub struct DistroInfoCommand {
+    pub format: OutputFormat,
+}
 impl ExecutableCommand for DistroInfoCommand {
     fn execute(&self) -> Result<()> {
         if matches!(self.format, OutputFormat::Original) {
@@ -78,16 +90,31 @@ impl ExecutableCommand for DistroInfoCommand {
                 table.add_row(vec!["Pretty Name", &info.pretty_name]);
                 println!("{}", table);
             }
-            OutputFormat::Json => { println!("{}", serde_json::to_string_pretty(&info)?); }
-            OutputFormat::Yaml => { println!("{}", serde_yaml::to_string(&info)?); }
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(&info)?);
+            }
+            OutputFormat::Yaml => {
+                println!("{}", serde_yaml::to_string(&info)?);
+            }
             OutputFormat::Original => unreachable!(),
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> { println!("[DRY RUN] Distro info (format: {:?})", self.format); Ok(()) }
-    fn print(&self) -> Result<()> { println!("distro info (format: {:?})", self.format); Ok(()) }
-    fn as_string(&self) -> String { format!("distro info --format {:?}", self.format) }
+    fn dry_run(&self) -> Result<()> {
+        println!("[DRY RUN] Distro info (format: {:?})", self.format);
+        Ok(())
+    }
+    fn print(&self) -> Result<()> {
+        println!("distro info (format: {:?})", self.format);
+        Ok(())
+    }
+    fn as_string(&self) -> String {
+        format!("distro info --format {:?}", self.format)
+    }
     fn is_structured(&self) -> bool {
-        matches!(self.format, OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original)
+        matches!(
+            self.format,
+            OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original
+        )
     }
 }

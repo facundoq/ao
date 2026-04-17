@@ -1,23 +1,33 @@
-use anyhow::Result;
-use clap::{ArgMatches, Command as ClapCommand, FromArgMatches, Args};
-use crate::os::{BootManager, ExecutableCommand, Domain, BootEntryInfo, KernelModInfo, OutputFormat};
-use crate::cli::{BootArgs, BootAction, BootModAction};
 use super::common::SystemCommand;
+use crate::cli::{BootAction, BootArgs, BootModAction};
+use crate::os::{
+    BootEntryInfo, BootManager, Domain, ExecutableCommand, KernelModInfo, OutputFormat,
+};
+use anyhow::Result;
+use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
 use std::process::Command;
 
 pub struct StandardBoot;
 
 impl Domain for StandardBoot {
-    fn name(&self) -> &'static str { "boot" }
-    fn command(&self) -> ClapCommand {
-        BootArgs::augment_args(ClapCommand::new("boot").about("Manage bootloader and kernel modules"))
+    fn name(&self) -> &'static str {
+        "boot"
     }
-    fn execute(&self, matches: &ArgMatches, _app: &ClapCommand) -> Result<Box<dyn ExecutableCommand>> {
+    fn command(&self) -> ClapCommand {
+        BootArgs::augment_args(
+            ClapCommand::new("boot").about("Manage bootloader and kernel modules"),
+        )
+    }
+    fn execute(
+        &self,
+        matches: &ArgMatches,
+        _app: &ClapCommand,
+    ) -> Result<Box<dyn ExecutableCommand>> {
         let args = BootArgs::from_arg_matches(matches)?;
         match &args.action {
-            BootAction::List { format } => self.list_entries(*format),
+            BootAction::Ls { format } => self.ls_entries(*format),
             BootAction::Mod { action } => match action {
-                BootModAction::List { format } => self.list_modules(*format),
+                BootModAction::Ls { format } => self.ls_modules(*format),
                 BootModAction::Load { name } => self.load_module(name),
                 BootModAction::Unload { name } => self.unload_module(name),
             },
@@ -26,28 +36,35 @@ impl Domain for StandardBoot {
 }
 
 impl BootManager for StandardBoot {
-    fn list_entries(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
+    fn ls_entries(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(BootListEntriesCommand { format }))
     }
-    fn list_modules(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
+    fn ls_modules(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(BootListModulesCommand { format }))
     }
     fn load_module(&self, name: &str) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(SystemCommand::new("modprobe").arg(name)))
+        Ok(Box::new(SystemCommand::new("modprobe").arg("--").arg(name)))
     }
     fn unload_module(&self, name: &str) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(SystemCommand::new("modprobe").arg("-r").arg(name)))
+        Ok(Box::new(
+            SystemCommand::new("modprobe").arg("-r").arg("--").arg(name),
+        ))
     }
 }
 
-pub struct BootListEntriesCommand { pub format: OutputFormat }
+pub struct BootListEntriesCommand {
+    pub format: OutputFormat,
+}
 impl ExecutableCommand for BootListEntriesCommand {
     fn execute(&self) -> Result<()> {
         if matches!(self.format, OutputFormat::Original) {
             return SystemCommand::new("bootctl").arg("list").execute();
         }
 
-        let output = Command::new("bootctl").arg("list").arg("--no-pager").output()?;
+        let output = Command::new("bootctl")
+            .arg("list")
+            .arg("--no-pager")
+            .output()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
         let mut entries = Vec::new();
         for line in stdout.lines() {
@@ -71,21 +88,38 @@ impl ExecutableCommand for BootListEntriesCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => { println!("{}", serde_json::to_string_pretty(&entries)?); }
-            OutputFormat::Yaml => { println!("{}", serde_yaml::to_string(&entries)?); }
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(&entries)?);
+            }
+            OutputFormat::Yaml => {
+                println!("{}", serde_yaml::to_string(&entries)?);
+            }
             OutputFormat::Original => unreachable!(),
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> { println!("[DRY RUN] bootctl list (format: {:?})", self.format); Ok(()) }
-    fn print(&self) -> Result<()> { println!("bootctl list (format: {:?})", self.format); Ok(()) }
-    fn as_string(&self) -> String { format!("bootctl list --format {:?}", self.format) }
+    fn dry_run(&self) -> Result<()> {
+        println!("[DRY RUN] bootctl list (format: {:?})", self.format);
+        Ok(())
+    }
+    fn print(&self) -> Result<()> {
+        println!("bootctl list (format: {:?})", self.format);
+        Ok(())
+    }
+    fn as_string(&self) -> String {
+        format!("bootctl list --format {:?}", self.format)
+    }
     fn is_structured(&self) -> bool {
-        matches!(self.format, OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original)
+        matches!(
+            self.format,
+            OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original
+        )
     }
 }
 
-pub struct BootListModulesCommand { pub format: OutputFormat }
+pub struct BootListModulesCommand {
+    pub format: OutputFormat,
+}
 impl ExecutableCommand for BootListModulesCommand {
     fn execute(&self) -> Result<()> {
         if matches!(self.format, OutputFormat::Original) {
@@ -115,16 +149,31 @@ impl ExecutableCommand for BootListModulesCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => { println!("{}", serde_json::to_string_pretty(&modules)?); }
-            OutputFormat::Yaml => { println!("{}", serde_yaml::to_string(&modules)?); }
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(&modules)?);
+            }
+            OutputFormat::Yaml => {
+                println!("{}", serde_yaml::to_string(&modules)?);
+            }
             OutputFormat::Original => unreachable!(),
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> { println!("[DRY RUN] lsmod (format: {:?})", self.format); Ok(()) }
-    fn print(&self) -> Result<()> { println!("lsmod (format: {:?})", self.format); Ok(()) }
-    fn as_string(&self) -> String { format!("lsmod --format {:?}", self.format) }
+    fn dry_run(&self) -> Result<()> {
+        println!("[DRY RUN] lsmod (format: {:?})", self.format);
+        Ok(())
+    }
+    fn print(&self) -> Result<()> {
+        println!("lsmod (format: {:?})", self.format);
+        Ok(())
+    }
+    fn as_string(&self) -> String {
+        format!("lsmod --format {:?}", self.format)
+    }
     fn is_structured(&self) -> bool {
-        matches!(self.format, OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original)
+        matches!(
+            self.format,
+            OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original
+        )
     }
 }

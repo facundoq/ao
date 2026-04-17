@@ -1,21 +1,27 @@
-use anyhow::Result;
-use std::process::Command;
-use clap::{ArgMatches, Command as ClapCommand, FromArgMatches, Args};
-use crate::os::{DevManager, ExecutableCommand, Domain, DeviceInfo, PrinterInfo, OutputFormat};
-use crate::cli::{DevArgs, DevAction, BtAction, PrintAction};
 use super::common::SystemCommand;
+use crate::cli::{BtAction, DevAction, DevArgs, PrintAction};
+use crate::os::{DevManager, DeviceInfo, Domain, ExecutableCommand, OutputFormat, PrinterInfo};
+use anyhow::Result;
+use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
+use std::process::Command;
 
 pub struct StandardDev;
 
 impl Domain for StandardDev {
-    fn name(&self) -> &'static str { "dev" }
+    fn name(&self) -> &'static str {
+        "dev"
+    }
     fn command(&self) -> ClapCommand {
         DevArgs::augment_args(ClapCommand::new("dev").about("Manage connected devices"))
     }
-    fn execute(&self, matches: &ArgMatches, _app: &ClapCommand) -> Result<Box<dyn ExecutableCommand>> {
+    fn execute(
+        &self,
+        matches: &ArgMatches,
+        _app: &ClapCommand,
+    ) -> Result<Box<dyn ExecutableCommand>> {
         let args = DevArgs::from_arg_matches(matches)?;
         match &args.action {
-            DevAction::List { format } => self.list(*format),
+            DevAction::Ls { format } => self.ls(*format),
             DevAction::Pci { format } => self.pci(*format),
             DevAction::Usb { format } => self.usb(*format),
             DevAction::Bt { action } => match action {
@@ -25,14 +31,14 @@ impl Domain for StandardDev {
                 BtAction::Connect { address } => self.bt_connect(address),
             },
             DevAction::Print { action } => match action {
-                PrintAction::List { format } => self.list_printers(*format),
+                PrintAction::Ls { format } => self.ls_printers(*format),
             },
         }
     }
 }
 
 impl DevManager for StandardDev {
-    fn list(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
+    fn ls(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(DevListAllCommand { format }))
     }
     fn pci(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
@@ -51,15 +57,27 @@ impl DevManager for StandardDev {
         Ok(Box::new(SystemCommand::new("bluetoothctl").arg("show")))
     }
     fn bt_scan(&self) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(SystemCommand::new("bluetoothctl").arg("scan").arg("on")))
+        Ok(Box::new(
+            SystemCommand::new("bluetoothctl").arg("scan").arg("on"),
+        ))
     }
     fn bt_pair(&self, address: &str) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(SystemCommand::new("bluetoothctl").arg("pair").arg(address)))
+        Ok(Box::new(
+            SystemCommand::new("bluetoothctl")
+                .arg("pair")
+                .arg("--")
+                .arg(address),
+        ))
     }
     fn bt_connect(&self, address: &str) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(SystemCommand::new("bluetoothctl").arg("connect").arg(address)))
+        Ok(Box::new(
+            SystemCommand::new("bluetoothctl")
+                .arg("connect")
+                .arg("--")
+                .arg(address),
+        ))
     }
-    fn list_printers(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
+    fn ls_printers(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
         if format == OutputFormat::Original {
             return Ok(Box::new(SystemCommand::new("lpstat").arg("-p")));
         }
@@ -67,18 +85,87 @@ impl DevManager for StandardDev {
     }
 }
 
-pub struct DevListAllCommand { pub format: OutputFormat }
+pub struct DevListAllCommand {
+    pub format: OutputFormat,
+}
 impl ExecutableCommand for DevListAllCommand {
     fn execute(&self) -> Result<()> {
-        println!("Combined Device List not fully implemented yet. Use 'ao dev pci' or 'ao dev usb'.");
+        let mut devices = Vec::new();
+
+        // PCI Devices
+        if let Ok(output) = Command::new("lspci").arg("-mm").output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                let parts: Vec<&str> = line.split("\" \"").collect();
+                if parts.len() >= 4 {
+                    devices.push(DeviceInfo {
+                        bus: "PCI".to_string(),
+                        device: parts[1].trim_matches('"').to_string(),
+                        id: parts[2].trim_matches('"').to_string(),
+                        description: parts[3..].join(" ").trim_matches('"').to_string(),
+                    });
+                }
+            }
+        }
+
+        // USB Devices
+        if let Ok(output) = Command::new("lsusb").output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 6 {
+                    devices.push(DeviceInfo {
+                        bus: "USB".to_string(),
+                        device: "Device".to_string(),
+                        id: parts[5].to_string(),
+                        description: parts[6..].join(" "),
+                    });
+                }
+            }
+        }
+
+        match self.format {
+            OutputFormat::Table => {
+                let mut table = comfy_table::Table::new();
+                if let Ok((width, _)) = crossterm::terminal::size() {
+                    table.set_width(width);
+                }
+                table.set_content_arrangement(comfy_table::ContentArrangement::Dynamic);
+                table.set_header(vec!["Type", "Class", "ID", "Description"]);
+                for d in devices {
+                    table.add_row(vec![d.bus, d.device, d.id, d.description]);
+                }
+                println!("{}", table);
+            }
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(&devices)?);
+            }
+            OutputFormat::Yaml => {
+                println!("{}", serde_yaml::to_string(&devices)?);
+            }
+            OutputFormat::Original => {
+                for d in devices {
+                    println!("[{}] {} {} {}", d.bus, d.id, d.device, d.description);
+                }
+            }
+        }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> { Ok(()) }
-    fn print(&self) -> Result<()> { Ok(()) }
-    fn as_string(&self) -> String { "dev list all".to_string() }
+    fn dry_run(&self) -> Result<()> {
+        Ok(())
+    }
+    fn print(&self) -> Result<()> {
+        println!("ao dev ls");
+        Ok(())
+    }
+    fn as_string(&self) -> String {
+        "dev list all".to_string()
+    }
 }
 
-pub struct DevPciCommand { pub format: OutputFormat }
+pub struct DevPciCommand {
+    pub format: OutputFormat,
+}
 impl ExecutableCommand for DevPciCommand {
     fn execute(&self) -> Result<()> {
         let output = Command::new("lspci").arg("-mm").output()?;
@@ -99,24 +186,42 @@ impl ExecutableCommand for DevPciCommand {
         match self.format {
             OutputFormat::Table => {
                 let mut table = comfy_table::Table::new();
+                if let Ok((width, _)) = crossterm::terminal::size() {
+                    table.set_width(width);
+                }
+                table.set_content_arrangement(comfy_table::ContentArrangement::Dynamic);
                 table.set_header(vec!["Bus", "Class", "Vendor", "Device"]);
                 for d in devices {
                     table.add_row(vec![d.bus, d.device, d.id, d.description]);
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => { println!("{}", serde_json::to_string_pretty(&devices)?); }
-            OutputFormat::Yaml => { println!("{}", serde_yaml::to_string(&devices)?); }
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(&devices)?);
+            }
+            OutputFormat::Yaml => {
+                println!("{}", serde_yaml::to_string(&devices)?);
+            }
             OutputFormat::Original => unreachable!(),
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> { println!("[DRY RUN] lspci (format: {:?})", self.format); Ok(()) }
-    fn print(&self) -> Result<()> { println!("lspci (format: {:?})", self.format); Ok(()) }
-    fn as_string(&self) -> String { format!("lspci --format {:?}", self.format) }
+    fn dry_run(&self) -> Result<()> {
+        println!("[DRY RUN] lspci (format: {:?})", self.format);
+        Ok(())
+    }
+    fn print(&self) -> Result<()> {
+        println!("lspci (format: {:?})", self.format);
+        Ok(())
+    }
+    fn as_string(&self) -> String {
+        format!("lspci --format {:?}", self.format)
+    }
 }
 
-pub struct DevUsbCommand { pub format: OutputFormat }
+pub struct DevUsbCommand {
+    pub format: OutputFormat,
+}
 impl ExecutableCommand for DevUsbCommand {
     fn execute(&self) -> Result<()> {
         let output = Command::new("lsusb").output()?;
@@ -137,24 +242,42 @@ impl ExecutableCommand for DevUsbCommand {
         match self.format {
             OutputFormat::Table => {
                 let mut table = comfy_table::Table::new();
+                if let Ok((width, _)) = crossterm::terminal::size() {
+                    table.set_width(width);
+                }
+                table.set_content_arrangement(comfy_table::ContentArrangement::Dynamic);
                 table.set_header(vec!["Bus", "Device", "ID", "Description"]);
                 for d in devices {
                     table.add_row(vec![d.bus, d.device, d.id, d.description]);
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => { println!("{}", serde_json::to_string_pretty(&devices)?); }
-            OutputFormat::Yaml => { println!("{}", serde_yaml::to_string(&devices)?); }
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(&devices)?);
+            }
+            OutputFormat::Yaml => {
+                println!("{}", serde_yaml::to_string(&devices)?);
+            }
             OutputFormat::Original => unreachable!(),
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> { println!("[DRY RUN] lsusb (format: {:?})", self.format); Ok(()) }
-    fn print(&self) -> Result<()> { println!("lsusb (format: {:?})", self.format); Ok(()) }
-    fn as_string(&self) -> String { format!("lsusb --format {:?}", self.format) }
+    fn dry_run(&self) -> Result<()> {
+        println!("[DRY RUN] lsusb (format: {:?})", self.format);
+        Ok(())
+    }
+    fn print(&self) -> Result<()> {
+        println!("lsusb (format: {:?})", self.format);
+        Ok(())
+    }
+    fn as_string(&self) -> String {
+        format!("lsusb --format {:?}", self.format)
+    }
 }
 
-pub struct DevPrintersCommand { pub format: OutputFormat }
+pub struct DevPrintersCommand {
+    pub format: OutputFormat,
+}
 impl ExecutableCommand for DevPrintersCommand {
     fn execute(&self) -> Result<()> {
         let output = Command::new("lpstat").arg("-p").output()?;
@@ -173,19 +296,35 @@ impl ExecutableCommand for DevPrintersCommand {
         match self.format {
             OutputFormat::Table => {
                 let mut table = comfy_table::Table::new();
+                if let Ok((width, _)) = crossterm::terminal::size() {
+                    table.set_width(width);
+                }
+                table.set_content_arrangement(comfy_table::ContentArrangement::Dynamic);
                 table.set_header(vec!["Printer", "Status"]);
                 for p in printers {
                     table.add_row(vec![p.name, p.status]);
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => { println!("{}", serde_json::to_string_pretty(&printers)?); }
-            OutputFormat::Yaml => { println!("{}", serde_yaml::to_string(&printers)?); }
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(&printers)?);
+            }
+            OutputFormat::Yaml => {
+                println!("{}", serde_yaml::to_string(&printers)?);
+            }
             OutputFormat::Original => unreachable!(),
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> { println!("[DRY RUN] lpstat -p (format: {:?})", self.format); Ok(()) }
-    fn print(&self) -> Result<()> { println!("lpstat -p (format: {:?})", self.format); Ok(()) }
-    fn as_string(&self) -> String { format!("lpstat -p --format {:?}", self.format) }
+    fn dry_run(&self) -> Result<()> {
+        println!("[DRY RUN] lpstat -p (format: {:?})", self.format);
+        Ok(())
+    }
+    fn print(&self) -> Result<()> {
+        println!("lpstat -p (format: {:?})", self.format);
+        Ok(())
+    }
+    fn as_string(&self) -> String {
+        format!("lpstat -p --format {:?}", self.format)
+    }
 }

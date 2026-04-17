@@ -1,29 +1,34 @@
+pub use crate::cli::OutputFormat;
 use anyhow::Result;
 use clap::{ArgMatches, Command};
-use serde::{Serialize, Deserialize};
-pub use crate::cli::OutputFormat;
+use serde::{Deserialize, Serialize};
 
+pub mod arch;
 pub mod debian;
 pub mod detector;
-pub mod linux_generic;
-pub mod arch;
 pub mod fedora;
+pub mod linux_generic;
 
 /// Unified trait for a system domain (e.g., packages, services).
 /// It defines both the CLI interface and the execution logic.
 pub trait Domain {
     /// The name of the subcommand (e.g., "pkg", "user")
     fn name(&self) -> &'static str;
-    
+
     /// Build the clap Command for this domain
     fn command(&self) -> Command;
-    
+
     /// Execute the command based on the parsed matches.
     /// Takes the full app Command tree in case it's needed (e.g. for completions)
     fn execute(&self, matches: &ArgMatches, app: &Command) -> Result<Box<dyn ExecutableCommand>>;
-    
+
     /// Provide dynamic completion suggestions
-    fn complete(&self, line: &str, words: &[&str], last_word_complete: bool) -> Result<Vec<String>> {
+    fn complete(
+        &self,
+        line: &str,
+        words: &[&str],
+        last_word_complete: bool,
+    ) -> Result<Vec<String>> {
         let _ = (line, words, last_word_complete);
         Ok(vec![])
     }
@@ -36,7 +41,9 @@ pub trait ExecutableCommand {
     fn print(&self) -> Result<()>;
     fn as_string(&self) -> String;
     /// Returns true if this command outputs structured or raw original data (should suppress ao decorations)
-    fn is_structured(&self) -> bool { false }
+    fn is_structured(&self) -> bool {
+        false
+    }
 }
 
 /// Abstracts shell completion management.
@@ -55,10 +62,10 @@ pub struct PackageInfo {
 /// Abstracts system package management operations.
 pub trait PackageManager: Domain {
     fn update(&self) -> Result<Box<dyn ExecutableCommand>>;
-    fn install(&self, packages: &[String]) -> Result<Box<dyn ExecutableCommand>>;
-    fn remove(&self, packages: &[String], purge: bool) -> Result<Box<dyn ExecutableCommand>>;
+    fn add(&self, packages: &[String]) -> Result<Box<dyn ExecutableCommand>>;
+    fn del(&self, packages: &[String], purge: bool) -> Result<Box<dyn ExecutableCommand>>;
     fn search(&self, query: &str) -> Result<Box<dyn ExecutableCommand>>;
-    fn list(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
+    fn ls(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
     fn get_installed_packages(&self) -> Result<Vec<String>>;
     fn get_available_packages(&self) -> Result<Vec<String>>;
 }
@@ -74,7 +81,7 @@ pub struct ServiceInfo {
 
 /// Abstracts system service management operations.
 pub trait ServiceManager: Domain {
-    fn list(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
+    fn ls(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
     fn up(&self, service: &str) -> Result<Box<dyn ExecutableCommand>>;
     fn down(&self, service: &str) -> Result<Box<dyn ExecutableCommand>>;
     fn restart(&self, service: &str) -> Result<Box<dyn ExecutableCommand>>;
@@ -95,7 +102,12 @@ pub struct UserInfo {
 
 /// Abstracts system user management operations.
 pub trait UserManager: Domain {
-    fn list(&self, all: bool, groups: bool, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
+    fn ls(
+        &self,
+        all: bool,
+        groups: bool,
+        format: OutputFormat,
+    ) -> Result<Box<dyn ExecutableCommand>>;
     fn add(
         &self,
         username: &str,
@@ -124,7 +136,7 @@ pub struct GroupInfo {
 
 /// Abstracts system group management operations.
 pub trait GroupManager: Domain {
-    fn list(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
+    fn ls(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
     fn add(&self, groupname: &str) -> Result<Box<dyn ExecutableCommand>>;
     fn del(&self, groupname: &str) -> Result<Box<dyn ExecutableCommand>>;
     fn mod_group(&self, groupname: &str, gid: u32) -> Result<Box<dyn ExecutableCommand>>;
@@ -142,7 +154,7 @@ pub struct DiskInfo {
 
 /// Abstracts system disk management operations.
 pub trait DiskManager: Domain {
-    fn list(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
+    fn ls(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
     fn mount(
         &self,
         device: &str,
@@ -183,7 +195,12 @@ pub struct SysTimeData {
 pub trait SysManager: Domain {
     fn info(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
     fn power(&self, state: &str, now: bool, force: bool) -> Result<Box<dyn ExecutableCommand>>;
-    fn time(&self, action: &str, value: Option<&str>, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
+    fn time(
+        &self,
+        action: &str,
+        value: Option<&str>,
+        format: OutputFormat,
+    ) -> Result<Box<dyn ExecutableCommand>>;
 }
 
 /// Abstracts system log operations.
@@ -264,8 +281,8 @@ pub struct KernelModInfo {
 
 /// Abstracts boot management.
 pub trait BootManager: Domain {
-    fn list_entries(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
-    fn list_modules(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
+    fn ls_entries(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
+    fn ls_modules(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
     fn load_module(&self, name: &str) -> Result<Box<dyn ExecutableCommand>>;
     fn unload_module(&self, name: &str) -> Result<Box<dyn ExecutableCommand>>;
 }
@@ -280,7 +297,7 @@ pub struct DisplayInfo {
 /// Abstracts GUI management.
 pub trait GuiManager: Domain {
     fn info(&self) -> Result<Box<dyn ExecutableCommand>>;
-    fn list_displays(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
+    fn ls_displays(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
 }
 
 #[derive(Serialize, Deserialize)]
@@ -299,14 +316,14 @@ pub struct PrinterInfo {
 
 /// Abstracts device management.
 pub trait DevManager: Domain {
-    fn list(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
+    fn ls(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
     fn pci(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
     fn usb(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
     fn bt_status(&self) -> Result<Box<dyn ExecutableCommand>>;
     fn bt_scan(&self) -> Result<Box<dyn ExecutableCommand>>;
     fn bt_pair(&self, address: &str) -> Result<Box<dyn ExecutableCommand>>;
     fn bt_connect(&self, address: &str) -> Result<Box<dyn ExecutableCommand>>;
-    fn list_printers(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
+    fn ls_printers(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
 }
 
 #[derive(Serialize, Deserialize)]
@@ -321,10 +338,10 @@ pub struct ContainerInfo {
 
 /// Abstracts virtualization.
 pub trait VirtManager: Domain {
-    fn ps(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
+    fn ls(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
     fn start(&self, name: &str) -> Result<Box<dyn ExecutableCommand>>;
     fn stop(&self, name: &str) -> Result<Box<dyn ExecutableCommand>>;
-    fn rm(&self, name: &str) -> Result<Box<dyn ExecutableCommand>>;
+    fn del(&self, name: &str) -> Result<Box<dyn ExecutableCommand>>;
     fn logs(&self, name: &str) -> Result<Box<dyn ExecutableCommand>>;
 }
 
@@ -339,6 +356,20 @@ pub struct SecAuditInfo {
 pub trait SecManager: Domain {
     fn audit(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
     fn context(&self) -> Result<Box<dyn ExecutableCommand>>;
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SelfInfo {
+    pub version: String,
+    pub architecture: String,
+    pub os: String,
+}
+
+/// Abstracts ao self management.
+pub trait SelfManager: Domain {
+    fn info(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
+    fn update(&self) -> Result<Box<dyn ExecutableCommand>>;
+    fn install_completions(&self, shell: clap_complete::Shell, exe_path: &str) -> Result<()>;
 }
 
 /// Abstracts system monitoring operations.

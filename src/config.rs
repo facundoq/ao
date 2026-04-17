@@ -1,10 +1,10 @@
-use serde::{Serialize, Deserialize};
-use std::path::PathBuf;
-use std::fs;
-use anyhow::{Result, Context};
 use crate::cli::OutputFormat;
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Config {
     #[serde(default)]
     pub ui: UiConfig,
@@ -40,16 +40,6 @@ pub struct SystemConfig {
     pub dry_run_by_default: bool,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            ui: UiConfig::default(),
-            system: SystemConfig::default(),
-            aliases: std::collections::HashMap::new(),
-        }
-    }
-}
-
 impl Config {
     pub fn load() -> Result<Self> {
         let home = std::env::var("HOME").context("Failed to find HOME directory")?;
@@ -64,7 +54,7 @@ impl Config {
             if config_path.exists() {
                 let content = fs::read_to_string(&config_path)
                     .with_context(|| format!("Failed to read config at {:?}", config_path))?;
-                
+
                 let config: Config = toml::from_str(&content)
                     .with_context(|| format!("Failed to parse TOML config at {:?}", config_path))?;
 

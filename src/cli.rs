@@ -1,7 +1,7 @@
-use clap::{Parser, Subcommand, Args, ValueHint};
-use clap_complete::Shell;
-use anyhow::Result;
 use crate::os::ExecutableCommand;
+use anyhow::Result;
+use clap::{Args, Parser, Subcommand, ValueHint};
+use clap_complete::Shell;
 
 #[derive(clap::ValueEnum, Clone, Copy, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -32,17 +32,21 @@ pub struct PkgArgs {
 
 #[derive(Subcommand)]
 pub enum PkgAction {
-    /// Update the system package tree and applies available upgrades.
-    Update,
-    /// Installs one or more packages.
-    Install {
-        /// Packages to install
+    /// Adds one or more packages.
+    Add {
+        /// Packages to add
         #[arg(required = true, value_hint = ValueHint::Other)]
         packages: Vec<String>,
     },
-    /// Uninstalls packages.
-    Remove {
-        /// Packages to remove
+    /// Lists all explicitly installed user packages.
+    Ls {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Deletes packages.
+    Del {
+        /// Packages to delete
         #[arg(required = true, value_hint = ValueHint::Other)]
         packages: Vec<String>,
         /// Completely remove configuration files alongside the binary.
@@ -55,12 +59,8 @@ pub enum PkgAction {
         #[arg(required = true, value_hint = ValueHint::Other)]
         query: String,
     },
-    /// Lists all explicitly installed user packages.
-    List {
-        /// The output format
-        #[arg(long, short, default_value = "table")]
-        format: OutputFormat,
-    },
+    /// Update the system package tree and applies available upgrades.
+    Update,
 }
 
 #[derive(Args)]
@@ -71,20 +71,20 @@ pub struct SvcArgs {
 
 #[derive(Subcommand)]
 pub enum SvcAction {
-    /// Lists all active and failed services on the system.
-    List {
-        /// The output format
-        #[arg(long, short, default_value = "table")]
-        format: OutputFormat,
-    },
-    /// Starts and enables a service to start on boot.
-    Up {
+    /// Stops and disables a service from starting on boot.
+    Down {
         /// The service name
         #[arg(required = true, value_hint = ValueHint::Other)]
         name: String,
     },
-    /// Stops and disables a service from starting on boot.
-    Down {
+    /// Lists all active and failed services on the system.
+    Ls {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Reloads the service configuration without fully stopping it.
+    Reload {
         /// The service name
         #[arg(required = true, value_hint = ValueHint::Other)]
         name: String,
@@ -95,14 +95,14 @@ pub enum SvcAction {
         #[arg(required = true, value_hint = ValueHint::Other)]
         name: String,
     },
-    /// Reloads the service configuration without fully stopping it.
-    Reload {
+    /// Displays detailed status for the service.
+    Status {
         /// The service name
         #[arg(required = true, value_hint = ValueHint::Other)]
         name: String,
     },
-    /// Displays detailed status for the service.
-    Status {
+    /// Starts and enables a service to start on boot.
+    Up {
         /// The service name
         #[arg(required = true, value_hint = ValueHint::Other)]
         name: String,
@@ -117,16 +117,6 @@ pub struct UserArgs {
 
 #[derive(Subcommand)]
 pub enum UserAction {
-    /// Lists users
-    List {
-        #[arg(long)]
-        all: bool,
-        #[arg(long)]
-        groups: bool,
-        /// The output format
-        #[arg(long, short, default_value = "table")]
-        format: OutputFormat,
-    },
     /// Creates a new user
     Add {
         #[arg(required = true, value_hint = ValueHint::Other)]
@@ -144,6 +134,16 @@ pub enum UserAction {
         username: String,
         #[arg(long, short)]
         purge: bool,
+    },
+    /// Lists users
+    Ls {
+        #[arg(long)]
+        all: bool,
+        #[arg(long)]
+        groups: bool,
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
     },
     /// Modifies a user
     Mod {
@@ -169,12 +169,6 @@ pub struct GroupArgs {
 
 #[derive(Subcommand)]
 pub enum GroupAction {
-    /// Lists all groups
-    List {
-        /// The output format
-        #[arg(long, short, default_value = "table")]
-        format: OutputFormat,
-    },
     /// Creates a new group
     Add {
         #[arg(required = true, value_hint = ValueHint::Other)]
@@ -184,6 +178,12 @@ pub enum GroupAction {
     Del {
         #[arg(required = true, value_hint = ValueHint::Other)]
         groupname: String,
+    },
+    /// Lists all groups
+    Ls {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
     },
     /// Modifies a group
     Mod {
@@ -201,7 +201,10 @@ pub struct DiskArgs {
 }
 
 impl DiskArgs {
-    pub fn run(&self, _system: &crate::os::detector::DetectedSystem) -> Result<Box<dyn ExecutableCommand>> {
+    pub fn run(
+        &self,
+        _system: &crate::os::detector::DetectedSystem,
+    ) -> Result<Box<dyn ExecutableCommand>> {
         anyhow::bail!("DiskArgs::run is no longer used in the unified Domain architecture")
     }
 }
@@ -209,7 +212,7 @@ impl DiskArgs {
 #[derive(Subcommand)]
 pub enum DiskAction {
     /// Lists all block devices and usage
-    List {
+    Ls {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
@@ -290,11 +293,11 @@ pub struct LogArgs {
 
 #[derive(Subcommand)]
 pub enum LogAction {
-    /// Tails the live logs of a specific service.
-    Tail {
-        /// The service name
-        #[arg(required = true)]
-        name: String,
+    /// Tails a specific log file from disk.
+    File {
+        /// Path to the log file
+        #[arg(required = true, value_hint = ValueHint::FilePath)]
+        path: String,
         /// Number of lines to show
         #[arg(long, short, default_value = "50")]
         lines: u32,
@@ -305,11 +308,11 @@ pub enum LogAction {
         #[arg(long, short, default_value = "50")]
         lines: u32,
     },
-    /// Tails a specific log file from disk.
-    File {
-        /// Path to the log file
-        #[arg(required = true, value_hint = ValueHint::FilePath)]
-        path: String,
+    /// Tails the live logs of a specific service.
+    Tail {
+        /// The service name
+        #[arg(required = true)]
+        name: String,
         /// Number of lines to show
         #[arg(long, short, default_value = "50")]
         lines: u32,
@@ -403,7 +406,7 @@ pub struct BootArgs {
 #[derive(Subcommand)]
 pub enum BootAction {
     /// Lists boot entries
-    List {
+    Ls {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
@@ -418,7 +421,7 @@ pub enum BootAction {
 #[derive(Subcommand)]
 pub enum BootModAction {
     /// Lists loaded kernel modules
-    List {
+    Ls {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
@@ -449,7 +452,7 @@ pub enum GuiAction {
 #[derive(Subcommand)]
 pub enum GuiDisplayAction {
     /// Lists connected displays and resolutions
-    List {
+    Ls {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
@@ -465,7 +468,7 @@ pub struct DevArgs {
 #[derive(Subcommand)]
 pub enum DevAction {
     /// Summarizes connected PCI and USB devices
-    List {
+    Ls {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
@@ -509,7 +512,7 @@ pub enum BtAction {
 #[derive(Subcommand)]
 pub enum PrintAction {
     /// Lists configured printers
-    List {
+    Ls {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
@@ -525,7 +528,7 @@ pub struct VirtArgs {
 #[derive(Subcommand)]
 pub enum VirtAction {
     /// Lists all running containers and active VMs
-    Ps {
+    Ls {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
@@ -559,9 +562,26 @@ pub enum SecAction {
 }
 
 #[derive(Args)]
-pub struct CompletionsArgs {
+pub struct SelfArgs {
     #[command(subcommand)]
-    pub action: CompletionsAction,
+    pub action: SelfAction,
+}
+
+#[derive(Subcommand)]
+pub enum SelfAction {
+    /// Shell completion management
+    Completions {
+        #[command(subcommand)]
+        action: CompletionsAction,
+    },
+    /// Displays information about ao itself
+    Info {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
+    },
+    /// Updates ao to the latest version
+    Update,
 }
 
 #[derive(Subcommand)]
@@ -572,7 +592,7 @@ pub enum CompletionsAction {
         shell: Shell,
     },
     /// Install shell completions into your shell's configuration file
-    Install {
+    Add {
         /// The shell to install completions for
         shell: Shell,
     },

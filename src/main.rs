@@ -1,12 +1,12 @@
 use anyhow::{Context, Result};
 use clap::{Command, CommandFactory, FromArgMatches};
-use cli::Cli;
 use clap_complete::env::CompleteEnv;
+use cli::Cli;
 use os::Domain;
 
 pub mod cli;
-pub mod os;
 pub mod config;
+pub mod os;
 
 fn main() -> Result<()> {
     // 0. Load config
@@ -14,7 +14,8 @@ fn main() -> Result<()> {
 
     // 1. Detect the system first
     let system = os::detector::detect_system()?;
-    let domains = system.domains();
+    let mut domains = system.domains();
+    domains.sort_by_key(|d| d.name());
 
     // 2. Build the command tree dynamically
     let mut app = Cli::command();
@@ -44,8 +45,9 @@ fn main() -> Result<()> {
             return Ok(());
         }
     };
-    
-    let domain = domains.iter()
+
+    let domain = domains
+        .iter()
         .find(|d| d.name() == subcommand_name)
         .with_context(|| format!("Unknown command: {}", subcommand_name))?;
 
@@ -59,7 +61,11 @@ fn main() -> Result<()> {
         // Print the command used to obtain the output by default
         if config.ui.show_command && !executable.is_structured() {
             use colored::Colorize;
-            println!("{} {}", ">".blue().bold(), executable.as_string().bright_black().italic());
+            println!(
+                "{} {}",
+                ">".blue().bold(),
+                executable.as_string().bright_black().italic()
+            );
         }
         executable.execute()?;
     }
@@ -80,16 +86,17 @@ fn handle_dynamic_completion(domains: &[&dyn Domain], app: &Command) -> Result<b
     if let Some(shell_val) = ao_complete {
         let args: Vec<String> = std::env::args().collect();
         if let Some(dash_dash_idx) = args.iter().position(|a| a == "--") {
-            let mut user_words: Vec<String> = args.iter().skip(dash_dash_idx + 1).cloned().collect();
-            
+            let mut user_words: Vec<String> =
+                args.iter().skip(dash_dash_idx + 1).cloned().collect();
+
             // Normalize first word to "ao" so matching logic works regardless of how binary was called
             if !user_words.is_empty() {
                 user_words[0] = "ao".to_string();
             }
-            
+
             let user_words_refs: Vec<&str> = user_words.iter().map(|s| s.as_str()).collect();
             let line = user_words_refs.join(" ");
-            
+
             for domain in domains {
                 let suggestions = domain.complete(&line, &user_words_refs, false)?;
                 if !suggestions.is_empty() {
@@ -102,11 +109,13 @@ fn handle_dynamic_completion(domains: &[&dyn Domain], app: &Command) -> Result<b
                 }
             }
         }
-        
+
         // Handover to clap if manual logic didn't match.
         // We MUST have an index to get suggestions instead of the script.
         if clap_complete_index.is_some() {
-            unsafe { std::env::set_var("COMPLETE", shell_val); }
+            unsafe {
+                std::env::set_var("COMPLETE", shell_val);
+            }
             let app_clone = app.clone();
             CompleteEnv::with_factory(move || app_clone.clone()).complete();
             return Ok(true);
@@ -127,10 +136,13 @@ fn hide_help_globally(mut cmd: Command) -> Command {
     if cmd.get_arguments().any(|a| a.get_id() == "help") {
         cmd = cmd.mut_arg("help", |a| a.hide(true));
     }
-    
-    let sub_names: Vec<String> = cmd.get_subcommands().map(|s| s.get_name().to_string()).collect();
+
+    let sub_names: Vec<String> = cmd
+        .get_subcommands()
+        .map(|s| s.get_name().to_string())
+        .collect();
     for name in sub_names {
-        cmd = cmd.mut_subcommand(&name, |s| hide_help_globally(s));
+        cmd = cmd.mut_subcommand(&name, hide_help_globally);
     }
     cmd
 }

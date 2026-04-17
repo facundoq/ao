@@ -1,32 +1,43 @@
-use super::{ExecutableCommand, PackageManager, Domain, OutputFormat, PackageInfo};
 use super::linux_generic::{SystemCommand, is_completing_arg};
+use super::{Domain, ExecutableCommand, OutputFormat, PackageInfo, PackageManager};
+use crate::cli::{PkgAction, PkgArgs};
 use anyhow::Result;
+use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
 use std::process::Command;
-use clap::{Command as ClapCommand, ArgMatches, FromArgMatches, Args};
-use crate::cli::{PkgArgs, PkgAction};
 
 pub struct Apt;
 
 impl Domain for Apt {
-    fn name(&self) -> &'static str { "pkg" }
+    fn name(&self) -> &'static str {
+        "pkg"
+    }
     fn command(&self) -> ClapCommand {
         PkgArgs::augment_args(ClapCommand::new("pkg").about("Manage packages (APT)"))
     }
-    fn execute(&self, matches: &ArgMatches, _app: &ClapCommand) -> Result<Box<dyn ExecutableCommand>> {
+    fn execute(
+        &self,
+        matches: &ArgMatches,
+        _app: &ClapCommand,
+    ) -> Result<Box<dyn ExecutableCommand>> {
         let args = PkgArgs::from_arg_matches(matches)?;
         match &args.action {
             PkgAction::Update => self.update(),
-            PkgAction::Install { packages } => self.install(packages),
-            PkgAction::Remove { packages, purge } => self.remove(packages, *purge),
+            PkgAction::Add { packages } => self.add(packages),
+            PkgAction::Del { packages, purge } => self.del(packages, *purge),
             PkgAction::Search { query } => self.search(query),
-            PkgAction::List { format } => self.list(*format),
+            PkgAction::Ls { format } => self.ls(*format),
         }
     }
-    fn complete(&self, _line: &str, words: &[&str], last_word_complete: bool) -> Result<Vec<String>> {
-        if is_completing_arg(words, &["ao", "pkg", "install"], 1, last_word_complete) {
+    fn complete(
+        &self,
+        _line: &str,
+        words: &[&str],
+        last_word_complete: bool,
+    ) -> Result<Vec<String>> {
+        if is_completing_arg(words, &["ao", "pkg", "add"], 1, last_word_complete) {
             return self.get_available_packages();
         }
-        if is_completing_arg(words, &["ao", "pkg", "remove"], 1, last_word_complete) {
+        if is_completing_arg(words, &["ao", "pkg", "del"], 1, last_word_complete) {
             return self.get_installed_packages();
         }
         Ok(vec![])
@@ -38,27 +49,44 @@ impl PackageManager for Apt {
         Ok(Box::new(SystemCommand::new("apt-get").arg("update")))
     }
 
-    fn install(&self, packages: &[String]) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(SystemCommand::new("apt-get").arg("install").arg("-y").arg("--").args(packages)))
+    fn add(&self, packages: &[String]) -> Result<Box<dyn ExecutableCommand>> {
+        Ok(Box::new(
+            SystemCommand::new("apt-get")
+                .arg("install")
+                .arg("-y")
+                .arg("--")
+                .args(packages),
+        ))
     }
 
-    fn remove(&self, packages: &[String], purge: bool) -> Result<Box<dyn ExecutableCommand>> {
+    fn del(&self, packages: &[String], purge: bool) -> Result<Box<dyn ExecutableCommand>> {
         let mut cmd = SystemCommand::new("apt-get");
-        if purge { cmd = cmd.arg("purge"); }
-        else { cmd = cmd.arg("remove"); }
+        if purge {
+            cmd = cmd.arg("purge");
+        } else {
+            cmd = cmd.arg("remove");
+        }
         Ok(Box::new(cmd.arg("-y").arg("--").args(packages)))
     }
 
     fn search(&self, query: &str) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(SystemCommand::new("apt-cache").arg("search").arg("--").arg(query)))
+        Ok(Box::new(
+            SystemCommand::new("apt-cache")
+                .arg("search")
+                .arg("--")
+                .arg(query),
+        ))
     }
 
-    fn list(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
+    fn ls(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(AptListCommand { format }))
     }
 
     fn get_installed_packages(&self) -> Result<Vec<String>> {
-        let output = Command::new("dpkg-query").arg("-W").arg("-f=${Package}\n").output()?;
+        let output = Command::new("dpkg-query")
+            .arg("-W")
+            .arg("-f=${Package}\n")
+            .output()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
         Ok(stdout.lines().map(|s| s.to_string()).collect())
     }
@@ -70,14 +98,22 @@ impl PackageManager for Apt {
     }
 }
 
-pub struct AptListCommand { pub format: OutputFormat }
+pub struct AptListCommand {
+    pub format: OutputFormat,
+}
 impl ExecutableCommand for AptListCommand {
     fn execute(&self) -> Result<()> {
         if matches!(self.format, OutputFormat::Original) {
-            return SystemCommand::new("apt").arg("list").arg("--installed").execute();
+            return SystemCommand::new("apt")
+                .arg("list")
+                .arg("--installed")
+                .execute();
         }
 
-        let output = Command::new("dpkg-query").arg("-W").arg("-f=${Package}\t${Version}\t${Architecture}\t${db:Status-Abbrev}\n").output()?;
+        let output = Command::new("dpkg-query")
+            .arg("-W")
+            .arg("-f=${Package}\t${Version}\t${Architecture}\t${db:Status-Abbrev}\n")
+            .output()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
         let mut packages = Vec::new();
         for line in stdout.lines() {
@@ -105,16 +141,31 @@ impl ExecutableCommand for AptListCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => { println!("{}", serde_json::to_string_pretty(&packages)?); }
-            OutputFormat::Yaml => { println!("{}", serde_yaml::to_string(&packages)?); }
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(&packages)?);
+            }
+            OutputFormat::Yaml => {
+                println!("{}", serde_yaml::to_string(&packages)?);
+            }
             OutputFormat::Original => unreachable!(),
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> { println!("[DRY RUN] apt list --installed (format: {:?})", self.format); Ok(()) }
-    fn print(&self) -> Result<()> { println!("apt list --installed (format: {:?})", self.format); Ok(()) }
-    fn as_string(&self) -> String { format!("apt list --installed --format {:?}", self.format) }
+    fn dry_run(&self) -> Result<()> {
+        println!("[DRY RUN] apt list --installed (format: {:?})", self.format);
+        Ok(())
+    }
+    fn print(&self) -> Result<()> {
+        println!("apt list --installed (format: {:?})", self.format);
+        Ok(())
+    }
+    fn as_string(&self) -> String {
+        format!("apt list --installed --format {:?}", self.format)
+    }
     fn is_structured(&self) -> bool {
-        matches!(self.format, OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original)
+        matches!(
+            self.format,
+            OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original
+        )
     }
 }

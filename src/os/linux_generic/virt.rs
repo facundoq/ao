@@ -1,54 +1,89 @@
-use anyhow::Result;
-use clap::{ArgMatches, Command as ClapCommand, FromArgMatches, Args};
-use crate::os::{VirtManager, ExecutableCommand, Domain, ContainerInfo, OutputFormat};
-use crate::cli::{VirtArgs, VirtAction};
 use super::common::SystemCommand;
+use crate::cli::{VirtAction, VirtArgs};
+use crate::os::{ContainerInfo, Domain, ExecutableCommand, OutputFormat, VirtManager};
+use anyhow::Result;
+use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
 use std::process::Command;
 
 pub struct StandardVirt;
 
 impl Domain for StandardVirt {
-    fn name(&self) -> &'static str { "virt" }
+    fn name(&self) -> &'static str {
+        "virt"
+    }
     fn command(&self) -> ClapCommand {
         VirtArgs::augment_args(ClapCommand::new("virt").about("Manage containers and VMs"))
     }
-    fn execute(&self, matches: &ArgMatches, _app: &ClapCommand) -> Result<Box<dyn ExecutableCommand>> {
+    fn execute(
+        &self,
+        matches: &ArgMatches,
+        _app: &ClapCommand,
+    ) -> Result<Box<dyn ExecutableCommand>> {
         let args = VirtArgs::from_arg_matches(matches)?;
         match &args.action {
-            VirtAction::Ps { format } => self.ps(*format),
+            VirtAction::Ls { format } => self.ls(*format),
             VirtAction::Start { name } => self.start(name),
             VirtAction::Stop { name } => self.stop(name),
-            VirtAction::Rm { name } => self.rm(name),
+            VirtAction::Rm { name } => self.del(name),
             VirtAction::Logs { name } => self.logs(name),
         }
     }
 }
 
 impl VirtManager for StandardVirt {
-    fn ps(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
+    fn ls(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
         if matches!(format, OutputFormat::Original) {
             return Ok(Box::new(SystemCommand::new("docker").arg("ps")));
         }
         Ok(Box::new(VirtPsCommand { format }))
     }
+
     fn start(&self, name: &str) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(SystemCommand::new("docker").arg("start").arg(name)))
+        Ok(Box::new(
+            SystemCommand::new("docker")
+                .arg("start")
+                .arg("--")
+                .arg(name),
+        ))
     }
+
     fn stop(&self, name: &str) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(SystemCommand::new("docker").arg("stop").arg(name)))
+        Ok(Box::new(
+            SystemCommand::new("docker").arg("stop").arg("--").arg(name),
+        ))
     }
-    fn rm(&self, name: &str) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(SystemCommand::new("docker").arg("rm").arg(name)))
+
+    fn del(&self, name: &str) -> Result<Box<dyn ExecutableCommand>> {
+        Ok(Box::new(
+            SystemCommand::new("docker")
+                .arg("rm")
+                .arg("-f")
+                .arg("--")
+                .arg(name),
+        ))
     }
+
     fn logs(&self, name: &str) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(SystemCommand::new("docker").arg("logs").arg("-f").arg(name)))
+        Ok(Box::new(
+            SystemCommand::new("docker")
+                .arg("logs")
+                .arg("-f")
+                .arg("--")
+                .arg(name),
+        ))
     }
 }
 
-pub struct VirtPsCommand { pub format: OutputFormat }
+pub struct VirtPsCommand {
+    pub format: OutputFormat,
+}
 impl ExecutableCommand for VirtPsCommand {
     fn execute(&self) -> Result<()> {
-        let output = Command::new("docker").arg("ps").arg("--format").arg("{{.ID}}\t{{.Image}}\t{{.Command}}\t{{.CreatedAt}}\t{{.Status}}\t{{.Names}}").output()?;
+        let output = Command::new("docker")
+            .arg("ps")
+            .arg("--format")
+            .arg("{{.ID}}\t{{.Image}}\t{{.Command}}\t{{.CreatedAt}}\t{{.Status}}\t{{.Names}}")
+            .output()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
         let mut containers = Vec::new();
         for line in stdout.lines() {
@@ -74,16 +109,31 @@ impl ExecutableCommand for VirtPsCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => { println!("{}", serde_json::to_string_pretty(&containers)?); }
-            OutputFormat::Yaml => { println!("{}", serde_yaml::to_string(&containers)?); }
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(&containers)?);
+            }
+            OutputFormat::Yaml => {
+                println!("{}", serde_yaml::to_string(&containers)?);
+            }
             OutputFormat::Original => unreachable!(),
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> { println!("[DRY RUN] docker ps (format: {:?})", self.format); Ok(()) }
-    fn print(&self) -> Result<()> { println!("docker ps (format: {:?})", self.format); Ok(()) }
-    fn as_string(&self) -> String { format!("docker ps --format {:?}", self.format) }
+    fn dry_run(&self) -> Result<()> {
+        println!("[DRY RUN] docker ps (format: {:?})", self.format);
+        Ok(())
+    }
+    fn print(&self) -> Result<()> {
+        println!("docker ps (format: {:?})", self.format);
+        Ok(())
+    }
+    fn as_string(&self) -> String {
+        format!("docker ps --format {:?}", self.format)
+    }
     fn is_structured(&self) -> bool {
-        matches!(self.format, OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original)
+        matches!(
+            self.format,
+            OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original
+        )
     }
 }

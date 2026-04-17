@@ -1,18 +1,30 @@
-use anyhow::Result;
-use clap::{ArgMatches, Command as ClapCommand, FromArgMatches, Args};
-use crate::os::{NetManager, ExecutableCommand, Domain, NetInterfaceInfo, NetIpInfo, NetRouteInfo, FwRuleInfo, OutputFormat};
-use crate::cli::{NetArgs, NetAction, FwAction, WifiAction};
 use super::common::SystemCommand;
+use crate::cli::{FwAction, NetAction, NetArgs, WifiAction};
+use crate::os::{
+    Domain, ExecutableCommand, FwRuleInfo, NetInterfaceInfo, NetIpInfo, NetManager, NetRouteInfo,
+    OutputFormat,
+};
+use anyhow::Result;
+use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
 use std::process::Command;
 
 pub struct StandardNet;
 
 impl Domain for StandardNet {
-    fn name(&self) -> &'static str { "net" }
-    fn command(&self) -> ClapCommand {
-        NetArgs::augment_args(ClapCommand::new("net").about("Manage networking (interfaces, IPs, routes, firewall, Wi-Fi)"))
+    fn name(&self) -> &'static str {
+        "net"
     }
-    fn execute(&self, matches: &ArgMatches, _app: &ClapCommand) -> Result<Box<dyn ExecutableCommand>> {
+    fn command(&self) -> ClapCommand {
+        NetArgs::augment_args(
+            ClapCommand::new("net")
+                .about("Manage networking (interfaces, IPs, routes, firewall, Wi-Fi)"),
+        )
+    }
+    fn execute(
+        &self,
+        matches: &ArgMatches,
+        _app: &ClapCommand,
+    ) -> Result<Box<dyn ExecutableCommand>> {
         let args = NetArgs::from_arg_matches(matches)?;
         match &args.action {
             NetAction::Interfaces { format } => self.interfaces(*format),
@@ -46,27 +58,55 @@ impl NetManager for StandardNet {
     }
     fn fw_allow(&self, rule: &str) -> Result<Box<dyn ExecutableCommand>> {
         if std::path::Path::new("/usr/sbin/ufw").exists() {
-            Ok(Box::new(SystemCommand::new("ufw").arg("allow").arg(rule)))
+            Ok(Box::new(
+                SystemCommand::new("ufw").arg("allow").arg("--").arg(rule),
+            ))
         } else {
-            Ok(Box::new(SystemCommand::new("firewall-cmd").arg("--add-rich-rule").arg(rule).arg("--permanent")))
+            Ok(Box::new(
+                SystemCommand::new("firewall-cmd")
+                    .arg("--add-rich-rule")
+                    .arg(rule)
+                    .arg("--permanent"),
+            ))
         }
     }
     fn fw_deny(&self, rule: &str) -> Result<Box<dyn ExecutableCommand>> {
         if std::path::Path::new("/usr/sbin/ufw").exists() {
-            Ok(Box::new(SystemCommand::new("ufw").arg("deny").arg(rule)))
+            Ok(Box::new(
+                SystemCommand::new("ufw").arg("deny").arg("--").arg(rule),
+            ))
         } else {
-            Ok(Box::new(SystemCommand::new("firewall-cmd").arg("--add-rich-rule").arg(rule).arg("--permanent")))
+            Ok(Box::new(
+                SystemCommand::new("firewall-cmd")
+                    .arg("--add-rich-rule")
+                    .arg(rule)
+                    .arg("--permanent"),
+            ))
         }
     }
     fn wifi_scan(&self) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(SystemCommand::new("nmcli").arg("dev").arg("wifi").arg("list")))
+        Ok(Box::new(
+            SystemCommand::new("nmcli")
+                .arg("dev")
+                .arg("wifi")
+                .arg("list"),
+        ))
     }
     fn wifi_connect(&self, ssid: &str) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(SystemCommand::new("nmcli").arg("dev").arg("wifi").arg("connect").arg(ssid)))
+        Ok(Box::new(
+            SystemCommand::new("nmcli")
+                .arg("dev")
+                .arg("wifi")
+                .arg("connect")
+                .arg("--")
+                .arg(ssid),
+        ))
     }
 }
 
-pub struct NetInterfacesCommand { pub format: OutputFormat }
+pub struct NetInterfacesCommand {
+    pub format: OutputFormat,
+}
 impl ExecutableCommand for NetInterfacesCommand {
     fn execute(&self) -> Result<()> {
         if matches!(self.format, OutputFormat::Original) {
@@ -75,41 +115,71 @@ impl ExecutableCommand for NetInterfacesCommand {
 
         let output = Command::new("ip").arg("--json").arg("addr").output()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
-        
+
         #[derive(serde::Deserialize)]
-        struct RawInterface { ifname: String, operstate: String, mtu: u32, address: Option<String> }
+        struct RawInterface {
+            ifname: String,
+            operstate: String,
+            mtu: u32,
+            address: Option<String>,
+        }
         let raw: Vec<RawInterface> = serde_json::from_str(&stdout)?;
-        let interfaces: Vec<NetInterfaceInfo> = raw.into_iter().map(|r| NetInterfaceInfo {
-            name: r.ifname,
-            state: r.operstate,
-            mtu: r.mtu,
-            mac: r.address.unwrap_or_default(),
-        }).collect();
+        let interfaces: Vec<NetInterfaceInfo> = raw
+            .into_iter()
+            .map(|r| NetInterfaceInfo {
+                name: r.ifname,
+                state: r.operstate,
+                mtu: r.mtu,
+                mac: r.address.unwrap_or_default(),
+            })
+            .collect();
 
         match self.format {
             OutputFormat::Table => {
                 let mut table = comfy_table::Table::new();
                 table.set_header(vec!["Interface", "State", "MTU", "MAC"]);
                 for iface in interfaces {
-                    table.add_row(vec![iface.name, iface.state, iface.mtu.to_string(), iface.mac]);
+                    table.add_row(vec![
+                        iface.name,
+                        iface.state,
+                        iface.mtu.to_string(),
+                        iface.mac,
+                    ]);
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => { println!("{}", serde_json::to_string_pretty(&interfaces)?); }
-            OutputFormat::Yaml => { println!("{}", serde_yaml::to_string(&interfaces)?); }
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(&interfaces)?);
+            }
+            OutputFormat::Yaml => {
+                println!("{}", serde_yaml::to_string(&interfaces)?);
+            }
             OutputFormat::Original => unreachable!(),
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> { println!("[DRY RUN] ip addr (format: {:?})", self.format); Ok(()) }
-    fn print(&self) -> Result<()> { println!("ip addr (format: {:?})", self.format); Ok(()) }
-    fn as_string(&self) -> String { format!("ip addr --format {:?}", self.format) }
+    fn dry_run(&self) -> Result<()> {
+        println!("[DRY RUN] ip addr (format: {:?})", self.format);
+        Ok(())
+    }
+    fn print(&self) -> Result<()> {
+        println!("ip addr (format: {:?})", self.format);
+        Ok(())
+    }
+    fn as_string(&self) -> String {
+        format!("ip addr --format {:?}", self.format)
+    }
     fn is_structured(&self) -> bool {
-        matches!(self.format, OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original)
+        matches!(
+            self.format,
+            OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original
+        )
     }
 }
 
-pub struct NetIpsCommand { pub format: OutputFormat }
+pub struct NetIpsCommand {
+    pub format: OutputFormat,
+}
 impl ExecutableCommand for NetIpsCommand {
     fn execute(&self) -> Result<()> {
         if matches!(self.format, OutputFormat::Original) {
@@ -118,11 +188,17 @@ impl ExecutableCommand for NetIpsCommand {
 
         let output = Command::new("ip").arg("--json").arg("addr").output()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
-        
+
         #[derive(serde::Deserialize)]
-        struct IpAddrEntry { ifname: String, addr_info: Vec<IpAddrInfo> }
+        struct IpAddrEntry {
+            ifname: String,
+            addr_info: Vec<IpAddrInfo>,
+        }
         #[derive(serde::Deserialize)]
-        struct IpAddrInfo { family: String, local: String }
+        struct IpAddrInfo {
+            family: String,
+            local: String,
+        }
 
         let raw: Vec<IpAddrEntry> = serde_json::from_str(&stdout)?;
         let mut ips = Vec::new();
@@ -145,21 +221,38 @@ impl ExecutableCommand for NetIpsCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => { println!("{}", serde_json::to_string_pretty(&ips)?); }
-            OutputFormat::Yaml => { println!("{}", serde_yaml::to_string(&ips)?); }
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(&ips)?);
+            }
+            OutputFormat::Yaml => {
+                println!("{}", serde_yaml::to_string(&ips)?);
+            }
             OutputFormat::Original => unreachable!(),
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> { println!("[DRY RUN] ip addr (for IPs) (format: {:?})", self.format); Ok(()) }
-    fn print(&self) -> Result<()> { println!("ip addr (for IPs) (format: {:?})", self.format); Ok(()) }
-    fn as_string(&self) -> String { format!("ip addr --format {:?}", self.format) }
+    fn dry_run(&self) -> Result<()> {
+        println!("[DRY RUN] ip addr (for IPs) (format: {:?})", self.format);
+        Ok(())
+    }
+    fn print(&self) -> Result<()> {
+        println!("ip addr (for IPs) (format: {:?})", self.format);
+        Ok(())
+    }
+    fn as_string(&self) -> String {
+        format!("ip addr --format {:?}", self.format)
+    }
     fn is_structured(&self) -> bool {
-        matches!(self.format, OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original)
+        matches!(
+            self.format,
+            OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original
+        )
     }
 }
 
-pub struct NetRoutesCommand { pub format: OutputFormat }
+pub struct NetRoutesCommand {
+    pub format: OutputFormat,
+}
 impl ExecutableCommand for NetRoutesCommand {
     fn execute(&self) -> Result<()> {
         if matches!(self.format, OutputFormat::Original) {
@@ -168,47 +261,77 @@ impl ExecutableCommand for NetRoutesCommand {
 
         let output = Command::new("ip").arg("--json").arg("route").output()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
-        
+
         #[derive(serde::Deserialize)]
-        struct RawRoute { dst: String, gateway: Option<String>, dev: String }
+        struct RawRoute {
+            dst: String,
+            gateway: Option<String>,
+            dev: String,
+        }
         let raw: Vec<RawRoute> = serde_json::from_str(&stdout)?;
-        let routes: Vec<NetRouteInfo> = raw.into_iter().map(|r| NetRouteInfo {
-            destination: r.dst,
-            gateway: r.gateway,
-            interface: r.dev,
-        }).collect();
+        let routes: Vec<NetRouteInfo> = raw
+            .into_iter()
+            .map(|r| NetRouteInfo {
+                destination: r.dst,
+                gateway: r.gateway,
+                interface: r.dev,
+            })
+            .collect();
 
         match self.format {
             OutputFormat::Table => {
                 let mut table = comfy_table::Table::new();
                 table.set_header(vec!["Destination", "Gateway", "Interface"]);
                 for r in routes {
-                    table.add_row(vec![r.destination, r.gateway.unwrap_or_default(), r.interface]);
+                    table.add_row(vec![
+                        r.destination,
+                        r.gateway.unwrap_or_default(),
+                        r.interface,
+                    ]);
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => { println!("{}", serde_json::to_string_pretty(&routes)?); }
-            OutputFormat::Yaml => { println!("{}", serde_yaml::to_string(&routes)?); }
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(&routes)?);
+            }
+            OutputFormat::Yaml => {
+                println!("{}", serde_yaml::to_string(&routes)?);
+            }
             OutputFormat::Original => unreachable!(),
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> { println!("[DRY RUN] ip route (format: {:?})", self.format); Ok(()) }
-    fn print(&self) -> Result<()> { println!("ip route (format: {:?})", self.format); Ok(()) }
-    fn as_string(&self) -> String { format!("ip route --format {:?}", self.format) }
+    fn dry_run(&self) -> Result<()> {
+        println!("[DRY RUN] ip route (format: {:?})", self.format);
+        Ok(())
+    }
+    fn print(&self) -> Result<()> {
+        println!("ip route (format: {:?})", self.format);
+        Ok(())
+    }
+    fn as_string(&self) -> String {
+        format!("ip route --format {:?}", self.format)
+    }
     fn is_structured(&self) -> bool {
-        matches!(self.format, OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original)
+        matches!(
+            self.format,
+            OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original
+        )
     }
 }
 
-pub struct FwStatusCommand { pub format: OutputFormat }
+pub struct FwStatusCommand {
+    pub format: OutputFormat,
+}
 impl ExecutableCommand for FwStatusCommand {
     fn execute(&self) -> Result<()> {
         if matches!(self.format, OutputFormat::Original) {
             if std::path::Path::new("/usr/sbin/ufw").exists() {
                 return SystemCommand::new("ufw").arg("status").execute();
             } else {
-                return SystemCommand::new("firewall-cmd").arg("--list-all").execute();
+                return SystemCommand::new("firewall-cmd")
+                    .arg("--list-all")
+                    .execute();
             }
         }
 
@@ -232,17 +355,32 @@ impl ExecutableCommand for FwStatusCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => { println!("{}", serde_json::to_string_pretty(&rules)?); }
-            OutputFormat::Yaml => { println!("{}", serde_yaml::to_string(&rules)?); }
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(&rules)?);
+            }
+            OutputFormat::Yaml => {
+                println!("{}", serde_yaml::to_string(&rules)?);
+            }
             OutputFormat::Original => unreachable!(),
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> { println!("[DRY RUN] Firewall status (format: {:?})", self.format); Ok(()) }
-    fn print(&self) -> Result<()> { println!("Firewall status (format: {:?})", self.format); Ok(()) }
-    fn as_string(&self) -> String { format!("firewall status --format {:?}", self.format) }
+    fn dry_run(&self) -> Result<()> {
+        println!("[DRY RUN] Firewall status (format: {:?})", self.format);
+        Ok(())
+    }
+    fn print(&self) -> Result<()> {
+        println!("Firewall status (format: {:?})", self.format);
+        Ok(())
+    }
+    fn as_string(&self) -> String {
+        format!("firewall status --format {:?}", self.format)
+    }
     fn is_structured(&self) -> bool {
-        matches!(self.format, OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original)
+        matches!(
+            self.format,
+            OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original
+        )
     }
 }
 
@@ -252,8 +390,8 @@ impl FwStatusCommand {
         let mut status = "unknown".to_string();
         let mut parsing_rules = false;
         for line in stdout.lines() {
-            if line.starts_with("Status: ") {
-                status = line["Status: ".len()..].to_string();
+            if let Some(s) = line.strip_prefix("Status: ") {
+                status = s.to_string();
             } else if line.contains("--") && line.contains("Action") {
                 parsing_rules = true;
                 continue;

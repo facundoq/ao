@@ -9,7 +9,7 @@ if [ ! -f "$EXE" ]; then
 fi
 
 echo "--- Testing Bash Completions ---"
-BASH_SCRIPT=$($EXE completions generate bash)
+BASH_SCRIPT=$($EXE self completions generate bash)
 
 test_bash() {
     local cmd="$1"
@@ -38,7 +38,7 @@ test_bash() {
 BASH_EOF
 }
 
-# 10 Bash Tests
+# Bash Tests
 test_bash "ao group del " "root"
 test_bash "ao group mod " "root"
 test_bash "ao user del " "root"
@@ -46,8 +46,8 @@ test_bash "ao user passwd " "root"
 test_bash "ao user mod " "root"
 test_bash "ao user mod root " "shell"
 test_bash "ao user mod root shell " "/bin/"
-test_bash "ao completions generate " "bash"
-test_bash "ao completions setup " "zsh"
+test_bash "ao self completions generate " "bash"
+test_bash "ao self completions setup " "zsh"
 test_bash "ao svc status " ".service"
 test_bash "ao sys power " "reboot"
 test_bash "ao log tail " ".service"
@@ -55,13 +55,13 @@ test_bash "ao distro " "upgrade"
 test_bash "ao net " "interfaces"
 test_bash "ao net fw " "status"
 test_bash "ao net wifi " "scan"
-test_bash "ao boot " "list"
-test_bash "ao boot mod " "list"
+test_bash "ao boot " "ls"
+test_bash "ao boot mod " "ls"
 test_bash "ao gui " "info"
-test_bash "ao gui display " "list"
-test_bash "ao dev " "list"
+test_bash "ao gui display " "ls"
+test_bash "ao dev " "ls"
 test_bash "ao dev bt " "scan"
-test_bash "ao virt " "ps"
+test_bash "ao virt " "ls"
 test_bash "ao virt start " "help"
 test_bash "ao sec " "audit"
 
@@ -86,7 +86,7 @@ test_zsh() {
     fi
 }
 
-# 10 Zsh Tests
+# Zsh Tests
 # "ao group del " -> index 3 (0:ao, 1:group, 2:del, 3:"")
 test_zsh "ao group del" "root" 3
 test_zsh "ao group mod" "root" 3
@@ -97,8 +97,8 @@ test_zsh "ao user mod" "root" 3
 test_zsh "ao user mod root" "shell" 4
 # "ao user mod root shell " -> index 5
 test_zsh "ao user mod root shell" "/bin/" 5
-test_zsh "ao completions generate" "bash" 3
-test_zsh "ao completions setup" "zsh" 3
+test_zsh "ao self completions generate" "bash" 4
+test_zsh "ao self completions setup" "zsh" 4
 test_zsh "ao svc status" ".service" 3
 test_zsh "ao sys power" "reboot" 3
 test_zsh "ao log tail" ".service" 3
@@ -106,13 +106,13 @@ test_zsh "ao distro" "upgrade" 2
 test_zsh "ao net" "interfaces" 2
 test_zsh "ao net fw" "status" 3
 test_zsh "ao net wifi" "scan" 3
-test_zsh "ao boot" "list" 2
-test_zsh "ao boot mod" "list" 3
+test_zsh "ao boot" "ls" 2
+test_zsh "ao boot mod" "ls" 3
 test_zsh "ao gui" "info" 2
-test_zsh "ao gui display" "list" 3
-test_zsh "ao dev" "list" 2
+test_zsh "ao gui display" "ls" 3
+test_zsh "ao dev" "ls" 2
 test_zsh "ao dev bt" "scan" 3
-test_zsh "ao virt" "ps" 2
+test_zsh "ao virt" "ls" 2
 test_zsh "ao virt start" "help" 3
 test_zsh "ao sec" "audit" 2
 

@@ -1,15 +1,15 @@
-use super::debian::Apt;
 use super::arch::Pacman;
+use super::debian::Apt;
 use super::fedora::Dnf;
 use super::linux_generic::{
-    StandardDisk, StandardGroup, StandardMonitor, Systemd, StandardUser, StandardCompletions,
-    StandardSys, StandardLog, StandardDistro, StandardNet, StandardBoot, StandardGui,
-    StandardDev, StandardVirt, StandardSec
+    StandardBoot, StandardDev, StandardDisk, StandardDistro, StandardGroup, StandardGui,
+    StandardLog, StandardMonitor, StandardNet, StandardSec, StandardSelf, StandardSys,
+    StandardUser, StandardVirt, Systemd,
 };
 use super::{
-    DiskManager, GroupManager, MonitorManager, PackageManager, ServiceManager, UserManager, Domain, CompletionsManager,
-    SysManager, LogManager, DistroManager, NetManager, BootManager, GuiManager,
-    DevManager, VirtManager, SecManager
+    BootManager, DevManager, DiskManager, DistroManager, Domain, GroupManager, GuiManager,
+    LogManager, MonitorManager, NetManager, PackageManager, SecManager, SelfManager,
+    ServiceManager, SysManager, UserManager, VirtManager,
 };
 use anyhow::{Result, bail};
 use std::fs::File;
@@ -31,7 +31,7 @@ pub struct DetectedSystem {
     pub log: Box<dyn LogManager>,
     pub distro: Box<dyn DistroManager>,
     pub monitor: Box<dyn MonitorManager>,
-    pub completions: Box<dyn CompletionsManager>,
+    pub self_manager: Box<dyn SelfManager>,
 }
 
 impl DetectedSystem {
@@ -52,7 +52,7 @@ impl DetectedSystem {
             self.log.as_ref(),
             self.distro.as_ref(),
             self.monitor.as_ref(),
-            self.completions.as_ref(),
+            self.self_manager.as_ref(),
         ]
     }
 }
@@ -62,15 +62,15 @@ pub fn detect_system() -> Result<DetectedSystem> {
     let mut os_release = String::new();
     if let Ok(file) = File::open("/etc/os-release") {
         let reader = BufReader::new(file);
-        for line in reader.lines() {
-            if let Ok(l) = line {
-                os_release.push_str(&l);
-                os_release.push('\n');
-            }
+        for l in reader.lines().map_while(Result::ok) {
+            os_release.push_str(&l);
+            os_release.push('\n');
         }
     }
 
-    let is_debian_based = os_release.contains("ID=ubuntu") || os_release.contains("ID=debian") || os_release.contains("ID_LIKE=debian");
+    let is_debian_based = os_release.contains("ID=ubuntu")
+        || os_release.contains("ID=debian")
+        || os_release.contains("ID_LIKE=debian");
     let is_arch_based = os_release.contains("ID=arch") || os_release.contains("ID_LIKE=arch");
     let is_fedora_based = os_release.contains("ID=fedora") || os_release.contains("ID_LIKE=fedora");
 
@@ -91,7 +91,7 @@ pub fn detect_system() -> Result<DetectedSystem> {
             log: Box::new(StandardLog),
             distro: Box::new(StandardDistro),
             monitor: Box::new(StandardMonitor),
-            completions: Box::new(StandardCompletions),
+            self_manager: Box::new(StandardSelf),
         });
     }
 
@@ -112,7 +112,7 @@ pub fn detect_system() -> Result<DetectedSystem> {
             log: Box::new(StandardLog),
             distro: Box::new(StandardDistro),
             monitor: Box::new(StandardMonitor),
-            completions: Box::new(StandardCompletions),
+            self_manager: Box::new(StandardSelf),
         });
     }
 
@@ -133,7 +133,7 @@ pub fn detect_system() -> Result<DetectedSystem> {
             log: Box::new(StandardLog),
             distro: Box::new(StandardDistro),
             monitor: Box::new(StandardMonitor),
-            completions: Box::new(StandardCompletions),
+            self_manager: Box::new(StandardSelf),
         });
     }
 

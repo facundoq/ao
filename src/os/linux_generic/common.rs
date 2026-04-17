@@ -1,7 +1,7 @@
-use anyhow::{Context, Result};
-use std::process::Command;
-use std::io::Write;
 use crate::os::ExecutableCommand;
+use anyhow::{Context, Result};
+use std::io::Write;
+use std::process::Command;
 
 pub struct SystemCommand {
     pub binary: String,
@@ -132,16 +132,33 @@ impl ExecutableCommand for CompoundCommand {
 
 pub struct NoopCommand;
 impl ExecutableCommand for NoopCommand {
-    fn execute(&self) -> Result<()> { Ok(()) }
-    fn dry_run(&self) -> Result<()> { Ok(()) }
-    fn print(&self) -> Result<()> { Ok(()) }
-    fn as_string(&self) -> String { "".to_string() }
+    fn execute(&self) -> Result<()> {
+        Ok(())
+    }
+    fn dry_run(&self) -> Result<()> {
+        Ok(())
+    }
+    fn print(&self) -> Result<()> {
+        Ok(())
+    }
+    fn as_string(&self) -> String {
+        "".to_string()
+    }
 }
 
-pub fn is_completing_arg(words: &[&str], cmd_parts: &[&str], arg_pos: usize, _last_word_complete: bool) -> bool {
-    if words.len() < cmd_parts.len() { return false; }
-    if !words.starts_with(cmd_parts) { return false; }
-    
+pub fn is_completing_arg(
+    words: &[&str],
+    cmd_parts: &[&str],
+    arg_pos: usize,
+    _last_word_complete: bool,
+) -> bool {
+    if words.len() < cmd_parts.len() {
+        return false;
+    }
+    if !words.starts_with(cmd_parts) {
+        return false;
+    }
+
     let words_after_cmd = words.len() - cmd_parts.len();
     words_after_cmd == arg_pos
 }
