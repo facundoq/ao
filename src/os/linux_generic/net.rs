@@ -43,6 +43,29 @@ impl Domain for StandardNet {
     }
 }
 
+fn is_safe_fw_rule(rule: &str) -> bool {
+    if rule.is_empty() {
+        return false;
+    }
+    // Check for shell metacharacters that could be used for command injection
+    // although SystemCommand uses std::process::Command which doesn't use a shell by default,
+    // it's good practice to restrict the input.
+    let shell_metachars = [';', '&', '|', '$', '>', '<', '\\', '`', '!', '{', '}', '(', ')', '*', '?', '[', ']', '~'];
+    if rule.chars().any(|c| shell_metachars.contains(&c)) {
+        return false;
+    }
+    // Also prevent newline and other control characters
+    if rule.chars().any(|c| c.is_control()) {
+        return false;
+    }
+    // Prevent rule from starting with a hyphen to avoid flag injection.
+    // Trim spaces before check as shells often strip them or command parsers ignore them.
+    if rule.trim_start().starts_with('-') {
+        return false;
+    }
+    true
+}
+
 impl NetManager for StandardNet {
     fn interfaces(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(NetInterfacesCommand { format }))
@@ -57,6 +80,9 @@ impl NetManager for StandardNet {
         Ok(Box::new(FwStatusCommand { format }))
     }
     fn fw_allow(&self, rule: &str) -> Result<Box<dyn ExecutableCommand>> {
+        if !is_safe_fw_rule(rule) {
+            anyhow::bail!("Invalid firewall rule: {}", rule);
+        }
         if std::path::Path::new("/usr/sbin/ufw").exists() {
             Ok(Box::new(
                 SystemCommand::new("ufw").arg("allow").arg("--").arg(rule),
@@ -71,6 +97,9 @@ impl NetManager for StandardNet {
         }
     }
     fn fw_deny(&self, rule: &str) -> Result<Box<dyn ExecutableCommand>> {
+        if !is_safe_fw_rule(rule) {
+            anyhow::bail!("Invalid firewall rule: {}", rule);
+        }
         if std::path::Path::new("/usr/sbin/ufw").exists() {
             Ok(Box::new(
                 SystemCommand::new("ufw").arg("deny").arg("--").arg(rule),
@@ -426,5 +455,37 @@ impl FwStatusCommand {
             }
         }
         (rules, "active".to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_safe_fw_rule() {
+        assert!(is_safe_fw_rule("80/tcp"));
+        assert!(is_safe_fw_rule("allow 22"));
+        assert!(is_safe_fw_rule("from 192.168.1.1 to any port 22 proto tcp"));
+
+        assert!(!is_safe_fw_rule(""));
+        assert!(!is_safe_fw_rule("80; rm -rf /"));
+        assert!(!is_safe_fw_rule("80 & reboot"));
+        assert!(!is_safe_fw_rule("80 | wall 'hacked'"));
+        assert!(!is_safe_fw_rule("$HOME"));
+        assert!(!is_safe_fw_rule("> /etc/passwd"));
+        assert!(!is_safe_fw_rule("`id`"));
+        assert!(!is_safe_fw_rule("-j ACCEPT"));
+        assert!(!is_safe_fw_rule("  -j ACCEPT"));
+        assert!(!is_safe_fw_rule("80\nallow 443"));
+    }
+
+    #[test]
+    fn test_fw_allow_security() {
+        let net = StandardNet;
+        assert!(net.fw_allow("80/tcp").is_ok());
+        assert!(net.fw_allow("80; rm -rf /").is_err());
+        assert!(net.fw_deny("80/tcp").is_ok());
+        assert!(net.fw_deny("80; rm -rf /").is_err());
     }
 }
