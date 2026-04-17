@@ -50,7 +50,9 @@ fn is_safe_fw_rule(rule: &str) -> bool {
     // Check for shell metacharacters that could be used for command injection
     // although SystemCommand uses std::process::Command which doesn't use a shell by default,
     // it's good practice to restrict the input.
-    let shell_metachars = [';', '&', '|', '$', '>', '<', '\\', '`', '!', '{', '}', '(', ')', '*', '?', '[', ']', '~'];
+    let shell_metachars = [
+        ';', '&', '|', '$', '>', '<', '\\', '`', '!', '{', '}', '(', ')', '*', '?', '[', ']', '~',
+    ];
     if rule.chars().any(|c| shell_metachars.contains(&c)) {
         return false;
     }
