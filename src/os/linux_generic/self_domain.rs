@@ -30,7 +30,7 @@ impl Domain for StandardSelf {
             .to_string();
 
         match &args.action {
-            SelfAction::Completions { action } => {
+            Some(SelfAction::Completions { action }) => {
                 match action {
                     CompletionsAction::Generate { shell } => match shell {
                         Shell::Bash => {
@@ -78,7 +78,7 @@ compdef _{0} {0}",
                             );
                         }
                     },
-                    CompletionsAction::Add { shell } => {
+                    CompletionsAction::Install { shell } => {
                         self.install_completions(*shell, &exe_path)?;
                     }
                     CompletionsAction::Setup { shell } => match shell {
@@ -99,8 +99,9 @@ compdef _{0} {0}",
                 }
                 Ok(Box::new(CompletionScriptCommand))
             }
-            SelfAction::Info { format } => self.info(*format),
-            SelfAction::Update => self.update(),
+            Some(SelfAction::Info { format }) => self.info(*format),
+            Some(SelfAction::Update) => self.update(),
+            None => self.info(OutputFormat::Table),
         }
     }
 }

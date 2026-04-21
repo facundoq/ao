@@ -1,4 +1,4 @@
-use super::common::SystemCommand;
+use super::common::{Emoji, SystemCommand};
 use crate::cli::{FwAction, NetAction, NetArgs, WifiAction};
 use crate::os::{
     Domain, ExecutableCommand, FwRuleInfo, NetInterfaceInfo, NetIpInfo, NetManager, NetRouteInfo,
@@ -27,18 +27,19 @@ impl Domain for StandardNet {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = NetArgs::from_arg_matches(matches)?;
         match &args.action {
-            NetAction::Interfaces { format } => self.interfaces(*format),
-            NetAction::Ips { format } => self.ips(*format),
-            NetAction::Routes { format } => self.routes(*format),
-            NetAction::Fw { action } => match action {
+            Some(NetAction::Interfaces { format }) => self.interfaces(*format),
+            Some(NetAction::Ips { format }) => self.ips(*format),
+            Some(NetAction::Routes { format }) => self.routes(*format),
+            Some(NetAction::Fw { action }) => match action {
                 FwAction::Status { format } => self.fw_status(*format),
                 FwAction::Allow { rule } => self.fw_allow(rule),
                 FwAction::Deny { rule } => self.fw_deny(rule),
             },
-            NetAction::Wifi { action } => match action {
+            Some(NetAction::Wifi { action }) => match action {
                 WifiAction::Scan => self.wifi_scan(),
                 WifiAction::Connect { ssid } => self.wifi_connect(ssid),
             },
+            None => self.interfaces(OutputFormat::Table),
         }
     }
 }
@@ -157,21 +158,46 @@ impl ExecutableCommand for NetInterfacesCommand {
         let raw: Vec<RawInterface> = serde_json::from_str(&stdout)?;
         let interfaces: Vec<NetInterfaceInfo> = raw
             .into_iter()
-            .map(|r| NetInterfaceInfo {
-                name: r.ifname,
-                state: r.operstate,
-                mtu: r.mtu,
-                mac: r.address.unwrap_or_default(),
+            .map(|r| {
+                let mut itype = "virtual".to_string();
+                let sys_path = format!("/sys/class/net/{}", r.ifname);
+                let path = std::path::Path::new(&sys_path);
+                if path.join("wireless").exists() || path.join("phy80211").exists() {
+                    itype = "wireless".to_string();
+                } else if path.join("device").exists() {
+                    itype = "physical".to_string();
+                }
+
+                NetInterfaceInfo {
+                    name: r.ifname,
+                    state: r.operstate,
+                    mtu: r.mtu,
+                    mac: r.address.unwrap_or_default(),
+                    interface_type: itype,
+                }
             })
             .collect();
 
         match self.format {
             OutputFormat::Table => {
                 let mut table = comfy_table::Table::new();
-                table.set_header(vec!["Interface", "State", "MTU", "MAC"]);
+                table.set_header(vec!["", "Interface", "Type", "State", "MTU", "MAC"]);
                 for iface in interfaces {
+                    let state_emoji = match iface.state.to_lowercase().as_str() {
+                        "up" => Emoji::Up.get(),
+                        "down" => Emoji::Down.get(),
+                        _ => Emoji::Unknown.get(),
+                    };
+                    let type_emoji = match iface.interface_type.as_str() {
+                        "physical" => Emoji::Physical.get(),
+                        "wireless" => Emoji::Wireless.get(),
+                        _ => Emoji::Virtual.get(),
+                    };
+
                     table.add_row(vec![
+                        format!("{} {}", type_emoji, state_emoji),
                         iface.name,
+                        iface.interface_type,
                         iface.state,
                         iface.mtu.to_string(),
                         iface.mac,
@@ -179,6 +205,7 @@ impl ExecutableCommand for NetInterfacesCommand {
                 }
                 println!("{}", table);
             }
+
             OutputFormat::Json => {
                 println!("{}", serde_json::to_string_pretty(&interfaces)?);
             }
@@ -198,7 +225,7 @@ impl ExecutableCommand for NetInterfacesCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("ip addr --format {:?}", self.format)
+        "ip addr".to_string()
     }
     fn is_structured(&self) -> bool {
         matches!(
@@ -271,7 +298,7 @@ impl ExecutableCommand for NetIpsCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("ip addr --format {:?}", self.format)
+        "ip addr".to_string()
     }
     fn is_structured(&self) -> bool {
         matches!(
@@ -341,8 +368,9 @@ impl ExecutableCommand for NetRoutesCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("ip route --format {:?}", self.format)
+        "ip route".to_string()
     }
+
     fn is_structured(&self) -> bool {
         matches!(
             self.format,
@@ -405,7 +433,11 @@ impl ExecutableCommand for FwStatusCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("firewall status --format {:?}", self.format)
+        if std::path::Path::new("/usr/sbin/ufw").exists() {
+            "ufw status".to_string()
+        } else {
+            "firewall-cmd --list-all".to_string()
+        }
     }
     fn is_structured(&self) -> bool {
         matches!(

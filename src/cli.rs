@@ -15,6 +15,9 @@ pub enum OutputFormat {
 #[derive(Parser)]
 #[command(name = "ao", version = "0.1.1", about = "Admin Operation", long_about = None)]
 pub struct Cli {
+    #[command(subcommand)]
+    pub command: Option<CliCommand>,
+
     /// Print the underlying command without running it
     #[arg(global = true, long, hide = true)]
     pub print: bool,
@@ -24,10 +27,23 @@ pub struct Cli {
     pub dry_run: bool,
 }
 
+#[derive(Subcommand)]
+pub enum CliCommand {
+    /// Starts an interactive session to browse and execute commands
+    Interactive,
+}
+
+#[derive(Args)]
+pub struct MonitorArgs {
+    /// The output format
+    #[arg(long, short, default_value = "table")]
+    pub format: OutputFormat,
+}
+
 #[derive(Args)]
 pub struct PkgArgs {
     #[command(subcommand)]
-    pub action: PkgAction,
+    pub action: Option<PkgAction>,
 }
 
 #[derive(Subcommand)]
@@ -66,7 +82,7 @@ pub enum PkgAction {
 #[derive(Args)]
 pub struct SvcArgs {
     #[command(subcommand)]
-    pub action: SvcAction,
+    pub action: Option<SvcAction>,
 }
 
 #[derive(Subcommand)]
@@ -112,21 +128,34 @@ pub enum SvcAction {
 #[derive(Args)]
 pub struct UserArgs {
     #[command(subcommand)]
-    pub action: UserAction,
+    pub action: Option<UserAction>,
 }
 
 #[derive(Subcommand)]
 pub enum UserAction {
     /// Creates a new user
     Add {
+        /// The unique system username
         #[arg(required = true, value_hint = ValueHint::Other)]
         username: String,
+        /// The user's full name
+        #[arg(long, value_hint = ValueHint::Other)]
+        name: Option<String>,
+        /// The user's email address
+        #[arg(long, value_hint = ValueHint::Other)]
+        email: Option<String>,
+        /// Comma-separated list of additional groups
         #[arg(long, value_hint = ValueHint::Other)]
         groups: Option<String>,
+        /// The login shell for the new user
         #[arg(long, value_hint = ValueHint::Other)]
         shell: Option<String>,
+        /// Create a system account
         #[arg(long)]
         system: bool,
+        /// Do not create the home directory
+        #[arg(long)]
+        no_create_home: bool,
     },
     /// Deletes a user
     Del {
@@ -164,7 +193,7 @@ pub enum UserAction {
 #[derive(Args)]
 pub struct GroupArgs {
     #[command(subcommand)]
-    pub action: GroupAction,
+    pub action: Option<GroupAction>,
 }
 
 #[derive(Subcommand)]
@@ -197,7 +226,7 @@ pub enum GroupAction {
 #[derive(Args)]
 pub struct DiskArgs {
     #[command(subcommand)]
-    pub action: DiskAction,
+    pub action: Option<DiskAction>,
 }
 
 impl DiskArgs {
@@ -249,7 +278,7 @@ pub enum DiskAction {
 #[derive(Args)]
 pub struct SysArgs {
     #[command(subcommand)]
-    pub action: SysAction,
+    pub action: Option<SysAction>,
 }
 
 #[derive(Subcommand)]
@@ -288,7 +317,7 @@ pub enum SysAction {
 #[derive(Args)]
 pub struct LogArgs {
     #[command(subcommand)]
-    pub action: LogAction,
+    pub action: Option<LogAction>,
 }
 
 #[derive(Subcommand)]
@@ -322,7 +351,7 @@ pub enum LogAction {
 #[derive(Args)]
 pub struct DistroArgs {
     #[command(subcommand)]
-    pub action: DistroAction,
+    pub action: Option<DistroAction>,
 }
 
 #[derive(Subcommand)]
@@ -340,7 +369,7 @@ pub enum DistroAction {
 #[derive(Args)]
 pub struct NetArgs {
     #[command(subcommand)]
-    pub action: NetAction,
+    pub action: Option<NetAction>,
 }
 
 #[derive(Subcommand)]
@@ -400,7 +429,7 @@ pub enum WifiAction {
 #[derive(Args)]
 pub struct BootArgs {
     #[command(subcommand)]
-    pub action: BootAction,
+    pub action: Option<BootAction>,
 }
 
 #[derive(Subcommand)]
@@ -435,7 +464,7 @@ pub enum BootModAction {
 #[derive(Args)]
 pub struct GuiArgs {
     #[command(subcommand)]
-    pub action: GuiAction,
+    pub action: Option<GuiAction>,
 }
 
 #[derive(Subcommand)]
@@ -462,7 +491,7 @@ pub enum GuiDisplayAction {
 #[derive(Args)]
 pub struct DevArgs {
     #[command(subcommand)]
-    pub action: DevAction,
+    pub action: Option<DevAction>,
 }
 
 #[derive(Subcommand)]
@@ -522,7 +551,7 @@ pub enum PrintAction {
 #[derive(Args)]
 pub struct VirtArgs {
     #[command(subcommand)]
-    pub action: VirtAction,
+    pub action: Option<VirtAction>,
 }
 
 #[derive(Subcommand)]
@@ -546,7 +575,7 @@ pub enum VirtAction {
 #[derive(Args)]
 pub struct SecArgs {
     #[command(subcommand)]
-    pub action: SecAction,
+    pub action: Option<SecAction>,
 }
 
 #[derive(Subcommand)]
@@ -564,7 +593,7 @@ pub enum SecAction {
 #[derive(Args)]
 pub struct SelfArgs {
     #[command(subcommand)]
-    pub action: SelfAction,
+    pub action: Option<SelfAction>,
 }
 
 #[derive(Subcommand)]
@@ -592,7 +621,7 @@ pub enum CompletionsAction {
         shell: Shell,
     },
     /// Install shell completions into your shell's configuration file
-    Add {
+    Install {
         /// The shell to install completions for
         shell: Shell,
     },

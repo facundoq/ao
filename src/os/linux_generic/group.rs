@@ -21,10 +21,11 @@ impl Domain for StandardGroup {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = GroupArgs::from_arg_matches(matches)?;
         match &args.action {
-            GroupAction::Ls { format } => self.ls(*format),
-            GroupAction::Add { groupname } => self.add(groupname),
-            GroupAction::Del { groupname } => self.del(groupname),
-            GroupAction::Mod { groupname, gid } => self.mod_group(groupname, *gid),
+            Some(GroupAction::Ls { format }) => self.ls(*format),
+            Some(GroupAction::Add { groupname }) => self.add(groupname),
+            Some(GroupAction::Del { groupname }) => self.del(groupname),
+            Some(GroupAction::Mod { groupname, gid }) => self.mod_group(groupname, *gid),
+            None => self.ls(OutputFormat::Table),
         }
     }
     fn complete(
@@ -103,9 +104,27 @@ impl ExecutableCommand for GroupListCommand {
         match self.format {
             OutputFormat::Table => {
                 let mut table = comfy_table::Table::new();
+                table.set_content_arrangement(comfy_table::ContentArrangement::Dynamic);
+                if let Ok((width, _)) = crossterm::terminal::size() {
+                    table.set_width(width);
+                }
                 table.set_header(vec!["Group", "GID", "Members"]);
+
+                let current_user = std::env::var("USER").unwrap_or_default();
+
                 for g in groups {
-                    table.add_row(vec![g.name, g.gid, g.members.join(",")]);
+                    let has_current_user = g.members.iter().any(|m| m == &current_user);
+                    let members_str = g.members.join(",");
+                    let mut cell = comfy_table::Cell::new(members_str);
+                    if has_current_user {
+                        cell = cell.fg(comfy_table::Color::Green);
+                    }
+
+                    table.add_row(vec![
+                        comfy_table::Cell::new(g.name),
+                        comfy_table::Cell::new(g.gid),
+                        cell,
+                    ]);
                 }
                 println!("{}", table);
             }
@@ -128,7 +147,7 @@ impl ExecutableCommand for GroupListCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("list groups --format {:?}", self.format)
+        "cat /etc/group".to_string()
     }
     fn is_structured(&self) -> bool {
         matches!(

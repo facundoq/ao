@@ -1,4 +1,4 @@
-use super::common::{SystemCommand, is_completing_arg};
+use super::common::{SystemCommand, format_duration, is_completing_arg};
 use crate::cli::{SysAction, SysArgs};
 use crate::os::{Domain, ExecutableCommand, OutputFormat, SysInfoData, SysManager, SysTimeData};
 use anyhow::Result;
@@ -24,13 +24,14 @@ impl Domain for StandardSys {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = SysArgs::from_arg_matches(matches)?;
         match &args.action {
-            SysAction::Info { format } => self.info(*format),
-            SysAction::Power { state, now, force } => self.power(state, *now, *force),
-            SysAction::Time {
+            Some(SysAction::Info { format }) => self.info(*format),
+            Some(SysAction::Power { state, now, force }) => self.power(state, *now, *force),
+            Some(SysAction::Time {
                 action,
                 value,
                 format,
-            } => self.time(action, value.as_deref(), *format),
+            }) => self.time(action, value.as_deref(), *format),
+            None => self.info(OutputFormat::Table),
         }
     }
     fn complete(
@@ -127,15 +128,146 @@ impl ExecutableCommand for SysInfoCommand {
         let mut sys = System::new_all();
         sys.refresh_all();
 
+        // Memory in GB
+        let total_memory_gb = sys.total_memory() as f64 / 1_073_741_824.0;
+        let used_memory_gb = sys.used_memory() as f64 / 1_073_741_824.0;
+        let total_memory_readable = format!("{:.2} GB", total_memory_gb);
+        let used_memory_readable = format!("{:.2} GB", used_memory_gb);
+
+        // CPU Model
+        let cpu_model = sys
+            .cpus()
+            .first()
+            .map(|c| c.brand().to_string())
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        // Physical Drives
+        let physical_drives = Command::new("lsblk")
+            .arg("-d")
+            .arg("-n")
+            .arg("-o")
+            .arg("TYPE")
+            .output()
+            .map(|o| {
+                String::from_utf8_lossy(&o.stdout)
+                    .lines()
+                    .filter(|l| l.trim() == "disk")
+                    .count()
+            })
+            .unwrap_or(0);
+
+        // Network Adapters
+        let mut lan_adapters = Vec::new();
+        let mut wifi_adapters = Vec::new();
+        if let Ok(entries) = std::fs::read_dir("/sys/class/net") {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name == "lo" {
+                    continue;
+                }
+                let path = entry.path();
+                // Check if it's a physical device by looking for the 'device' symlink
+                if !path.join("device").exists() {
+                    continue;
+                }
+
+                let is_wifi = path.join("wireless").exists() || path.join("phy80211").exists();
+                if is_wifi {
+                    wifi_adapters.push(name);
+                } else {
+                    lan_adapters.push(name);
+                }
+            }
+        }
+
+        // BT Adapters
+        let mut bt_adapters = Vec::new();
+        if let Ok(output) = Command::new("hciconfig").output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                if line.contains("hci")
+                    && line.contains(':')
+                    && let Some(name) = line.split(':').next()
+                {
+                    bt_adapters.push(name.trim().to_string());
+                }
+            }
+        }
+        if bt_adapters.is_empty()
+            && let Ok(output) = Command::new("bluetoothctl").arg("list").output()
+        {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                if let Some(name) = line.split_whitespace().nth(1) {
+                    bt_adapters.push(name.to_string());
+                }
+            }
+        }
+
+        // Monitors
+        let mut monitors = Vec::new();
+        let output = Command::new("xrandr")
+            .arg("--query")
+            .output()
+            .or_else(|_| Command::new("wlr-randr").output());
+
+        if let Ok(output) = output {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                if line.contains(" connected") {
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    if !parts.is_empty() {
+                        let name = parts[0].to_string();
+                        // Try to get model from the next lines if possible
+                        monitors.push(name);
+                    }
+                }
+            }
+        }
+
+        // Users
+        let mut system_users_count = 0;
+        let mut common_users_count = 0;
+        if let Ok(content) = std::fs::read_to_string("/etc/passwd") {
+            for line in content.lines() {
+                let parts: Vec<&str> = line.split(':').collect();
+                if parts.len() >= 3
+                    && let Ok(uid) = parts[2].parse::<u32>()
+                {
+                    if uid < 1000 {
+                        system_users_count += 1;
+                    } else {
+                        common_users_count += 1;
+                    }
+                }
+            }
+        }
+
+        // RAM Type/Model (hard to get without root, try dmidecode if available)
+        let ram_type = "Unknown".to_string();
+        let ram_model = "Unknown".to_string();
+
         let data = SysInfoData {
             hostname: System::host_name().unwrap_or_default(),
             os: System::long_os_version().unwrap_or_default(),
             kernel: System::kernel_version().unwrap_or_default(),
             architecture: System::cpu_arch(),
-            uptime: format!("{} seconds", System::uptime()),
+            uptime: format_duration(System::uptime()),
             cpu_count: sys.cpus().len(),
+            cpu_model,
             total_memory: sys.total_memory(),
             used_memory: sys.used_memory(),
+            total_memory_readable,
+            used_memory_readable,
+            ram_type,
+            ram_model,
+            physical_drives,
+            lan_adapters,
+            wifi_adapters,
+            bt_adapters,
+            monitors,
+            system_users_count,
+            common_users_count,
         };
 
         match self.format {
@@ -147,12 +279,19 @@ impl ExecutableCommand for SysInfoCommand {
                 table.add_row(vec!["Kernel", &data.kernel]);
                 table.add_row(vec!["Architecture", &data.architecture]);
                 table.add_row(vec!["Uptime", &data.uptime]);
+                table.add_row(vec!["CPU Model", &data.cpu_model]);
                 table.add_row(vec!["CPU Count", &data.cpu_count.to_string()]);
-                table.add_row(vec![
-                    "Total Memory",
-                    &format!("{} bytes", data.total_memory),
-                ]);
-                table.add_row(vec!["Used Memory", &format!("{} bytes", data.used_memory)]);
+                table.add_row(vec!["Total Memory", &data.total_memory_readable]);
+                table.add_row(vec!["Used Memory", &data.used_memory_readable]);
+                table.add_row(vec!["RAM Type", &data.ram_type]);
+                table.add_row(vec!["RAM Model", &data.ram_model]);
+                table.add_row(vec!["Physical Drives", &data.physical_drives.to_string()]);
+                table.add_row(vec!["LAN Adapters", &data.lan_adapters.join(", ")]);
+                table.add_row(vec!["WiFi Adapters", &data.wifi_adapters.join(", ")]);
+                table.add_row(vec!["BT Adapters", &data.bt_adapters.join(", ")]);
+                table.add_row(vec!["Monitors", &data.monitors.join(", ")]);
+                table.add_row(vec!["System Users", &data.system_users_count.to_string()]);
+                table.add_row(vec!["Common Users", &data.common_users_count.to_string()]);
                 println!("{}", table);
             }
             OutputFormat::Json => {
@@ -174,7 +313,7 @@ impl ExecutableCommand for SysInfoCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("sys info --format {:?}", self.format)
+        "sysinfo (Rust library)".to_string()
     }
     fn is_structured(&self) -> bool {
         matches!(
@@ -254,7 +393,7 @@ impl ExecutableCommand for SysTimeCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("timedatectl status --format {:?}", self.format)
+        "timedatectl status".to_string()
     }
     fn is_structured(&self) -> bool {
         matches!(

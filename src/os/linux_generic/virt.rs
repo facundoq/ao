@@ -21,11 +21,12 @@ impl Domain for StandardVirt {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = VirtArgs::from_arg_matches(matches)?;
         match &args.action {
-            VirtAction::Ls { format } => self.ls(*format),
-            VirtAction::Start { name } => self.start(name),
-            VirtAction::Stop { name } => self.stop(name),
-            VirtAction::Rm { name } => self.del(name),
-            VirtAction::Logs { name } => self.logs(name),
+            Some(VirtAction::Ls { format }) => self.ls(*format),
+            Some(VirtAction::Start { name }) => self.start(name),
+            Some(VirtAction::Stop { name }) => self.stop(name),
+            Some(VirtAction::Rm { name }) => self.del(name),
+            Some(VirtAction::Logs { name }) => self.logs(name),
+            None => self.ls(OutputFormat::Table),
         }
     }
 }
@@ -128,7 +129,7 @@ impl ExecutableCommand for VirtPsCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("docker ps --format {:?}", self.format)
+        "docker ps".to_string()
     }
     fn is_structured(&self) -> bool {
         matches!(

@@ -21,18 +21,19 @@ impl Domain for StandardDev {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = DevArgs::from_arg_matches(matches)?;
         match &args.action {
-            DevAction::Ls { format } => self.ls(*format),
-            DevAction::Pci { format } => self.pci(*format),
-            DevAction::Usb { format } => self.usb(*format),
-            DevAction::Bt { action } => match action {
+            Some(DevAction::Ls { format }) => self.ls(*format),
+            Some(DevAction::Pci { format }) => self.pci(*format),
+            Some(DevAction::Usb { format }) => self.usb(*format),
+            Some(DevAction::Bt { action }) => match action {
                 BtAction::Status => self.bt_status(),
                 BtAction::Scan => self.bt_scan(),
                 BtAction::Pair { address } => self.bt_pair(address),
                 BtAction::Connect { address } => self.bt_connect(address),
             },
-            DevAction::Print { action } => match action {
+            Some(DevAction::Print { action }) => match action {
                 PrintAction::Ls { format } => self.ls_printers(*format),
             },
+            None => self.ls(OutputFormat::Table),
         }
     }
 }
@@ -131,10 +132,16 @@ impl ExecutableCommand for DevListAllCommand {
                     table.set_width(width);
                 }
                 table.set_content_arrangement(comfy_table::ContentArrangement::Dynamic);
-                table.set_header(vec!["Type", "Class", "ID", "Description"]);
+                table.set_header(vec!["", "Type", "Class", "ID", "Description"]);
                 for d in devices {
-                    table.add_row(vec![d.bus, d.device, d.id, d.description]);
+                    let emoji = match d.bus.as_str() {
+                        "PCI" => "🏗️",
+                        "USB" => "🔌",
+                        _ => "📟",
+                    };
+                    table.add_row(vec![emoji, &d.bus, &d.device, &d.id, &d.description]);
                 }
+                println!("=== Connected Devices (🏗️ PCI / 🔌 USB) ===");
                 println!("{}", table);
             }
             OutputFormat::Json => {
@@ -159,7 +166,7 @@ impl ExecutableCommand for DevListAllCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        "dev list all".to_string()
+        "lspci -mm && lsusb".to_string()
     }
 }
 
@@ -215,7 +222,7 @@ impl ExecutableCommand for DevPciCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("lspci --format {:?}", self.format)
+        "lspci -mm".to_string()
     }
 }
 
@@ -271,7 +278,7 @@ impl ExecutableCommand for DevUsbCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("lsusb --format {:?}", self.format)
+        "lsusb".to_string()
     }
 }
 
@@ -325,6 +332,6 @@ impl ExecutableCommand for DevPrintersCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("lpstat -p --format {:?}", self.format)
+        "lpstat -p".to_string()
     }
 }

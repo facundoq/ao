@@ -162,3 +162,91 @@ pub fn is_completing_arg(
     let words_after_cmd = words.len() - cmd_parts.len();
     words_after_cmd == arg_pos
 }
+
+pub fn format_duration(seconds: u64) -> String {
+    let days = seconds / 86400;
+    let hours = (seconds % 86400) / 3600;
+    let minutes = (seconds % 3600) / 60;
+    let secs = seconds % 60;
+
+    let mut parts = Vec::new();
+    if days > 0 {
+        parts.push(format!("{}d", days));
+    }
+    if hours > 0 {
+        parts.push(format!("{}h", hours));
+    }
+    if minutes > 0 {
+        parts.push(format!("{}m", minutes));
+    }
+    if secs > 0 || parts.is_empty() {
+        parts.push(format!("{}s", secs));
+    }
+
+    parts.join(" ")
+}
+
+pub fn format_bytes(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+    const TB: u64 = GB * 1024;
+
+    if bytes >= TB {
+        format!("{:.2} TB", bytes as f64 / TB as f64)
+    } else if bytes >= GB {
+        format!("{:.2} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.2} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.2} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+pub enum Emoji {
+    Up,
+    Down,
+    Unknown,
+    Physical,
+    Wireless,
+    Virtual,
+    Cpu,
+    Ram,
+    Network,
+    Disk,
+    Used,
+    Total,
+    Pci,
+    Usb,
+    Loop,
+    Nvme,
+    Ssd,
+    Hdd,
+}
+
+impl Emoji {
+    pub fn get(&self) -> &'static str {
+        match self {
+            Emoji::Up => "🟢",
+            Emoji::Down => "🔴",
+            Emoji::Unknown => "🟡",
+            Emoji::Physical => "🏗️",
+            Emoji::Wireless => "📶",
+            Emoji::Virtual => "☁️",
+            Emoji::Cpu => "💻",
+            Emoji::Ram => "🧠",
+            Emoji::Network => "🌐",
+            Emoji::Disk => "💾",
+            Emoji::Used => "⬛",
+            Emoji::Total => "⬜",
+            Emoji::Pci => "🏗️",
+            Emoji::Usb => "🔌",
+            Emoji::Loop => "🔁",
+            Emoji::Nvme => "🚀",
+            Emoji::Ssd => "⚡",
+            Emoji::Hdd => "💾",
+        }
+    }
+}

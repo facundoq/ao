@@ -20,8 +20,9 @@ impl Domain for StandardDistro {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = DistroArgs::from_arg_matches(matches)?;
         match &args.action {
-            DistroAction::Info { format } => self.info(*format),
-            DistroAction::Upgrade => self.upgrade(),
+            Some(DistroAction::Info { format }) => self.info(*format),
+            Some(DistroAction::Upgrade) => self.upgrade(),
+            None => self.info(OutputFormat::Table),
         }
     }
 }
@@ -109,7 +110,7 @@ impl ExecutableCommand for DistroInfoCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("distro info --format {:?}", self.format)
+        "cat /etc/os-release".to_string()
     }
     fn is_structured(&self) -> bool {
         matches!(

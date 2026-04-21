@@ -1,4 +1,4 @@
-use super::common::{SystemCommand, is_completing_arg};
+use super::common::{Emoji, SystemCommand, is_completing_arg};
 use crate::cli::{DiskAction, DiskArgs};
 use crate::os::{DiskInfo, DiskManager, Domain, ExecutableCommand, OutputFormat};
 use anyhow::Result;
@@ -21,19 +21,20 @@ impl Domain for StandardDisk {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = DiskArgs::from_arg_matches(matches)?;
         match &args.action {
-            DiskAction::Ls { format } => self.ls(*format),
-            DiskAction::Mount {
+            Some(DiskAction::Ls { format }) => self.ls(*format),
+            Some(DiskAction::Mount {
                 device,
                 path,
                 fstype,
                 options,
-            } => self.mount(device, path, fstype.as_deref(), options.as_deref()),
-            DiskAction::Unmount {
+            }) => self.mount(device, path, fstype.as_deref(), options.as_deref()),
+            Some(DiskAction::Unmount {
                 target,
                 lazy,
                 force,
-            } => self.unmount(target, *lazy, *force),
-            DiskAction::Usage { path, depth } => self.usage(path, *depth),
+            }) => self.unmount(target, *lazy, *force),
+            Some(DiskAction::Usage { path, depth }) => self.usage(path, *depth),
+            None => self.ls(OutputFormat::Table),
         }
     }
     fn complete(
@@ -124,7 +125,7 @@ impl ExecutableCommand for DiskListCommand {
         let output = Command::new("lsblk")
             .arg("--json")
             .arg("-o")
-            .arg("NAME,PATH,SIZE,MOUNTPOINT,FSTYPE")
+            .arg("NAME,PATH,SIZE,MOUNTPOINT,FSTYPE,TYPE,ROTA,TRAN")
             .output()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -133,17 +134,96 @@ impl ExecutableCommand for DiskListCommand {
             blockdevices: Vec<DiskInfo>,
         }
         let raw: LsblkOutput = serde_json::from_str(&stdout)?;
-        let disks = raw.blockdevices;
+
+        fn flatten_disks(disks: Vec<DiskInfo>, parent_tran: Option<String>) -> Vec<DiskInfo> {
+            let mut flat = Vec::new();
+            for mut d in disks {
+                if d.tran.is_none() {
+                    d.tran = parent_tran.clone();
+                }
+                let children = d.children.take();
+                let current_tran = d.tran.clone();
+                flat.push(d);
+                if let Some(c) = children {
+                    flat.extend(flatten_disks(c, current_tran));
+                }
+            }
+            flat
+        }
+
+        let mut disks = flatten_disks(raw.blockdevices, None);
+
+        // Sort: physical first, virtual later.
+        let is_physical = |t: &str| matches!(t, "disk" | "part" | "rom" | "crypt");
+
+        disks.sort_by(|a, b| {
+            let a_phys = is_physical(&a.device_type);
+            let b_phys = is_physical(&b.device_type);
+            if a_phys == b_phys {
+                a.name.cmp(&b.name)
+            } else if a_phys {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Greater
+            }
+        });
 
         match self.format {
             OutputFormat::Table => {
                 let mut table = comfy_table::Table::new();
-                table.set_header(vec!["Name", "Path", "Size", "Mountpoint", "FSType"]);
+                table.set_header(vec![
+                    "",
+                    "Name",
+                    "Path",
+                    "Size",
+                    "Type",
+                    "Class",
+                    "Mountpoint",
+                    "FSType",
+                ]);
                 for d in disks {
+                    let class_is_phys = is_physical(&d.device_type);
+                    let class_emoji = if class_is_phys {
+                        Emoji::Physical.get()
+                    } else {
+                        Emoji::Virtual.get()
+                    };
+                    let class_text = if class_is_phys { "Physical" } else { "Virtual" };
+
+                    let type_emoji = match d.device_type.as_str() {
+                        "loop" => Emoji::Loop.get(),
+                        _ => {
+                            if let Some(ref tran) = d.tran {
+                                match tran.as_str() {
+                                    "nvme" => Emoji::Nvme.get(),
+                                    "sata" | "usb" => {
+                                        if d.rota {
+                                            Emoji::Hdd.get()
+                                        } else {
+                                            Emoji::Ssd.get()
+                                        }
+                                    }
+                                    _ => Emoji::Disk.get(),
+                                }
+                            } else if d.device_type == "disk" || d.device_type == "part" {
+                                if d.rota {
+                                    Emoji::Hdd.get()
+                                } else {
+                                    Emoji::Ssd.get()
+                                }
+                            } else {
+                                Emoji::Disk.get()
+                            }
+                        }
+                    };
+
                     table.add_row(vec![
+                        format!("{} {}", class_emoji, type_emoji),
                         d.name,
                         d.path,
                         d.size,
+                        d.device_type,
+                        class_text.to_string(),
                         d.mountpoint.unwrap_or_default(),
                         d.fstype.unwrap_or_default(),
                     ]);
@@ -169,7 +249,7 @@ impl ExecutableCommand for DiskListCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("lsblk --json --format {:?}", self.format)
+        "lsblk --json".to_string()
     }
     fn is_structured(&self) -> bool {
         matches!(

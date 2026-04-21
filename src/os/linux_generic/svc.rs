@@ -21,12 +21,13 @@ impl Domain for Systemd {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = SvcArgs::from_arg_matches(matches)?;
         match &args.action {
-            SvcAction::Ls { format } => self.ls(*format),
-            SvcAction::Up { name } => self.up(name),
-            SvcAction::Down { name } => self.down(name),
-            SvcAction::Restart { name } => self.restart(name),
-            SvcAction::Reload { name } => self.reload(name),
-            SvcAction::Status { name } => self.status(name),
+            Some(SvcAction::Ls { format }) => self.ls(*format),
+            Some(SvcAction::Up { name }) => self.up(name),
+            Some(SvcAction::Down { name }) => self.down(name),
+            Some(SvcAction::Restart { name }) => self.restart(name),
+            Some(SvcAction::Reload { name }) => self.reload(name),
+            Some(SvcAction::Status { name }) => self.status(name),
+            None => self.ls(OutputFormat::Table),
         }
     }
     fn complete(
@@ -141,32 +142,31 @@ impl ExecutableCommand for ServiceListCommand {
                 // Constraint service name and description to wrap if they are too long
                 table.set_content_arrangement(comfy_table::ContentArrangement::Dynamic);
 
-                use colored::Colorize;
                 for s in services {
-                    let loaded_colored = if s.loaded == "loaded" {
-                        s.loaded.green()
-                    } else {
-                        s.loaded.normal()
-                    };
-                    let active_colored = if s.active == "active" {
-                        s.active.green()
-                    } else {
-                        s.active.normal()
-                    };
+                    let mut cell_loaded = comfy_table::Cell::new(&s.loaded);
+                    if s.loaded == "loaded" {
+                        cell_loaded = cell_loaded.fg(comfy_table::Color::Green);
+                    }
 
-                    let status_colored = match s.status.as_str() {
-                        "running" => s.status.green(),
-                        "exited" => s.status.yellow(),
-                        "failed" => s.status.red(),
-                        _ => s.status.normal(),
+                    let mut cell_active = comfy_table::Cell::new(&s.active);
+                    if s.active == "active" {
+                        cell_active = cell_active.fg(comfy_table::Color::Green);
+                    }
+
+                    let mut cell_status = comfy_table::Cell::new(&s.status);
+                    match s.status.as_str() {
+                        "running" => cell_status = cell_status.fg(comfy_table::Color::Green),
+                        "exited" => cell_status = cell_status.fg(comfy_table::Color::Yellow),
+                        "failed" => cell_status = cell_status.fg(comfy_table::Color::Red),
+                        _ => {}
                     };
 
                     table.add_row(vec![
-                        comfy_table::Cell::new(s.name),
-                        comfy_table::Cell::new(loaded_colored),
-                        comfy_table::Cell::new(active_colored),
-                        comfy_table::Cell::new(status_colored),
-                        comfy_table::Cell::new(s.description),
+                        comfy_table::Cell::new(&s.name),
+                        cell_loaded,
+                        cell_active,
+                        cell_status,
+                        comfy_table::Cell::new(&s.description),
                     ]);
                 }
                 println!("{}", table);
@@ -190,7 +190,7 @@ impl ExecutableCommand for ServiceListCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("systemctl list-units --format {:?}", self.format)
+        "systemctl list-units --type=service".to_string()
     }
     fn is_structured(&self) -> bool {
         matches!(

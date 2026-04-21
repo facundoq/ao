@@ -21,11 +21,12 @@ impl Domain for Apt {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = PkgArgs::from_arg_matches(matches)?;
         match &args.action {
-            PkgAction::Update => self.update(),
-            PkgAction::Add { packages } => self.add(packages),
-            PkgAction::Del { packages, purge } => self.del(packages, *purge),
-            PkgAction::Search { query } => self.search(query),
-            PkgAction::Ls { format } => self.ls(*format),
+            Some(PkgAction::Update) => self.update(),
+            Some(PkgAction::Add { packages }) => self.add(packages),
+            Some(PkgAction::Del { packages, purge }) => self.del(packages, *purge),
+            Some(PkgAction::Search { query }) => self.search(query),
+            Some(PkgAction::Ls { format }) => self.ls(*format),
+            None => self.ls(OutputFormat::Table),
         }
     }
     fn complete(
@@ -160,7 +161,7 @@ impl ExecutableCommand for AptListCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("apt list --installed --format {:?}", self.format)
+        "dpkg-query -W".to_string()
     }
     fn is_structured(&self) -> bool {
         matches!(

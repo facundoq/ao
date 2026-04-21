@@ -21,24 +21,36 @@ impl Domain for StandardUser {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = UserArgs::from_arg_matches(matches)?;
         match &args.action {
-            UserAction::Ls {
+            Some(UserAction::Ls {
                 all,
                 groups,
                 format,
-            } => self.ls(*all, *groups, *format),
-            UserAction::Add {
+            }) => self.ls(*all, *groups, *format),
+            Some(UserAction::Add {
                 username,
+                name,
+                email,
                 groups,
                 shell,
                 system,
-            } => self.add(username, groups.as_deref(), shell.as_deref(), *system),
-            UserAction::Del { username, purge } => self.del(username, *purge),
-            UserAction::Mod {
+                no_create_home,
+            }) => self.add(
+                username,
+                name.as_deref(),
+                email.as_deref(),
+                groups.as_deref(),
+                shell.as_deref(),
+                *system,
+                *no_create_home,
+            ),
+            Some(UserAction::Del { username, purge }) => self.del(username, *purge),
+            Some(UserAction::Mod {
                 username,
                 action,
                 value,
-            } => self.mod_user(username, action, value),
-            UserAction::Passwd { username } => self.passwd(username),
+            }) => self.mod_user(username, action, value),
+            Some(UserAction::Passwd { username }) => self.passwd(username),
+            None => self.ls(false, false, OutputFormat::Table),
         }
     }
     fn complete(
@@ -101,15 +113,21 @@ impl UserManager for StandardUser {
     fn add(
         &self,
         username: &str,
+        name: Option<&str>,
+        email: Option<&str>,
         groups: Option<&str>,
         shell: Option<&str>,
         system: bool,
+        no_create_home: bool,
     ) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(UserAddCommand {
             username: username.to_string(),
+            name: name.map(|s| s.to_string()),
+            email: email.map(|s| s.to_string()),
             groups: groups.map(|s| s.to_string()),
             shell: shell.map(|s| s.to_string()),
             system,
+            no_create_home,
         }))
     }
 
@@ -178,6 +196,12 @@ impl ExecutableCommand for UserListCommand {
                     continue;
                 }
 
+                let user_type = if uid == 0 || uid >= 1000 {
+                    "Regular"
+                } else {
+                    "System"
+                };
+
                 users.push(UserInfo {
                     username: parts[0].to_string(),
                     uid: parts[2].to_string(),
@@ -185,6 +209,7 @@ impl ExecutableCommand for UserListCommand {
                     home: parts[5].to_string(),
                     shell: parts[6].to_string(),
                     groups: Vec::new(),
+                    user_type: user_type.to_string(),
                 });
             }
         }
@@ -192,9 +217,9 @@ impl ExecutableCommand for UserListCommand {
         match self.format {
             OutputFormat::Table => {
                 let mut table = comfy_table::Table::new();
-                table.set_header(vec!["Username", "UID", "GID", "Home", "Shell"]);
+                table.set_header(vec!["Username", "Type", "UID", "GID", "Home", "Shell"]);
                 for u in users {
-                    table.add_row(vec![u.username, u.uid, u.gid, u.home, u.shell]);
+                    table.add_row(vec![u.username, u.user_type, u.uid, u.gid, u.home, u.shell]);
                 }
                 println!("{}", table);
             }
@@ -217,7 +242,7 @@ impl ExecutableCommand for UserListCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("list users --format {:?}", self.format)
+        "cat /etc/passwd".to_string()
     }
     fn is_structured(&self) -> bool {
         matches!(
@@ -229,13 +254,19 @@ impl ExecutableCommand for UserListCommand {
 
 pub struct UserAddCommand {
     pub username: String,
+    pub name: Option<String>,
+    pub email: Option<String>,
     pub groups: Option<String>,
     pub shell: Option<String>,
     pub system: bool,
+    pub no_create_home: bool,
 }
 impl ExecutableCommand for UserAddCommand {
     fn execute(&self) -> Result<()> {
-        let mut cmd = SystemCommand::new("useradd").arg("-m");
+        let mut cmd = SystemCommand::new("useradd");
+        if !self.no_create_home {
+            cmd = cmd.arg("-m");
+        }
         if self.system {
             cmd = cmd.arg("--system");
         }
@@ -245,6 +276,18 @@ impl ExecutableCommand for UserAddCommand {
         if let Some(ref g) = self.groups {
             cmd = cmd.arg("--groups").arg(g);
         }
+
+        let mut comment = Vec::new();
+        if let Some(ref n) = self.name {
+            comment.push(n.clone());
+        }
+        if let Some(ref e) = self.email {
+            comment.push(format!("<{}>", e));
+        }
+        if !comment.is_empty() {
+            cmd = cmd.arg("-c").arg(&comment.join(" "));
+        }
+
         cmd.arg("--").arg(&self.username).execute()
     }
     fn dry_run(&self) -> Result<()> {
@@ -256,7 +299,10 @@ impl ExecutableCommand for UserAddCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        let mut s = "useradd -m".to_string();
+        let mut s = "useradd".to_string();
+        if !self.no_create_home {
+            s.push_str(" -m");
+        }
         if self.system {
             s.push_str(" --system");
         }
@@ -266,6 +312,18 @@ impl ExecutableCommand for UserAddCommand {
         if let Some(ref g) = self.groups {
             s.push_str(&format!(" --groups {}", g));
         }
+
+        let mut comment = Vec::new();
+        if let Some(ref n) = self.name {
+            comment.push(n.clone());
+        }
+        if let Some(ref e) = self.email {
+            comment.push(format!("<{}>", e));
+        }
+        if !comment.is_empty() {
+            s.push_str(&format!(" -c \"{}\"", comment.join(" ")));
+        }
+
         s.push_str(&format!(" -- {}", self.username));
         s
     }

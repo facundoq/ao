@@ -21,9 +21,10 @@ impl Domain for StandardLog {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = LogArgs::from_arg_matches(matches)?;
         match &args.action {
-            LogAction::Tail { name, lines } => self.tail(name, *lines),
-            LogAction::Sys { lines } => self.sys_logs(*lines),
-            LogAction::File { path, lines } => self.file_logs(path, *lines),
+            Some(LogAction::Tail { name, lines }) => self.tail(name, *lines),
+            Some(LogAction::Sys { lines }) => self.sys_logs(*lines),
+            Some(LogAction::File { path, lines }) => self.file_logs(path, *lines),
+            None => self.sys_logs(50),
         }
     }
     fn complete(
@@ -66,7 +67,6 @@ impl LogManager for StandardLog {
     fn sys_logs(&self, lines: u32) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(
             SystemCommand::new("journalctl")
-                .arg("-f")
                 .arg("-n")
                 .arg(&lines.to_string()),
         ))

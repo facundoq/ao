@@ -25,12 +25,13 @@ impl Domain for StandardBoot {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = BootArgs::from_arg_matches(matches)?;
         match &args.action {
-            BootAction::Ls { format } => self.ls_entries(*format),
-            BootAction::Mod { action } => match action {
+            Some(BootAction::Ls { format }) => self.ls_entries(*format),
+            Some(BootAction::Mod { action }) => match action {
                 BootModAction::Ls { format } => self.ls_modules(*format),
                 BootModAction::Load { name } => self.load_module(name),
                 BootModAction::Unload { name } => self.unload_module(name),
             },
+            None => self.ls_entries(OutputFormat::Table),
         }
     }
 }
@@ -61,10 +62,17 @@ impl ExecutableCommand for BootListEntriesCommand {
             return SystemCommand::new("bootctl").arg("list").execute();
         }
 
-        let output = Command::new("bootctl")
+        let output = match Command::new("bootctl")
             .arg("list")
             .arg("--no-pager")
-            .output()?;
+            .output()
+        {
+            Ok(o) => o,
+            Err(_) => {
+                println!("bootctl command not found or failed to execute.");
+                return Ok(());
+            }
+        };
         let stdout = String::from_utf8_lossy(&output.stdout);
         let mut entries = Vec::new();
         for line in stdout.lines() {
@@ -107,7 +115,7 @@ impl ExecutableCommand for BootListEntriesCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("bootctl list --format {:?}", self.format)
+        "bootctl list".to_string()
     }
     fn is_structured(&self) -> bool {
         matches!(
@@ -126,7 +134,13 @@ impl ExecutableCommand for BootListModulesCommand {
             return SystemCommand::new("lsmod").execute();
         }
 
-        let output = Command::new("lsmod").output()?;
+        let output = match Command::new("lsmod").output() {
+            Ok(o) => o,
+            Err(_) => {
+                println!("lsmod command not found or failed to execute.");
+                return Ok(());
+            }
+        };
         let stdout = String::from_utf8_lossy(&output.stdout);
         let mut modules = Vec::new();
         for line in stdout.lines().skip(1) {
@@ -168,7 +182,7 @@ impl ExecutableCommand for BootListModulesCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("lsmod --format {:?}", self.format)
+        "lsmod".to_string()
     }
     fn is_structured(&self) -> bool {
         matches!(

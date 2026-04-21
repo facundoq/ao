@@ -98,6 +98,8 @@ pub struct UserInfo {
     pub home: String,
     pub shell: String,
     pub groups: Vec<String>,
+    #[serde(rename = "type")]
+    pub user_type: String,
 }
 
 /// Abstracts system user management operations.
@@ -108,12 +110,16 @@ pub trait UserManager: Domain {
         groups: bool,
         format: OutputFormat,
     ) -> Result<Box<dyn ExecutableCommand>>;
+    #[allow(clippy::too_many_arguments)]
     fn add(
         &self,
         username: &str,
+        name: Option<&str>,
+        email: Option<&str>,
         groups: Option<&str>,
         shell: Option<&str>,
         system: bool,
+        no_create_home: bool,
     ) -> Result<Box<dyn ExecutableCommand>>;
     fn del(&self, username: &str, purge: bool) -> Result<Box<dyn ExecutableCommand>>;
     fn mod_user(
@@ -150,6 +156,11 @@ pub struct DiskInfo {
     pub size: String,
     pub mountpoint: Option<String>,
     pub fstype: Option<String>,
+    #[serde(rename = "type")]
+    pub device_type: String,
+    pub rota: bool,
+    pub tran: Option<String>,
+    pub children: Option<Vec<DiskInfo>>,
 }
 
 /// Abstracts system disk management operations.
@@ -176,8 +187,20 @@ pub struct SysInfoData {
     pub architecture: String,
     pub uptime: String,
     pub cpu_count: usize,
+    pub cpu_model: String,
     pub total_memory: u64,
     pub used_memory: u64,
+    pub total_memory_readable: String,
+    pub used_memory_readable: String,
+    pub ram_type: String,
+    pub ram_model: String,
+    pub physical_drives: usize,
+    pub lan_adapters: Vec<String>,
+    pub wifi_adapters: Vec<String>,
+    pub bt_adapters: Vec<String>,
+    pub monitors: Vec<String>,
+    pub system_users_count: usize,
+    pub common_users_count: usize,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -231,6 +254,8 @@ pub struct NetInterfaceInfo {
     pub state: String,
     pub mtu: u32,
     pub mac: String,
+    #[serde(rename = "type")]
+    pub interface_type: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -372,7 +397,16 @@ pub trait SelfManager: Domain {
     fn install_completions(&self, shell: clap_complete::Shell, exe_path: &str) -> Result<()>;
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct MonitorEntry {
+    #[serde(rename = "type")]
+    pub entry_type: String,
+    pub subtype: String,
+    pub value: String,
+    pub description: String,
+}
+
 /// Abstracts system monitoring operations.
 pub trait MonitorManager: Domain {
-    fn live_stats(&self) -> Result<Box<dyn ExecutableCommand>>;
+    fn live_stats(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
 }

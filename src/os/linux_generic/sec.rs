@@ -20,8 +20,9 @@ impl Domain for StandardSec {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = SecArgs::from_arg_matches(matches)?;
         match &args.action {
-            SecAction::Audit { format } => self.audit(*format),
-            SecAction::Context => self.context(),
+            Some(SecAction::Audit { format }) => self.audit(*format),
+            Some(SecAction::Context) => self.context(),
+            None => self.audit(OutputFormat::Table),
         }
     }
 }
@@ -74,7 +75,7 @@ impl ExecutableCommand for SecContextCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        "security context".to_string()
+        "sestatus || apparmor_status".to_string()
     }
 }
 
@@ -124,7 +125,7 @@ impl ExecutableCommand for SecAuditCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        format!("security audit --format {:?}", self.format)
+        "Custom security audit logic".to_string()
     }
     fn is_structured(&self) -> bool {
         matches!(
