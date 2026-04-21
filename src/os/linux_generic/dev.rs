@@ -203,13 +203,7 @@ impl ExecutableCommand for DevPciCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&devices)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&devices)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&devices)?,
         }
         Ok(())
     }
@@ -259,13 +253,7 @@ impl ExecutableCommand for DevUsbCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&devices)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&devices)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&devices)?,
         }
         Ok(())
     }
@@ -313,13 +301,7 @@ impl ExecutableCommand for DevPrintersCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&printers)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&printers)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&printers)?,
         }
         Ok(())
     }

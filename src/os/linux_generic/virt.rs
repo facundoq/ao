@@ -110,13 +110,7 @@ impl ExecutableCommand for VirtPsCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&containers)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&containers)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&containers)?,
         }
         Ok(())
     }

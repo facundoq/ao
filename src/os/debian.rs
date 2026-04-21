@@ -142,13 +142,7 @@ impl ExecutableCommand for AptListCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&packages)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&packages)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&packages)?,
         }
         Ok(())
     }

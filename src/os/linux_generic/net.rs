@@ -206,13 +206,7 @@ impl ExecutableCommand for NetInterfacesCommand {
                 println!("{}", table);
             }
 
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&interfaces)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&interfaces)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&interfaces)?,
         }
         Ok(())
     }
@@ -279,13 +273,7 @@ impl ExecutableCommand for NetIpsCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&ips)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&ips)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&ips)?,
         }
         Ok(())
     }
@@ -349,13 +337,7 @@ impl ExecutableCommand for NetRoutesCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&routes)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&routes)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&routes)?,
         }
         Ok(())
     }
@@ -414,13 +396,7 @@ impl ExecutableCommand for FwStatusCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&rules)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&rules)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&rules)?,
         }
         Ok(())
     }

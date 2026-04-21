@@ -103,13 +103,7 @@ impl ExecutableCommand for GuiListDisplaysCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&displays)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&displays)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&displays)?,
         }
         Ok(())
     }

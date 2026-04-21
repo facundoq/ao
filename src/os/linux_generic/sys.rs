@@ -294,13 +294,7 @@ impl ExecutableCommand for SysInfoCommand {
                 table.add_row(vec!["Common Users", &data.common_users_count.to_string()]);
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&data)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&data)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&data)?,
         }
         Ok(())
     }
@@ -374,13 +368,7 @@ impl ExecutableCommand for SysTimeCommand {
                 table.add_row(vec!["RTC in Local TZ", &data.rtc_in_local_tz]);
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&data)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&data)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&data)?,
         }
         Ok(())
     }

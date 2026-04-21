@@ -230,13 +230,7 @@ impl ExecutableCommand for DiskListCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&disks)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&disks)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&disks)?,
         }
         Ok(())
     }

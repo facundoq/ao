@@ -96,13 +96,7 @@ impl ExecutableCommand for BootListEntriesCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&entries)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&entries)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&entries)?,
         }
         Ok(())
     }
@@ -163,13 +157,7 @@ impl ExecutableCommand for BootListModulesCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&modules)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&modules)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&modules)?,
         }
         Ok(())
     }

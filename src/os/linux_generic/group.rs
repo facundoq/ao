@@ -128,13 +128,7 @@ impl ExecutableCommand for GroupListCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&groups)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&groups)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&groups)?,
         }
         Ok(())
     }

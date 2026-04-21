@@ -12,6 +12,21 @@ pub enum OutputFormat {
     Original,
 }
 
+impl OutputFormat {
+    pub fn print_structured<T: serde::Serialize>(&self, data: &T) -> anyhow::Result<()> {
+        match self {
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(data)?);
+            }
+            OutputFormat::Yaml => {
+                println!("{}", serde_yaml::to_string(data)?);
+            }
+            _ => unreachable!("structured data shouldn't be printed with this format"),
+        }
+        Ok(())
+    }
+}
+
 #[derive(Parser)]
 #[command(name = "ao", version = "0.1.1", about = "Admin Operation", long_about = None)]
 pub struct Cli {

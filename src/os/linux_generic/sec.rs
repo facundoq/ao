@@ -106,13 +106,7 @@ impl ExecutableCommand for SecAuditCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&audits)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&audits)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&audits)?,
         }
         Ok(())
     }

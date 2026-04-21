@@ -223,13 +223,7 @@ impl ExecutableCommand for UserListCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&users)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&users)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&users)?,
         }
         Ok(())
     }

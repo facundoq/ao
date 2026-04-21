@@ -171,13 +171,7 @@ impl ExecutableCommand for ServiceListCommand {
                 }
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&services)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&services)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&services)?,
         }
         Ok(())
     }

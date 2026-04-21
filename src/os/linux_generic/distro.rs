@@ -91,13 +91,7 @@ impl ExecutableCommand for DistroInfoCommand {
                 table.add_row(vec!["Pretty Name", &info.pretty_name]);
                 println!("{}", table);
             }
-            OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&info)?);
-            }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&info)?);
-            }
-            OutputFormat::Original => unreachable!(),
+            _ => self.format.print_structured(&info)?,
         }
         Ok(())
     }
