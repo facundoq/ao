@@ -8,7 +8,7 @@ homepage = "https://github.com/facundoq/ao"
 repository = "https://github.com/facundoq/ao"
 documentation = "https://github.com/facundoq/ao#readme"
 keywords = ["cli", "linux", "admin", "system", "wrapper"]
-license = "GNU Affero General Public License v3.0"
+license = "AGPL-3.0-only"
 
 [dependencies]
 anyhow = "1.0.102"
