@@ -304,14 +304,6 @@ impl ExecutableCommand for SysInfoCommand {
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] Sys info (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("sys info --format {:?}", self.format);
-        Ok(())
-    }
     fn as_string(&self) -> String {
         "sysinfo (Rust library)".to_string()
     }
@@ -382,14 +374,6 @@ impl ExecutableCommand for SysTimeCommand {
             }
             OutputFormat::Original => unreachable!(),
         }
-        Ok(())
-    }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] timedatectl status (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("timedatectl status (format: {:?})", self.format);
         Ok(())
     }
     fn as_string(&self) -> String {

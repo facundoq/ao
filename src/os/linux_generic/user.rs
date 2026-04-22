@@ -244,22 +244,14 @@ impl ExecutableCommand for UserListCommand {
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] List users (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("list users (format: {:?})", self.format);
-        Ok(())
-    }
-    fn as_string(&self) -> String {
-        "cat /etc/passwd".to_string()
-    }
     fn is_structured(&self) -> bool {
         matches!(
             self.format,
             OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original
         )
+    }
+    fn as_string(&self) -> String {
+        "cat /etc/passwd".to_string()
     }
 }
 
@@ -300,14 +292,6 @@ impl ExecutableCommand for UserAddCommand {
         }
 
         cmd.arg("--").arg(&self.username).execute()
-    }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] {}", self.as_string());
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("{}", self.as_string());
-        Ok(())
     }
     fn as_string(&self) -> String {
         let mut s = "useradd".to_string();
@@ -351,14 +335,6 @@ impl ExecutableCommand for UserDelCommand {
             cmd = cmd.arg("-r");
         }
         cmd.arg("--").arg(&self.username).execute()
-    }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] {}", self.as_string());
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("{}", self.as_string());
-        Ok(())
     }
     fn as_string(&self) -> String {
         if self.purge {
@@ -405,14 +381,6 @@ impl ExecutableCommand for UserModCommand {
             _ => anyhow::bail!("Unsupported user modification action: {}", self.action),
         }
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] {}", self.as_string());
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("{}", self.as_string());
-        Ok(())
-    }
     fn as_string(&self) -> String {
         match self.action.as_str() {
             "add-group" => format!("usermod -aG {} -- {}", self.value, self.username),
@@ -437,14 +405,6 @@ impl ExecutableCommand for PasswdCommand {
         }
         let creds = format!("{}:{}", self.username, password);
         SystemCommand::new("chpasswd").stdin(&creds).execute()
-    }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] chpasswd for user {}", self.username);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("chpasswd (for user {})", self.username);
-        Ok(())
     }
     fn as_string(&self) -> String {
         format!("chpasswd (for user {})", self.username)

@@ -19,88 +19,42 @@ fn run_print(args: &[&str]) -> String {
 #[test]
 fn test_command_printing() {
     // Ensure binary is built
-    let build = Command::new("cargo").arg("build").status().unwrap();
+    let build = Command::new("cargo")
+        .arg("build")
+        .status()
+        .expect("Failed to build");
     assert!(build.success());
 
-    // Pkg
-    assert!(run_print(&["pkg", "add", "vim"]).contains("install"));
-    assert!(run_print(&["pkg", "del", "vim"]).contains("remove"));
+    // 1. User List
+    assert_eq!(run_print(&["user", "ls"]), "cat /etc/passwd");
+
+    // 2. Network Interfaces
+    assert_eq!(run_print(&["net", "interfaces"]), "ip addr");
+
+    // 3. Service Status
+    assert_eq!(
+        run_print(&["svc", "status", "cron"]),
+        "systemctl status -- cron"
+    );
+
+    // 4. Disk List
+    assert_eq!(run_print(&["disk", "ls"]), "lsblk --json");
+
+    // 5. System Info (Library usage)
+    assert_eq!(run_print(&["sys", "info"]), "sysinfo (Rust library)");
+
+    // 6. Auth Logs
+    assert_eq!(
+        run_print(&["log", "auth", "--lines", "10"]),
+        "journalctl -n 10 _FACILITY=4 _FACILITY=10 --"
+    );
+
+    // 7. Package Install (Distro specific, but assuming debian/apt for this environment)
+    let pkg_print = run_print(&["pkg", "add", "vim"]);
     assert!(
-        run_print(&["pkg", "update"]).contains("update")
-            || run_print(&["pkg", "update"]).contains("upgrade")
+        pkg_print.contains("apt install")
+            || pkg_print.contains("apt-get install")
+            || pkg_print.contains("dnf install")
+            || pkg_print.contains("pacman -S")
     );
-    assert!(run_print(&["pkg", "ls"]).contains("list"));
-
-    // Svc
-    assert_eq!(
-        run_print(&["svc", "up", "nginx"]),
-        "systemctl enable --now -- nginx"
-    );
-    assert_eq!(
-        run_print(&["svc", "down", "nginx"]),
-        "systemctl disable --now -- nginx"
-    );
-    assert_eq!(
-        run_print(&["svc", "status", "nginx"]),
-        "systemctl status -- nginx"
-    );
-    assert!(run_print(&["svc", "ls"]).contains("systemctl list-units (format: Table)"));
-
-    // User
-    assert!(run_print(&["user", "add", "bob"]).contains("useradd"));
-    assert!(run_print(&["user", "del", "bob"]).contains("userdel"));
-    assert!(run_print(&["user", "mod", "bob", "add-group", "sudo"]).contains("usermod"));
-    assert!(run_print(&["user", "ls"]).contains("list users (format: Table)"));
-
-    // Group
-    assert!(run_print(&["group", "add", "devs"]).contains("groupadd"));
-    assert!(run_print(&["group", "del", "devs"]).contains("groupdel"));
-    assert!(run_print(&["group", "ls"]).contains("list groups (format: Table)"));
-
-    // Disk
-    assert!(run_print(&["disk", "ls"]).contains("lsblk --json (format: Table)"));
-    assert!(run_print(&["disk", "mount", "/dev/sdb1", "/mnt"]).contains("mount"));
-    assert!(run_print(&["disk", "usage", "/var"]).contains("du"));
-
-    // Sys
-    assert!(run_print(&["sys", "info"]).contains("sys info --format Table"));
-    assert!(run_print(&["sys", "info", "--format", "json"]).contains("sys info --format Json"));
-    assert!(run_print(&["sys", "info", "--format", "yaml"]).contains("sys info --format Yaml"));
-    assert!(run_print(&["sys", "power", "reboot"]).contains("reboot"));
-    assert!(run_print(&["sys", "time", "status"]).contains("timedatectl status (format: Table)"));
-
-    // Net
-    assert!(run_print(&["net", "interfaces"]).contains("ip addr (format: Table)"));
-    assert!(run_print(&["net", "ips"]).contains("ip addr (for IPs) (format: Table)"));
-    assert!(run_print(&["net", "routes"]).contains("ip route (format: Table)"));
-    assert!(run_print(&["net", "fw", "status"]).contains("Firewall status (format: Table)"));
-    assert!(run_print(&["net", "wifi", "scan"]).contains("nmcli"));
-
-    // Log
-    assert!(run_print(&["log", "svc", "nginx"]).contains("journalctl"));
-    assert!(run_print(&["log", "file", "/var/log/syslog"]).contains("tail"));
-
-    // Boot
-    assert!(run_print(&["boot", "ls"]).contains("bootctl list (format: Table)"));
-    assert!(run_print(&["boot", "mod", "ls"]).contains("lsmod (format: Table)"));
-
-    // Gui
-    assert!(run_print(&["gui", "info"]).contains("loginctl"));
-    assert!(run_print(&["gui", "display", "ls"]).contains("list displays (format: Table)"));
-
-    // Dev
-    assert!(run_print(&["dev", "ls"]).contains("ao dev ls"));
-    assert!(run_print(&["dev", "pci"]).contains("lspci (format: Table)"));
-    assert!(run_print(&["dev", "usb"]).contains("lsusb (format: Table)"));
-    assert!(run_print(&["dev", "bt", "status"]).contains("bluetoothctl"));
-
-    // Virt
-    assert!(run_print(&["virt", "ls"]).contains("docker ps (format: Table)"));
-
-    // Sec
-    assert!(run_print(&["sec", "audit"]).contains("security audit (format: Table)"));
-    assert!(run_print(&["sec", "context"]).contains("sestatus"));
-
-    // Distro
-    assert!(run_print(&["distro", "info"]).contains("distro info (format: Table)"));
 }

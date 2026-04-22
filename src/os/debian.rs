@@ -152,14 +152,6 @@ impl ExecutableCommand for AptListCommand {
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] apt list --installed (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("apt list --installed (format: {:?})", self.format);
-        Ok(())
-    }
     fn as_string(&self) -> String {
         "dpkg-query -W".to_string()
     }

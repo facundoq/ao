@@ -120,14 +120,6 @@ impl ExecutableCommand for VirtPsCommand {
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] docker ps (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("docker ps (format: {:?})", self.format);
-        Ok(())
-    }
     fn as_string(&self) -> String {
         "docker ps".to_string()
     }

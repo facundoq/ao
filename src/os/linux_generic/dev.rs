@@ -175,13 +175,6 @@ impl ExecutableCommand for DevListAllCommand {
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> {
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("ao dev ls");
-        Ok(())
-    }
     fn as_string(&self) -> String {
         "lspci -mm && lsusb".to_string()
     }
@@ -228,14 +221,6 @@ impl ExecutableCommand for DevPciCommand {
             }
             OutputFormat::Original => unreachable!(),
         }
-        Ok(())
-    }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] lspci (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("lspci (format: {:?})", self.format);
         Ok(())
     }
     fn as_string(&self) -> String {
@@ -286,14 +271,6 @@ impl ExecutableCommand for DevUsbCommand {
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] lsusb (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("lsusb (format: {:?})", self.format);
-        Ok(())
-    }
     fn as_string(&self) -> String {
         "lsusb".to_string()
     }
@@ -338,14 +315,6 @@ impl ExecutableCommand for DevPrintersCommand {
             }
             OutputFormat::Original => unreachable!(),
         }
-        Ok(())
-    }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] lpstat -p (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("lpstat -p (format: {:?})", self.format);
         Ok(())
     }
     fn as_string(&self) -> String {

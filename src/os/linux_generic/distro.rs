@@ -101,14 +101,6 @@ impl ExecutableCommand for DistroInfoCommand {
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] Distro info (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("distro info (format: {:?})", self.format);
-        Ok(())
-    }
     fn as_string(&self) -> String {
         "cat /etc/os-release".to_string()
     }

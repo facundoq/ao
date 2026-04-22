@@ -138,14 +138,6 @@ impl ExecutableCommand for GroupListCommand {
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] List groups (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("list groups (format: {:?})", self.format);
-        Ok(())
-    }
     fn as_string(&self) -> String {
         "cat /etc/group".to_string()
     }
@@ -167,14 +159,6 @@ impl ExecutableCommand for GroupAddCommand {
             .arg(&self.groupname)
             .execute()
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] {}", self.as_string());
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("{}", self.as_string());
-        Ok(())
-    }
     fn as_string(&self) -> String {
         format!("groupadd -- {}", self.groupname)
     }
@@ -189,14 +173,6 @@ impl ExecutableCommand for GroupDelCommand {
             .arg("--")
             .arg(&self.groupname)
             .execute()
-    }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] {}", self.as_string());
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("{}", self.as_string());
-        Ok(())
     }
     fn as_string(&self) -> String {
         format!("groupdel -- {}", self.groupname)
@@ -215,14 +191,6 @@ impl ExecutableCommand for GroupModCommand {
             .arg("--")
             .arg(&self.groupname)
             .execute()
-    }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] {}", self.as_string());
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("{}", self.as_string());
-        Ok(())
     }
     fn as_string(&self) -> String {
         format!("groupmod --gid {} -- {}", self.gid, self.groupname)

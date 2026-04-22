@@ -240,14 +240,6 @@ impl ExecutableCommand for DiskListCommand {
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] lsblk --json (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("lsblk --json (format: {:?})", self.format);
-        Ok(())
-    }
     fn as_string(&self) -> String {
         "lsblk --json".to_string()
     }
@@ -275,14 +267,6 @@ impl ExecutableCommand for DiskMountCommand {
             cmd = cmd.arg("-o").arg(opts);
         }
         cmd.arg("--").arg(&self.device).arg(&self.path).execute()
-    }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] {}", self.as_string());
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("{}", self.as_string());
-        Ok(())
     }
     fn as_string(&self) -> String {
         let mut s = "mount".to_string();
@@ -313,14 +297,6 @@ impl ExecutableCommand for DiskUnmountCommand {
         }
         cmd.arg("--").arg(&self.target).execute()
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] {}", self.as_string());
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("{}", self.as_string());
-        Ok(())
-    }
     fn as_string(&self) -> String {
         let mut s = "umount".to_string();
         if self.lazy {
@@ -347,14 +323,6 @@ impl ExecutableCommand for DiskUsageCommand {
             cmd = cmd.arg("-sh");
         }
         cmd.arg("--").arg(&self.path).execute()
-    }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] {}", self.as_string());
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("{}", self.as_string());
-        Ok(())
     }
     fn as_string(&self) -> String {
         if let Some(d) = self.depth {

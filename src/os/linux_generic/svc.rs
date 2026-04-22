@@ -181,14 +181,6 @@ impl ExecutableCommand for ServiceListCommand {
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] systemctl list-units (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("systemctl list-units (format: {:?})", self.format);
-        Ok(())
-    }
     fn as_string(&self) -> String {
         "systemctl list-units --type=service".to_string()
     }
@@ -212,14 +204,6 @@ impl ExecutableCommand for ServiceUpCommand {
             .arg(&self.service)
             .execute()
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] {}", self.as_string());
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("{}", self.as_string());
-        Ok(())
-    }
     fn as_string(&self) -> String {
         format!("systemctl enable --now -- {}", self.service)
     }
@@ -237,14 +221,6 @@ impl ExecutableCommand for ServiceDownCommand {
             .arg(&self.service)
             .execute()
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] {}", self.as_string());
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("{}", self.as_string());
-        Ok(())
-    }
     fn as_string(&self) -> String {
         format!("systemctl disable --now -- {}", self.service)
     }
@@ -260,14 +236,6 @@ impl ExecutableCommand for ServiceRestartCommand {
             .arg("--")
             .arg(&self.service)
             .execute()
-    }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] {}", self.as_string());
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("{}", self.as_string());
-        Ok(())
     }
     fn as_string(&self) -> String {
         format!("systemctl restart -- {}", self.service)
@@ -285,14 +253,6 @@ impl ExecutableCommand for ServiceReloadCommand {
             .arg(&self.service)
             .execute()
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] {}", self.as_string());
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("{}", self.as_string());
-        Ok(())
-    }
     fn as_string(&self) -> String {
         format!("systemctl reload -- {}", self.service)
     }
@@ -309,14 +269,6 @@ impl ExecutableCommand for ServiceStatusCommand {
             .arg(&self.service)
             .ignore_exit_code()
             .execute()
-    }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] {}", self.as_string());
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("{}", self.as_string());
-        Ok(())
     }
     fn as_string(&self) -> String {
         format!("systemctl status -- {}", self.service)

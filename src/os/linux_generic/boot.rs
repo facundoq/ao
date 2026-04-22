@@ -106,14 +106,6 @@ impl ExecutableCommand for BootListEntriesCommand {
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] bootctl list (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("bootctl list (format: {:?})", self.format);
-        Ok(())
-    }
     fn as_string(&self) -> String {
         "bootctl list".to_string()
     }
@@ -171,14 +163,6 @@ impl ExecutableCommand for BootListModulesCommand {
             }
             OutputFormat::Original => unreachable!(),
         }
-        Ok(())
-    }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] lsmod (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("lsmod (format: {:?})", self.format);
         Ok(())
     }
     fn as_string(&self) -> String {

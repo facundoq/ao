@@ -206,14 +206,6 @@ impl ExecutableCommand for LiveStatsCommand {
 
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] Live stats");
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("Live stats monitor");
-        Ok(())
-    }
     fn as_string(&self) -> String {
         "sysinfo (Rust library)".to_string()
     }

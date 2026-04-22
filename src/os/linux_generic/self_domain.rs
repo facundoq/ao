@@ -111,12 +111,6 @@ impl ExecutableCommand for CompletionScriptCommand {
     fn execute(&self) -> Result<()> {
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> {
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        Ok(())
-    }
     fn as_string(&self) -> String {
         "".to_string()
     }
@@ -223,13 +217,6 @@ impl ExecutableCommand for SelfInfoCommand {
                 println!("os: {}", info.os);
             }
         }
-        Ok(())
-    }
-    fn dry_run(&self) -> Result<()> {
-        self.execute()
-    }
-    fn print(&self) -> Result<()> {
-        println!("ao self info");
         Ok(())
     }
     fn as_string(&self) -> String {

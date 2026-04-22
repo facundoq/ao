@@ -216,14 +216,6 @@ impl ExecutableCommand for NetInterfacesCommand {
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] ip addr (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("ip addr (format: {:?})", self.format);
-        Ok(())
-    }
     fn as_string(&self) -> String {
         "ip addr".to_string()
     }
@@ -289,14 +281,6 @@ impl ExecutableCommand for NetIpsCommand {
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] ip addr (for IPs) (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("ip addr (for IPs) (format: {:?})", self.format);
-        Ok(())
-    }
     fn as_string(&self) -> String {
         "ip addr".to_string()
     }
@@ -359,14 +343,6 @@ impl ExecutableCommand for NetRoutesCommand {
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] ip route (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("ip route (format: {:?})", self.format);
-        Ok(())
-    }
     fn as_string(&self) -> String {
         "ip route".to_string()
     }
@@ -422,14 +398,6 @@ impl ExecutableCommand for FwStatusCommand {
             }
             OutputFormat::Original => unreachable!(),
         }
-        Ok(())
-    }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] Firewall status (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("Firewall status (format: {:?})", self.format);
         Ok(())
     }
     fn as_string(&self) -> String {

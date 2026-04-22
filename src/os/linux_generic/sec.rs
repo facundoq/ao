@@ -66,14 +66,6 @@ impl ExecutableCommand for SecContextCommand {
         println!("Neither SELinux nor AppArmor appear to be available on this system.");
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] Check security context (SELinux/AppArmor)");
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("sestatus || apparmor_status");
-        Ok(())
-    }
     fn as_string(&self) -> String {
         "sestatus || apparmor_status".to_string()
     }
@@ -114,14 +106,6 @@ impl ExecutableCommand for SecAuditCommand {
             }
             OutputFormat::Original => unreachable!(),
         }
-        Ok(())
-    }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] Security audit (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("security audit (format: {:?})", self.format);
         Ok(())
     }
     fn as_string(&self) -> String {

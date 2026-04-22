@@ -113,14 +113,6 @@ impl ExecutableCommand for GuiListDisplaysCommand {
         }
         Ok(())
     }
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] List displays (format: {:?})", self.format);
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
-        println!("list displays (format: {:?})", self.format);
-        Ok(())
-    }
     fn as_string(&self) -> String {
         "xrandr --query || wlr-randr".to_string()
     }

@@ -37,9 +37,19 @@ pub trait Domain {
 /// Represents a command that can be executed, printed, or dry-run.
 pub trait ExecutableCommand {
     fn execute(&self) -> Result<()>;
-    fn dry_run(&self) -> Result<()>;
-    fn print(&self) -> Result<()>;
+
+    fn dry_run(&self) -> Result<()> {
+        println!("[DRY RUN] {}", self.as_string());
+        Ok(())
+    }
+
+    fn print(&self) -> Result<()> {
+        println!("{}", self.as_string());
+        Ok(())
+    }
+
     fn as_string(&self) -> String;
+
     /// Returns true if this command outputs structured or raw original data (should suppress ao decorations)
     fn is_structured(&self) -> bool {
         false
@@ -274,6 +284,11 @@ pub struct NetIpInfo {
     pub interface: String,
     pub family: String,
     pub address: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct NetIpInfoList {
+    pub ips: Vec<NetIpInfo>,
 }
 
 #[derive(Serialize, Deserialize)]

@@ -75,19 +75,6 @@ impl ExecutableCommand for SystemCommand {
         Ok(())
     }
 
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] Executing: {}", self.as_string());
-        if self.stdin_data.is_some() {
-            println!("[DRY RUN] (With secure stdin payload)");
-        }
-        Ok(())
-    }
-
-    fn print(&self) -> Result<()> {
-        println!("{}", self.as_string());
-        Ok(())
-    }
-
     fn as_string(&self) -> String {
         format!("{} {}", self.binary, self.args.join(" "))
     }
@@ -111,16 +98,6 @@ impl ExecutableCommand for CompoundCommand {
         Ok(())
     }
 
-    fn dry_run(&self) -> Result<()> {
-        println!("[DRY RUN] Executing: {}", self.as_string());
-        Ok(())
-    }
-
-    fn print(&self) -> Result<()> {
-        println!("{}", self.as_string());
-        Ok(())
-    }
-
     fn as_string(&self) -> String {
         self.commands
             .iter()
@@ -133,12 +110,6 @@ impl ExecutableCommand for CompoundCommand {
 pub struct NoopCommand;
 impl ExecutableCommand for NoopCommand {
     fn execute(&self) -> Result<()> {
-        Ok(())
-    }
-    fn dry_run(&self) -> Result<()> {
-        Ok(())
-    }
-    fn print(&self) -> Result<()> {
         Ok(())
     }
     fn as_string(&self) -> String {
