@@ -1,7 +1,14 @@
 [package]
-name = "ao"
+name = "ao-cli"
 version = "0.1.6"
 edition = "2024"
+authors = ["Facundo Olano <facundo.olano@gmail.com>"]
+description = "A unified administration tool for Linux systems"
+homepage = "https://github.com/facundoq/ao"
+repository = "https://github.com/facundoq/ao"
+documentation = "https://github.com/facundoq/ao#readme"
+keywords = ["cli", "linux", "admin", "system", "wrapper"]
+license = "GNU Affero General Public License v3.0"
 
 [dependencies]
 anyhow = "1.0.102"
