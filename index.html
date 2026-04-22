@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ao - Admin Operations</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --text: #f8fafc;
+            --primary: #38bdf8;
+            --secondary: #94a3b8;
+            --code-bg: #1e293b;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+        h1 {
+            font-size: 3rem;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+        .tagline {
+            font-size: 1.2rem;
+            color: var(--secondary);
+        }
+        section {
+            margin-bottom: 40px;
+        }
+        h2 {
+            border-bottom: 2px solid var(--code-bg);
+            padding-bottom: 10px;
+            color: var(--primary);
+        }
+        .motivation-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 600px) {
+            .motivation-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .card {
+            background-color: var(--code-bg);
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .code-block {
+            background-color: #000;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            position: relative;
+            margin-top: 10px;
+        }
+        .sample-output {
+            background-color: #0f172a;
+            border: 1px solid var(--code-bg);
+            padding: 15px;
+            border-radius: 6px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.8rem;
+            color: #cbd5e1;
+            margin-top: 10px;
+            white-space: pre;
+            overflow-x: auto;
+        }
+        .code-header {
+            font-size: 0.8rem;
+            color: var(--secondary);
+            margin-bottom: 5px;
+            display: block;
+        }
+        footer {
+            text-align: center;
+            margin-top: 80px;
+            color: var(--secondary);
+            font-size: 0.9rem;
+        }
+        a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ao</h1>
+            <p class="tagline">Admin Operations: The Unified Linux CLI Wrapper</p>
+        </header>
+
+        <section id="about">
+            <h2>📖 What is ao?</h2>
+            <p>
+                <strong>ao</strong> is a centralized, unified command line wrapper written in Rust. 
+                It simplifies system operations across fragmented Linux environments by providing 
+                a consistent syntax (<code>ao &lt;domain&gt; &lt;action&gt;</code>) for tasks that 
+                usually require dozens of different tools like <code>apt</code>, <code>systemctl</code>, 
+                <code>ip</code>, and <code>useradd</code>.
+            </p>
+        </section>
+
+        <section id="modes">
+            <h2>🎮 CLI vs Interactive Mode</h2>
+            <div class="motivation-grid">
+                <div class="card">
+                    <h3>⚡ Standard CLI</h3>
+                    <p>
+                        For power users and scripts. Run <code>ao &lt;domain&gt; &lt;action&gt;</code> directly. 
+                        It's fast, predictable, and provides consistent output.
+                    </p>
+                    <div class="code-block">ao user add jane --system</div>
+                </div>
+                <div class="card">
+                    <h3>🕹️ Interactive Mode</h3>
+                    <p>
+                        For discovery and ease of use. Run <code>ao interactive</code> to browse domains 
+                        and subcommands visually. <strong>ao</strong> will guide you through argument 
+                        collection and validate your input before execution.
+                    </p>
+                    <div class="code-block">ao interactive</div>
+                </div>
+            </div>
+        </section>
+
+        <section id="motivation">
+            <h2>💡 Why use it?</h2>
+            <div class="motivation-grid">
+                <div class="card">
+                    <h3>For New Users</h3>
+                    <p>
+                        Stop memorizing cryptic flags for twenty different tools. 
+                        <strong>ao</strong> gives you a logical, predictable interface to manage 
+                        your system from day one without feeling overwhelmed.
+                    </p>
+                </div>
+                <div class="card">
+                    <h3>For Old Timers</h3>
+                    <p>
+                        Can't remember if it's <code>ip addr</code> or <code>ifconfig</code> today? 
+                        Switching between Debian and Fedora? 
+                        <strong>ao</strong> abstracts the distribution differences so your muscle 
+                        memory just works.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section id="examples">
+            <h2>🚀 Usage Examples</h2>
+            <p>Predictable commands for everything you do.</p>
+            
+            <div class="card">
+                <h3>🔍 Monitoring</h3>
+                <div class="code-block">
+                    ao monitor
+                </div>
+                <div class="sample-output">=== System Monitor (⬛ Used / ⬜ Total) ===
++-------+---------+----------+---------------------------+------------------------------------+
+|       | Type    | Subtype  | Value                     | Description                        |
++=============================================================================================+
+| 💻 🏗️ | CPU     | Physical | 1.2%                      | Generic x86_64 Processor           |
+|-------+---------+----------+---------------------------+------------------------------------|
+| 🧠 🏗️ | RAM     | Physical | ⬛ 4.2 GB / ⬜ 16.0 GB     | System Memory                      |
+|-------+---------+----------+---------------------------+------------------------------------|
+| 🌐 📶 | Network | Wireless | 📥 RX 1.2 GB, 📤 TX 245 MB | wlan0                              |
++-------+---------+----------+---------------------------+------------------------------------+</div>
+            </div>
+
+            <div class="card" style="margin-top: 15px;">
+                <h3>📦 Package Management</h3>
+                <div class="code-block">
+                    ao pkg install vim
+                </div>
+                <div class="sample-output">> apt install vim
+Reading package lists... Done
+Building dependency tree... Done
+...
+The following NEW packages will be installed:
+  vim
+0 upgraded, 1 newly installed, 0 to remove.</div>
+            </div>
+
+            <div class="card" style="margin-top: 15px;">
+                <h3>⚙️ Services</h3>
+                <div class="code-block">
+                    ao svc status cron
+                </div>
+                <div class="sample-output">> systemctl status cron
+● cron.service - Regular background program processing daemon
+     Loaded: loaded (/usr/lib/systemd/system/cron.service; enabled; preset: enabled)
+     Active: active (running) since Mon 2026-10-10 09:00:00 UTC; 3h ago
+...</div>
+            </div>
+
+            <div class="card" style="margin-top: 15px;">
+                <h3>👤 Users</h3>
+                <div class="code-block">
+                    ao user ls
+                </div>
+                <div class="sample-output">> cat /etc/passwd
++-----------+---------+-------+-------+----------------+--------------+
+| Username  | Type    | UID   | GID   | Home           | Shell        |
++=====================================================================+
+| root      | Regular | 0     | 0     | /root          | /bin/bash    |
+|-----------+---------+-------+-------+----------------+--------------|
+| admin     | Regular | 1000  | 1000  | /home/admin    | /usr/bin/zsh |
++-----------+---------+-------+-------+----------------+--------------+</div>
+            </div>
+
+            <div class="card" style="margin-top: 15px;">
+                <h3>🌐 Networking</h3>
+                <div class="code-block">
+                    ao net interfaces
+                </div>
+                <div class="sample-output">> ip addr
++-------+-----------+----------+---------+-------+-------------------+
+|       | Interface | Type     | State   | MTU   | MAC               |
++======================================================================+
+| 📶 🟢 | wlan0     | wireless | UP      | 1500  | 00:11:22:33:44:55 |
+|-------+-----------+----------+---------+-------+-------------------|
+| 🏗️ 🔴 | eth0      | physical | DOWN    | 1500  | 00:11:22:33:44:66 |
++-------+-----------+----------+---------+-------+-------------------+</div>
+            </div>
+
+            <div class="card" style="margin-top: 15px;">
+                <h3>📜 Logs</h3>
+                <div class="code-block">
+                    ao log error --lines 3
+                </div>
+                <div class="sample-output">> journalctl -p err..emerg -n 3 --
+Oct 10 12:17:32 linux-srv systemd-udevd[429]: Invalid key 'SYSFS'.
+Oct 10 12:17:32 linux-srv systemd-udevd[429]: Invalid operator for GROUP.
+Oct 10 12:50:03 linux-srv sddm-helper[2540]: gkr-pam: unable to locate daemon</div>
+            </div>
+        </section>
+
+        <section id="structure">
+            <h2>🌲 Command Structure</h2>
+            <p>A consistent, hierarchical command tree for all your needs.</p>
+            <div class="code-block" style="font-size: 0.8rem; line-height: 1.2;">
+ao
+├── interactive
+├── boot
+│   ├── ls
+│   └── mod
+│       ├── ls
+│       ├── load
+│       └── unload
+├── dev
+│   ├── ls
+│   ├── pci
+│   ├── usb
+│   ├── bt
+│   │   ├── status
+│   │   ├── scan
+│   │   ├── pair
+│   │   └── connect
+│   └── print
+│       └── ls
+├── disk
+│   ├── ls
+│   ├── mount
+│   ├── unmount
+│   └── usage
+├── distro
+│   ├── info
+│   └── upgrade
+├── group
+│   ├── add
+│   ├── del
+│   ├── ls
+│   └── mod
+├── gui
+│   ├── info
+│   └── display
+│       └── ls
+├── log
+│   ├── auth
+│   ├── boot
+│   ├── crash
+│   ├── dev
+│   ├── error
+│   ├── file
+│   ├── pkg
+│   ├── svc
+│   └── sys
+├── monitor
+├── net
+│   ├── interfaces
+│   ├── ips
+│   ├── routes
+│   ├── fw
+│   │   ├── status
+│   │   ├── allow
+│   │   └── deny
+│   └── wifi
+│       ├── scan
+│       └── connect
+├── pkg
+│   ├── add
+│   ├── ls
+│   ├── del
+│   ├── search
+│   └── update
+├── sec
+│   ├── audit
+│   └── context
+├── self
+│   ├── completions
+│   │   ├── generate
+│   │   ├── install
+│   │   └── setup
+│   ├── info
+│   └── update
+├── svc
+│   ├── down
+│   ├── ls
+│   ├── reload
+│   ├── restart
+│   ├── status
+│   └── up
+├── sys
+│   ├── info
+│   ├── power
+│   └── time
+├── user
+│   ├── add
+│   ├── del
+│   ├── ls
+│   ├── mod
+│   └── passwd
+└── virt
+    ├── ls
+    ├── start
+    ├── stop
+    ├── rm
+    └── logs
+            </div>
+        </section>
+
+        <section id="install">
+            <h2>📥 Installation</h2>
+            
+            <div>
+                <span class="code-header">Option A: Local Install (to ~/.local/bin)</span>
+                <div class="code-block">
+                    curl -L https://github.com/facundoq/ao/releases/latest/download/ao -o ~/.local/bin/ao && chmod +x ~/.local/bin/ao
+                </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <span class="code-header">Option B: Global Install (to /usr/local/bin, requires sudo)</span>
+                <div class="code-block">
+                    sudo curl -L https://github.com/facundoq/ao/releases/latest/download/ao -o /usr/local/bin/ao && sudo chmod +x /usr/local/bin/ao
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>View the source on <a href="https://github.com/facundoq/ao">GitHub</a></p>
+        </footer>
+    </div>
+</body>
+</html>
