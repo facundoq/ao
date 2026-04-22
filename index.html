@@ -120,6 +120,18 @@
                 usually require dozens of different tools like <code>apt</code>, <code>systemctl</code>, 
                 <code>ip</code>, and <code>useradd</code>.
             </p>
+            <div class="card" style="border-left: 4px solid #ef4444; background-color: #450a0a;">
+                <p><strong>⚠️ CAUTION: ao is currently Alpha software.</strong></p>
+                <p style="font-size: 0.9rem;">
+                    While designed for efficiency, it interacts with critical system components. 
+                    Exercise caution and always verify commands in sensitive environments.
+                </p>
+                <p style="font-size: 0.9rem; color: var(--secondary);">
+                    <strong>Pro Tip:</strong> If in doubt, run any command with the <code>--print</code> flag 
+                    (e.g., <code>ao --print user add jane</code>) to see the exact bash commands 
+                    that would be executed without actually running them.
+                </p>
+            </div>
         </section>
 
         <section id="modes">
