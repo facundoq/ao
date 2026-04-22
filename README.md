@@ -2,6 +2,11 @@
 
 Admin Operations (`ao`) is a centralized, unified command line wrapper written in Rust designed to perform sysop operations across fragmented Linux environments. Instead of context-switching between `apt`, `dnf`, `systemctl`, `usermod`, and `ip`, you just use `ao`.
 
+> [!CAUTION]
+> **ao is currently Alpha software.** While designed for efficiency, it interacts with critical system components. Exercise caution and always verify commands in sensitive environments.
+> 
+> **Pro Tip:** If in doubt, run any command with the `--print` flag (e.g., `ao --print user add jane`) to see the exact bash commands that would be executed without actually running them.
+
 ## Philosophy
 
 * **Ergonomic Speed:** Fast, predictable muscle memory (`ao <domain> <action>`).
