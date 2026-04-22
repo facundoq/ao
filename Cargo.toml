@@ -1,6 +1,6 @@
 [package]
 name = "ao-cli"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2024"
 authors = ["Facundo Manuel Quiroga"]
 description = "A unified administration tool for Linux systems"
