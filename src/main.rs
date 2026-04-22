@@ -47,7 +47,7 @@ fn main() -> Result<()> {
     let (subcommand_name, subcommand_matches) = match matches.subcommand() {
         Some(s) => s,
         None => {
-            Cli::command().print_help()?;
+            app.print_help()?;
             println!();
             return Ok(());
         }

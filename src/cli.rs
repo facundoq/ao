@@ -13,7 +13,12 @@ pub enum OutputFormat {
 }
 
 #[derive(Parser)]
-#[command(name = "ao", version = "0.1.1", about = "Admin Operation", long_about = None)]
+#[command(
+    name = "ao",
+    version = env!("CARGO_PKG_VERSION"),
+    about = "Admin Operation",
+    long_about = "A unified administration tool for Linux systems, providing a consistent interface for managing packages, services, users, networking, and more across various distributions."
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<CliCommand>,
