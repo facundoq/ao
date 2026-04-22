@@ -127,3 +127,20 @@ ao
     ├── rm
     └── logs
 ```
+
+## Installation
+
+### Via Cargo
+
+You can install `ao` directly from [crates.io](https://crates.io/crates/ao-cli):
+
+```bash
+cargo install ao-cli
+```
+
+**Note:** The crate is named `ao-cli` due to naming availability, but the installed binary will be named `ao`.
+
+### Binary Downloads
+
+Statically compiled binaries are available for every release in the [GitHub Releases](https://github.com/facundoq/ao/releases) section.
+
