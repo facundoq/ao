@@ -33,7 +33,7 @@ jobs:
           cd dist && tar -czf ao-x86_64-unknown-linux-musl.tar.gz ao
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             dist/ao-x86_64-unknown-linux-musl.tar.gz
@@ -52,7 +52,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Authenticate with crates.io
-        uses: rust-lang/crates-io-auth-action@v1.0.1
+        uses: rust-lang/crates-io-auth-action@v2
         id: auth
       - name: Publish
         run: cargo publish
