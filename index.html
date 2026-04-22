@@ -102,6 +102,9 @@
         a:hover {
             text-decoration: underline;
         }
+        pre {
+            margin: 0;
+        }
     </style>
 </head>
 <body>
@@ -120,17 +123,33 @@
                 usually require dozens of different tools like <code>apt</code>, <code>systemctl</code>, 
                 <code>ip</code>, and <code>useradd</code>.
             </p>
-            <div class="card" style="border-left: 4px solid #ef4444; background-color: #450a0a;">
-                <p><strong>⚠️ CAUTION: ao is currently Alpha software.</strong></p>
-                <p style="font-size: 0.9rem;">
-                    While designed for efficiency, it interacts with critical system components. 
-                    Exercise caution and always verify commands in sensitive environments.
-                </p>
-                <p style="font-size: 0.9rem; color: var(--secondary);">
-                    <strong>Pro Tip:</strong> If in doubt, run any command with the <code>--print</code> flag 
-                    (e.g., <code>ao --print user add jane</code>) to see the exact bash commands 
-                    that would be executed without actually running them.
-                </p>
+            <p>
+                <strong>ao</strong> is distributed as a <strong>statically compiled binary using musl</strong>, 
+                providing a single standalone executable that works on most x86_64 Linux distributions 
+                without any external dependencies.
+            </p>
+        </section>
+
+        <section id="motivation">
+            <h2>💡 Why use it?</h2>
+            <div class="motivation-grid">
+                <div class="card">
+                    <h3>For New Users</h3>
+                    <p>
+                        Stop memorizing cryptic flags for twenty different tools. 
+                        <strong>ao</strong> gives you a logical, predictable interface to manage 
+                        your system from day one without feeling overwhelmed.
+                    </p>
+                </div>
+                <div class="card">
+                    <h3>For Old Timers</h3>
+                    <p>
+                        Can't remember if it's <code>ip addr</code> or <code>ifconfig</code> today? 
+                        Switching between Debian and Fedora? 
+                        <strong>ao</strong> abstracts the distribution differences so your muscle 
+                        memory just works.
+                    </p>
+                </div>
             </div>
         </section>
 
@@ -153,29 +172,6 @@
                         collection and validate your input before execution.
                     </p>
                     <div class="code-block">ao interactive</div>
-                </div>
-            </div>
-        </section>
-
-        <section id="motivation">
-            <h2>💡 Why use it?</h2>
-            <div class="motivation-grid">
-                <div class="card">
-                    <h3>For New Users</h3>
-                    <p>
-                        Stop memorizing cryptic flags for twenty different tools. 
-                        <strong>ao</strong> gives you a logical, predictable interface to manage 
-                        your system from day one without feeling overwhelmed.
-                    </p>
-                </div>
-                <div class="card">
-                    <h3>For Old Timers</h3>
-                    <p>
-                        Can't remember if it's <code>ip addr</code> or <code>ifconfig</code> today? 
-                        Switching between Debian and Fedora? 
-                        <strong>ao</strong> abstracts the distribution differences so your muscle 
-                        memory just works.
-                    </p>
                 </div>
             </div>
         </section>
@@ -273,6 +269,7 @@ Oct 10 12:50:03 linux-srv sddm-helper[2540]: gkr-pam: unable to locate daemon</d
             <h2>🌲 Command Structure</h2>
             <p>A consistent, hierarchical command tree for all your needs.</p>
             <div class="code-block" style="font-size: 0.8rem; line-height: 1.2;">
+<pre>
 ao
 ├── interactive
 ├── boot
@@ -370,11 +367,25 @@ ao
     ├── stop
     ├── rm
     └── logs
+</pre>
             </div>
         </section>
 
         <section id="install">
             <h2>📥 Installation</h2>
+
+            <div class="card" style="border-left: 4px solid #ef4444; background-color: #450a0a; margin-bottom: 25px;">
+                <p><strong>⚠️ CAUTION: ao is currently Alpha software.</strong></p>
+                <p style="font-size: 0.9rem;">
+                    While designed for efficiency, it interacts with critical system components. 
+                    Exercise caution and always verify commands in sensitive environments.
+                </p>
+                <p style="font-size: 0.9rem; color: var(--secondary);">
+                    <strong>Pro Tip:</strong> If in doubt, run any command with the <code>--print</code> flag 
+                    (e.g., <code>ao --print user add jane</code>) to see the exact bash commands 
+                    that would be executed without actually running them.
+                </p>
+            </div>
             
             <div>
                 <span class="code-header">Option A: Local Install (to ~/.local/bin)</span>
