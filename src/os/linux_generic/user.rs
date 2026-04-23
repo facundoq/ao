@@ -152,9 +152,7 @@ impl UserManager for StandardUser {
     }
 
     fn passwd(&self, username: &str) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(PasswdCommand {
-            username: username.to_string(),
-        }))
+        Ok(Box::new(SystemCommand::new("passwd").arg(username)))
     }
 
     fn get_users(&self) -> Result<Vec<String>> {
@@ -392,21 +390,3 @@ impl ExecutableCommand for UserModCommand {
     }
 }
 
-pub struct PasswdCommand {
-    pub username: String,
-}
-
-impl ExecutableCommand for PasswdCommand {
-    fn execute(&self) -> Result<()> {
-        let password = rpassword::prompt_password("New password: ")?;
-        let confirm = rpassword::prompt_password("Retype new password: ")?;
-        if password != confirm {
-            anyhow::bail!("Passwords do not match");
-        }
-        let creds = format!("{}:{}", self.username, password);
-        SystemCommand::new("chpasswd").stdin(&creds).execute()
-    }
-    fn as_string(&self) -> String {
-        format!("chpasswd (for user {})", self.username)
-    }
-}
