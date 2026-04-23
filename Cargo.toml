@@ -22,7 +22,6 @@ colored = "3.1.1"
 comfy-table = { version = "7.2.2", features = ["tty"] }
 crossterm = "0.29.0"
 duct = "1.1.1"
-rpassword = "7.4.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.9"
