@@ -19,11 +19,15 @@ fn run_print(args: &[&str]) -> String {
 #[test]
 fn test_command_printing() {
     // Ensure binary is built
-    let build = Command::new("cargo")
+    let build_output = Command::new("cargo")
         .arg("build")
-        .status()
-        .expect("Failed to build");
-    assert!(build.success());
+        .output()
+        .expect("Failed to run cargo build");
+    if !build_output.status.success() {
+        eprintln!("STDOUT:\n{}", String::from_utf8_lossy(&build_output.stdout));
+        eprintln!("STDERR:\n{}", String::from_utf8_lossy(&build_output.stderr));
+        panic!("Failed to build binary for command printing tests");
+    }
 
     // 1. User List
     assert_eq!(run_print(&["user", "ls"]), "cat /etc/passwd");

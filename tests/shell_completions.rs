@@ -6,17 +6,26 @@ fn test_shell_completions() {
     // Ensure the binary exists
     if !Path::new("./target/debug/ao").exists() {
         // Skip if not built yet (though cargo test usually builds it)
-        let build_status = Command::new("cargo")
+        let build_output = Command::new("cargo")
             .arg("build")
-            .status()
+            .output()
             .expect("Failed to run cargo build");
-        assert!(build_status.success());
+        if !build_output.status.success() {
+            eprintln!("STDOUT:\n{}", String::from_utf8_lossy(&build_output.stdout));
+            eprintln!("STDERR:\n{}", String::from_utf8_lossy(&build_output.stderr));
+            panic!("Failed to build binary for completion tests");
+        }
     }
 
-    let status = Command::new("bash")
+    let output = Command::new("bash")
         .arg("tests/completions_test.sh")
-        .status()
+        .output()
         .expect("Failed to execute completion test script");
 
-    assert!(status.success(), "Shell completion tests failed!");
+    if !output.status.success() {
+        eprintln!("Shell completion tests failed!");
+        eprintln!("STDOUT:\n{}", String::from_utf8_lossy(&output.stdout));
+        eprintln!("STDERR:\n{}", String::from_utf8_lossy(&output.stderr));
+        panic!("Shell completion tests failed!");
+    }
 }
