@@ -61,4 +61,14 @@ fn test_command_printing() {
             || pkg_print.contains("dnf install")
             || pkg_print.contains("pacman -S")
     );
+
+    // 8. User Modification
+    assert_eq!(
+        run_print(&["user", "mod", "john", "add-group", "docker"]),
+        "usermod -aG docker -- john"
+    );
+    assert_eq!(
+        run_print(&["user", "mod", "john", "shell", "/bin/zsh"]),
+        "usermod -s /bin/zsh -- john"
+    );
 }

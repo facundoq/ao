@@ -1,0 +1,67 @@
+name: Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.distro }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [ubuntu-latest, archlinux, fedora, alpine]
+    
+    container:
+      image: >-
+        ${{ 
+          matrix.distro == 'ubuntu-latest' && 'ubuntu:24.04' ||
+          matrix.distro == 'archlinux' && 'archlinux:latest' ||
+          matrix.distro == 'fedora' && 'fedora:40' ||
+          matrix.distro == 'alpine' && 'alpine:3.20'
+        }}
+
+    steps:
+      - name: Install dependencies (Ubuntu)
+        if: matrix.distro == 'ubuntu-latest'
+        run: |
+          apt-get update
+          apt-get install -y curl build-essential libssl-dev pkg-config musl-tools
+
+      - name: Install dependencies (Arch)
+        if: matrix.distro == 'archlinux'
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm rustup base-devel openssl pkg-config
+
+      - name: Install dependencies (Fedora)
+        if: matrix.distro == 'fedora'
+        run: |
+          dnf install -y curl gcc openssl-devel pkg-config rustup
+
+      - name: Install dependencies (Alpine)
+        if: matrix.distro == 'alpine'
+        run: |
+          apk add --no-progress --update curl gcc musl-dev openssl-dev pkgconfig rustup
+
+      - uses: actions/checkout@v6
+
+      - name: Install Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          source $HOME/.cargo/env
+          rustup default stable
+
+      - name: Build
+        run: cargo build
+
+      - name: Run Tests
+        run: cargo test --lib --bins
+        
+      - name: Run Integration Tests
+        # Skip testcontainers tests in CI as it requires a docker daemon
+        run: cargo test --test print_commands --test shell_completions

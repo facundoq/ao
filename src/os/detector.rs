@@ -1,3 +1,4 @@
+use super::alpine::Apk;
 use super::arch::Pacman;
 use super::debian::Apt;
 use super::fedora::Dnf;
@@ -73,6 +74,7 @@ pub fn detect_system() -> Result<DetectedSystem> {
         || os_release.contains("ID_LIKE=debian");
     let is_arch_based = os_release.contains("ID=arch") || os_release.contains("ID_LIKE=arch");
     let is_fedora_based = os_release.contains("ID=fedora") || os_release.contains("ID_LIKE=fedora");
+    let is_alpine = os_release.contains("ID=alpine");
 
     if is_debian_based {
         return Ok(DetectedSystem {
@@ -120,6 +122,27 @@ pub fn detect_system() -> Result<DetectedSystem> {
         return Ok(DetectedSystem {
             pkg: Box::new(Dnf),
             svc: Box::new(Systemd),
+            net: Box::new(StandardNet),
+            dev: Box::new(StandardDev),
+            virt: Box::new(StandardVirt),
+            sec: Box::new(StandardSec),
+            boot: Box::new(StandardBoot),
+            gui: Box::new(StandardGui),
+            user: Box::new(StandardUser),
+            group: Box::new(StandardGroup),
+            disk: Box::new(StandardDisk),
+            sys: Box::new(StandardSys),
+            log: Box::new(StandardLog),
+            distro: Box::new(StandardDistro),
+            monitor: Box::new(StandardMonitor),
+            self_manager: Box::new(StandardSelf),
+        });
+    }
+
+    if is_alpine {
+        return Ok(DetectedSystem {
+            pkg: Box::new(Apk),
+            svc: Box::new(Systemd), // Placeholder
             net: Box::new(StandardNet),
             dev: Box::new(StandardDev),
             virt: Box::new(StandardVirt),

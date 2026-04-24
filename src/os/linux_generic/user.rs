@@ -355,8 +355,8 @@ impl ExecutableCommand for UserModCommand {
         match self.action.as_str() {
             "add-group" => SystemCommand::new("usermod")
                 .arg("-aG")
-                .arg("--")
                 .arg(&self.value)
+                .arg("--")
                 .arg(&self.username)
                 .execute(),
             "del-group" => SystemCommand::new("gpasswd")
@@ -367,8 +367,8 @@ impl ExecutableCommand for UserModCommand {
                 .execute(),
             "shell" => SystemCommand::new("usermod")
                 .arg("-s")
-                .arg("--")
                 .arg(&self.value)
+                .arg("--")
                 .arg(&self.username)
                 .execute(),
             "home" => SystemCommand::new("usermod")

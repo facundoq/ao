@@ -1,4 +1,4 @@
-use super::common::{Emoji, SystemCommand};
+use super::common::{Emoji, SystemCommand, command_exists};
 use crate::cli::{FwAction, NetAction, NetArgs, WifiAction};
 use crate::os::{
     Domain, ExecutableCommand, FwRuleInfo, NetInterfaceInfo, NetIpInfo, NetManager, NetRouteInfo,
@@ -361,23 +361,27 @@ pub struct FwStatusCommand {
 impl ExecutableCommand for FwStatusCommand {
     fn execute(&self) -> Result<()> {
         if matches!(self.format, OutputFormat::Original) {
-            if std::path::Path::new("/usr/sbin/ufw").exists() {
+            if command_exists("ufw") {
                 return SystemCommand::new("ufw").arg("status").execute();
-            } else {
+            } else if command_exists("firewall-cmd") {
                 return SystemCommand::new("firewall-cmd")
                     .arg("--list-all")
                     .execute();
+            } else {
+                anyhow::bail!("No supported firewall management tool found (ufw or firewalld)");
             }
         }
 
-        let (rules, status_msg) = if std::path::Path::new("/usr/sbin/ufw").exists() {
+        let (rules, status_msg) = if command_exists("ufw") {
             let output = Command::new("ufw").arg("status").output()?;
             let stdout = String::from_utf8_lossy(&output.stdout);
             self.parse_ufw(&stdout)
-        } else {
+        } else if command_exists("firewall-cmd") {
             let output = Command::new("firewall-cmd").arg("--list-all").output()?;
             let stdout = String::from_utf8_lossy(&output.stdout);
             self.parse_firewalld(&stdout)
+        } else {
+            anyhow::bail!("No supported firewall management tool found (ufw or firewalld)");
         };
 
         match self.format {

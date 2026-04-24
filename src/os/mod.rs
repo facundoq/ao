@@ -3,6 +3,7 @@ use anyhow::Result;
 use clap::{ArgMatches, Command};
 use serde::{Deserialize, Serialize};
 
+pub mod alpine;
 pub mod arch;
 pub mod debian;
 pub mod detector;

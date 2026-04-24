@@ -134,6 +134,16 @@ pub fn is_completing_arg(
     words_after_cmd == arg_pos
 }
 
+pub fn command_exists(binary: &str) -> bool {
+    Command::new("which")
+        .arg(binary)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
 pub fn format_duration(seconds: u64) -> String {
     let days = seconds / 86400;
     let hours = (seconds % 86400) / 3600;

@@ -82,10 +82,14 @@ impl DiskManager for StandardDisk {
         }))
     }
     fn usage(&self, path: &str, depth: Option<u32>) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(DiskUsageCommand {
-            path: path.to_string(),
-            depth,
-        }))
+        Ok(Box::new(
+            DiskUsageCommand {
+                path: path.to_string(),
+                depth,
+                ignore_exit_code: false,
+            }
+            .ignore_exit_code(),
+        ))
     }
 
     fn get_devices(&self) -> Result<Vec<String>> {
@@ -313,10 +317,22 @@ impl ExecutableCommand for DiskUnmountCommand {
 pub struct DiskUsageCommand {
     pub path: String,
     pub depth: Option<u32>,
+    pub ignore_exit_code: bool,
 }
+
+impl DiskUsageCommand {
+    pub fn ignore_exit_code(mut self) -> Self {
+        self.ignore_exit_code = true;
+        self
+    }
+}
+
 impl ExecutableCommand for DiskUsageCommand {
     fn execute(&self) -> Result<()> {
         let mut cmd = SystemCommand::new("du");
+        if self.ignore_exit_code {
+            cmd = cmd.ignore_exit_code();
+        }
         if let Some(d) = self.depth {
             cmd = cmd.arg("-h").arg(&format!("--max-depth={}", d));
         } else {

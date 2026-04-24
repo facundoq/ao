@@ -1,0 +1,6 @@
+FROM docker.io/library/alpine:3.20
+RUN apk add --no-cache \
+    bash \
+    iproute2 \
+    procps \
+    which
