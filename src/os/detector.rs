@@ -4,12 +4,12 @@ use super::debian::Apt;
 use super::fedora::Dnf;
 use super::linux_generic::{
     StandardBoot, StandardDev, StandardDisk, StandardDistro, StandardGroup, StandardGui,
-    StandardLog, StandardMonitor, StandardNet, StandardSec, StandardSelf, StandardSys,
+    StandardLog, StandardMonitor, StandardNet, StandardPartition, StandardSec, StandardSelf, StandardSys,
     StandardUser, StandardVirt, Systemd,
 };
 use super::{
     BootManager, DevManager, DiskManager, DistroManager, Domain, GroupManager, GuiManager,
-    LogManager, MonitorManager, NetManager, PackageManager, SecManager, SelfManager,
+    LogManager, MonitorManager, NetManager, PartitionManager, PackageManager, SecManager, SelfManager,
     ServiceManager, SysManager, UserManager, VirtManager,
 };
 use anyhow::{Result, bail};
@@ -28,6 +28,7 @@ pub struct DetectedSystem {
     pub user: Box<dyn UserManager>,
     pub group: Box<dyn GroupManager>,
     pub disk: Box<dyn DiskManager>,
+    pub partition: Box<dyn PartitionManager>,
     pub sys: Box<dyn SysManager>,
     pub log: Box<dyn LogManager>,
     pub distro: Box<dyn DistroManager>,
@@ -49,6 +50,7 @@ impl DetectedSystem {
             self.user.as_ref(),
             self.group.as_ref(),
             self.disk.as_ref(),
+            self.partition.as_ref(),
             self.sys.as_ref(),
             self.log.as_ref(),
             self.distro.as_ref(),
@@ -89,6 +91,7 @@ pub fn detect_system() -> Result<DetectedSystem> {
             user: Box::new(StandardUser),
             group: Box::new(StandardGroup),
             disk: Box::new(StandardDisk),
+            partition: Box::new(StandardPartition),
             sys: Box::new(StandardSys),
             log: Box::new(StandardLog),
             distro: Box::new(StandardDistro),
@@ -110,6 +113,7 @@ pub fn detect_system() -> Result<DetectedSystem> {
             user: Box::new(StandardUser),
             group: Box::new(StandardGroup),
             disk: Box::new(StandardDisk),
+            partition: Box::new(StandardPartition),
             sys: Box::new(StandardSys),
             log: Box::new(StandardLog),
             distro: Box::new(StandardDistro),
@@ -131,6 +135,7 @@ pub fn detect_system() -> Result<DetectedSystem> {
             user: Box::new(StandardUser),
             group: Box::new(StandardGroup),
             disk: Box::new(StandardDisk),
+            partition: Box::new(StandardPartition),
             sys: Box::new(StandardSys),
             log: Box::new(StandardLog),
             distro: Box::new(StandardDistro),
@@ -152,6 +157,7 @@ pub fn detect_system() -> Result<DetectedSystem> {
             user: Box::new(StandardUser),
             group: Box::new(StandardGroup),
             disk: Box::new(StandardDisk),
+            partition: Box::new(StandardPartition),
             sys: Box::new(StandardSys),
             log: Box::new(StandardLog),
             distro: Box::new(StandardDistro),

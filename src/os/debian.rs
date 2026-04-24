@@ -1,6 +1,6 @@
 use super::linux_generic::{SystemCommand, is_completing_arg};
 use super::{Domain, ExecutableCommand, OutputFormat, PackageInfo, PackageManager};
-use crate::cli::{PkgAction, PkgArgs};
+use crate::cli::{PackageAction, PackageArgs};
 use anyhow::Result;
 use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
 use std::process::Command;
@@ -9,23 +9,23 @@ pub struct Apt;
 
 impl Domain for Apt {
     fn name(&self) -> &'static str {
-        "pkg"
+        "package"
     }
     fn command(&self) -> ClapCommand {
-        PkgArgs::augment_args(ClapCommand::new("pkg").about("Manage packages (APT)"))
+        PackageArgs::augment_args(ClapCommand::new("package").about("Manage packages (APT)"))
     }
     fn execute(
         &self,
         matches: &ArgMatches,
         _app: &ClapCommand,
     ) -> Result<Box<dyn ExecutableCommand>> {
-        let args = PkgArgs::from_arg_matches(matches)?;
+        let args = PackageArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(PkgAction::Update) => self.update(),
-            Some(PkgAction::Add { packages }) => self.add(packages),
-            Some(PkgAction::Del { packages, purge }) => self.del(packages, *purge),
-            Some(PkgAction::Search { query }) => self.search(query),
-            Some(PkgAction::Ls { format }) => self.ls(*format),
+            Some(PackageAction::Update) => self.update(),
+            Some(PackageAction::Add { packages }) => self.add(packages),
+            Some(PackageAction::Del { packages, purge }) => self.del(packages, *purge),
+            Some(PackageAction::Search { query }) => self.search(query),
+            Some(PackageAction::Ls { format }) => self.ls(*format),
             None => self.ls(OutputFormat::Table),
         }
     }
@@ -35,10 +35,10 @@ impl Domain for Apt {
         words: &[&str],
         last_word_complete: bool,
     ) -> Result<Vec<String>> {
-        if is_completing_arg(words, &["ao", "pkg", "add"], 1, last_word_complete) {
+        if is_completing_arg(words, &["ao", "package", "add"], 1, last_word_complete) {
             return self.get_available_packages();
         }
-        if is_completing_arg(words, &["ao", "pkg", "del"], 1, last_word_complete) {
+        if is_completing_arg(words, &["ao", "package", "del"], 1, last_word_complete) {
             return self.get_installed_packages();
         }
         Ok(vec![])

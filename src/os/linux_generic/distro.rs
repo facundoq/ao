@@ -1,5 +1,5 @@
 use super::common::SystemCommand;
-use crate::cli::{DistroAction, DistroArgs};
+use crate::cli::{DistributionAction, DistributionArgs};
 use crate::os::{DistroInfo, DistroManager, Domain, ExecutableCommand, OutputFormat};
 use anyhow::Result;
 use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
@@ -8,20 +8,20 @@ pub struct StandardDistro;
 
 impl Domain for StandardDistro {
     fn name(&self) -> &'static str {
-        "distro"
+        "distribution"
     }
     fn command(&self) -> ClapCommand {
-        DistroArgs::augment_args(ClapCommand::new("distro").about("Manage distributions"))
+        DistributionArgs::augment_args(ClapCommand::new("distribution").about("Manage distributions"))
     }
     fn execute(
         &self,
         matches: &ArgMatches,
         _app: &ClapCommand,
     ) -> Result<Box<dyn ExecutableCommand>> {
-        let args = DistroArgs::from_arg_matches(matches)?;
+        let args = DistributionArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(DistroAction::Info { format }) => self.info(*format),
-            Some(DistroAction::Upgrade) => self.upgrade(),
+            Some(DistributionAction::Info { format }) => self.info(*format),
+            Some(DistributionAction::Upgrade) => self.upgrade(),
             None => self.info(OutputFormat::Table),
         }
     }

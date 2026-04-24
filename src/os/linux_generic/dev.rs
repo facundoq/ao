@@ -1,5 +1,5 @@
 use super::common::{Emoji, SystemCommand};
-use crate::cli::{BtAction, DevAction, DevArgs, PrintAction};
+use crate::cli::{BtAction, DeviceAction, DeviceArgs, PrintAction};
 use crate::os::{DevManager, DeviceInfo, Domain, ExecutableCommand, OutputFormat, PrinterInfo};
 use anyhow::Result;
 use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
@@ -9,28 +9,28 @@ pub struct StandardDev;
 
 impl Domain for StandardDev {
     fn name(&self) -> &'static str {
-        "dev"
+        "device"
     }
     fn command(&self) -> ClapCommand {
-        DevArgs::augment_args(ClapCommand::new("dev").about("Manage connected devices"))
+        DeviceArgs::augment_args(ClapCommand::new("device").about("Manage connected devices"))
     }
     fn execute(
         &self,
         matches: &ArgMatches,
         _app: &ClapCommand,
     ) -> Result<Box<dyn ExecutableCommand>> {
-        let args = DevArgs::from_arg_matches(matches)?;
+        let args = DeviceArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(DevAction::Ls { format }) => self.ls(*format),
-            Some(DevAction::Pci { format }) => self.pci(*format),
-            Some(DevAction::Usb { format }) => self.usb(*format),
-            Some(DevAction::Bt { action }) => match action {
+            Some(DeviceAction::Ls { format }) => self.ls(*format),
+            Some(DeviceAction::Pci { format }) => self.pci(*format),
+            Some(DeviceAction::Usb { format }) => self.usb(*format),
+            Some(DeviceAction::Bt { action }) => match action {
                 BtAction::Status => self.bt_status(),
                 BtAction::Scan => self.bt_scan(),
                 BtAction::Pair { address } => self.bt_pair(address),
                 BtAction::Connect { address } => self.bt_connect(address),
             },
-            Some(DevAction::Print { action }) => match action {
+            Some(DeviceAction::Print { action }) => match action {
                 PrintAction::Ls { format } => self.ls_printers(*format),
             },
             None => self.ls(OutputFormat::Table),

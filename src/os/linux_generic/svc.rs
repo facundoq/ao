@@ -1,5 +1,5 @@
 use super::common::{SystemCommand, is_completing_arg};
-use crate::cli::{SvcAction, SvcArgs};
+use crate::cli::{ServiceAction, ServiceArgs};
 use crate::os::{Domain, ExecutableCommand, OutputFormat, ServiceInfo, ServiceManager};
 use anyhow::Result;
 use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
@@ -9,24 +9,24 @@ pub struct Systemd;
 
 impl Domain for Systemd {
     fn name(&self) -> &'static str {
-        "svc"
+        "service"
     }
     fn command(&self) -> ClapCommand {
-        SvcArgs::augment_args(ClapCommand::new("svc").about("Manage services"))
+        ServiceArgs::augment_args(ClapCommand::new("service").about("Manage services"))
     }
     fn execute(
         &self,
         matches: &ArgMatches,
         _app: &ClapCommand,
     ) -> Result<Box<dyn ExecutableCommand>> {
-        let args = SvcArgs::from_arg_matches(matches)?;
+        let args = ServiceArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(SvcAction::Ls { format }) => self.ls(*format),
-            Some(SvcAction::Up { name }) => self.up(name),
-            Some(SvcAction::Down { name }) => self.down(name),
-            Some(SvcAction::Restart { name }) => self.restart(name),
-            Some(SvcAction::Reload { name }) => self.reload(name),
-            Some(SvcAction::Status { name }) => self.status(name),
+            Some(ServiceAction::Ls { format }) => self.ls(*format),
+            Some(ServiceAction::Up { name }) => self.up(name),
+            Some(ServiceAction::Down { name }) => self.down(name),
+            Some(ServiceAction::Restart { name }) => self.restart(name),
+            Some(ServiceAction::Reload { name }) => self.reload(name),
+            Some(ServiceAction::Status { name }) => self.status(name),
             None => self.ls(OutputFormat::Table),
         }
     }
@@ -38,7 +38,7 @@ impl Domain for Systemd {
     ) -> Result<Vec<String>> {
         let svc_actions = ["up", "down", "restart", "reload", "status"];
         for action in svc_actions {
-            if is_completing_arg(words, &["ao", "svc", action], 1, last_word_complete) {
+            if is_completing_arg(words, &["ao", "service", action], 1, last_word_complete) {
                 return self.get_services();
             }
         }

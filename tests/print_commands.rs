@@ -33,19 +33,19 @@ fn test_command_printing() {
     assert_eq!(run_print(&["user", "ls"]), "cat /etc/passwd");
 
     // 2. Network Interfaces
-    assert_eq!(run_print(&["net", "interfaces"]), "ip addr");
+    assert_eq!(run_print(&["network", "interfaces"]), "ip addr");
 
     // 3. Service Status
     assert_eq!(
-        run_print(&["svc", "status", "cron"]),
+        run_print(&["service", "status", "cron"]),
         "systemctl status -- cron"
     );
 
     // 4. Disk List
-    assert_eq!(run_print(&["disk", "ls"]), "lsblk --json");
+    assert_eq!(run_print(&["disk", "ls"]), "lsblk -d --json");
 
     // 5. System Info (Library usage)
-    assert_eq!(run_print(&["sys", "info"]), "sysinfo (Rust library)");
+    assert_eq!(run_print(&["system", "info"]), "sysinfo (Rust library)");
 
     // 6. Auth Logs
     assert_eq!(
@@ -54,7 +54,7 @@ fn test_command_printing() {
     );
 
     // 7. Package Install (Distro specific, but assuming debian/apt for this environment)
-    let pkg_print = run_print(&["pkg", "add", "vim"]);
+    let pkg_print = run_print(&["package", "add", "vim"]);
     assert!(
         pkg_print.contains("apt install")
             || pkg_print.contains("apt-get install")

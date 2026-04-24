@@ -1,5 +1,5 @@
 use super::common::SystemCommand;
-use crate::cli::{VirtAction, VirtArgs};
+use crate::cli::{VirtualizationAction, VirtualizationArgs};
 use crate::os::{ContainerInfo, Domain, ExecutableCommand, OutputFormat, VirtManager};
 use anyhow::Result;
 use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
@@ -9,23 +9,23 @@ pub struct StandardVirt;
 
 impl Domain for StandardVirt {
     fn name(&self) -> &'static str {
-        "virt"
+        "virtualization"
     }
     fn command(&self) -> ClapCommand {
-        VirtArgs::augment_args(ClapCommand::new("virt").about("Manage containers and VMs"))
+        VirtualizationArgs::augment_args(ClapCommand::new("virtualization").about("Manage containers and VMs"))
     }
     fn execute(
         &self,
         matches: &ArgMatches,
         _app: &ClapCommand,
     ) -> Result<Box<dyn ExecutableCommand>> {
-        let args = VirtArgs::from_arg_matches(matches)?;
+        let args = VirtualizationArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(VirtAction::Ls { format }) => self.ls(*format),
-            Some(VirtAction::Start { name }) => self.start(name),
-            Some(VirtAction::Stop { name }) => self.stop(name),
-            Some(VirtAction::Rm { name }) => self.del(name),
-            Some(VirtAction::Logs { name }) => self.logs(name),
+            Some(VirtualizationAction::Ls { format }) => self.ls(*format),
+            Some(VirtualizationAction::Start { name }) => self.start(name),
+            Some(VirtualizationAction::Stop { name }) => self.stop(name),
+            Some(VirtualizationAction::Rm { name }) => self.del(name),
+            Some(VirtualizationAction::Logs { name }) => self.logs(name),
             None => self.ls(OutputFormat::Table),
         }
     }

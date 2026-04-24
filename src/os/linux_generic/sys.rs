@@ -1,5 +1,5 @@
 use super::common::{SystemCommand, format_duration, is_completing_arg};
-use crate::cli::{SysAction, SysArgs};
+use crate::cli::{SystemAction, SystemArgs};
 use crate::os::{Domain, ExecutableCommand, OutputFormat, SysInfoData, SysManager, SysTimeData};
 use anyhow::Result;
 use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
@@ -10,11 +10,11 @@ pub struct StandardSys;
 
 impl Domain for StandardSys {
     fn name(&self) -> &'static str {
-        "sys"
+        "system"
     }
     fn command(&self) -> ClapCommand {
-        SysArgs::augment_args(
-            ClapCommand::new("sys").about("Manage core system (updates, power, time)"),
+        SystemArgs::augment_args(
+            ClapCommand::new("system").about("Manage core system (updates, power, time)"),
         )
     }
     fn execute(
@@ -22,11 +22,11 @@ impl Domain for StandardSys {
         matches: &ArgMatches,
         _app: &ClapCommand,
     ) -> Result<Box<dyn ExecutableCommand>> {
-        let args = SysArgs::from_arg_matches(matches)?;
+        let args = SystemArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(SysAction::Info { format }) => self.info(*format),
-            Some(SysAction::Power { state, now, force }) => self.power(state, *now, *force),
-            Some(SysAction::Time {
+            Some(SystemAction::Info { format }) => self.info(*format),
+            Some(SystemAction::Power { state, now, force }) => self.power(state, *now, *force),
+            Some(SystemAction::Time {
                 action,
                 value,
                 format,
@@ -40,7 +40,7 @@ impl Domain for StandardSys {
         words: &[&str],
         last_word_complete: bool,
     ) -> Result<Vec<String>> {
-        if is_completing_arg(words, &["ao", "sys", "power"], 1, last_word_complete) {
+        if is_completing_arg(words, &["ao", "system", "power"], 1, last_word_complete) {
             return Ok(vec![
                 "reboot".to_string(),
                 "shutdown".to_string(),
@@ -48,7 +48,7 @@ impl Domain for StandardSys {
                 "hibernate".to_string(),
             ]);
         }
-        if is_completing_arg(words, &["ao", "sys", "time"], 1, last_word_complete) {
+        if is_completing_arg(words, &["ao", "system", "time"], 1, last_word_complete) {
             return Ok(vec![
                 "status".to_string(),
                 "set".to_string(),

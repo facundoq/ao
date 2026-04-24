@@ -1,5 +1,5 @@
 use super::common::{Emoji, SystemCommand, command_exists};
-use crate::cli::{FwAction, NetAction, NetArgs, WifiAction};
+use crate::cli::{FwAction, NetworkAction, NetworkArgs, WifiAction};
 use crate::os::{
     Domain, ExecutableCommand, FwRuleInfo, NetInterfaceInfo, NetIpInfo, NetManager, NetRouteInfo,
     OutputFormat,
@@ -12,11 +12,11 @@ pub struct StandardNet;
 
 impl Domain for StandardNet {
     fn name(&self) -> &'static str {
-        "net"
+        "network"
     }
     fn command(&self) -> ClapCommand {
-        NetArgs::augment_args(
-            ClapCommand::new("net")
+        NetworkArgs::augment_args(
+            ClapCommand::new("network")
                 .about("Manage networking (interfaces, IPs, routes, firewall, Wi-Fi)"),
         )
     }
@@ -25,17 +25,17 @@ impl Domain for StandardNet {
         matches: &ArgMatches,
         _app: &ClapCommand,
     ) -> Result<Box<dyn ExecutableCommand>> {
-        let args = NetArgs::from_arg_matches(matches)?;
+        let args = NetworkArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(NetAction::Interfaces { format }) => self.interfaces(*format),
-            Some(NetAction::Ips { format }) => self.ips(*format),
-            Some(NetAction::Routes { format }) => self.routes(*format),
-            Some(NetAction::Fw { action }) => match action {
+            Some(NetworkAction::Interfaces { format }) => self.interfaces(*format),
+            Some(NetworkAction::Ips { format }) => self.ips(*format),
+            Some(NetworkAction::Routes { format }) => self.routes(*format),
+            Some(NetworkAction::Fw { action }) => match action {
                 FwAction::Status { format } => self.fw_status(*format),
                 FwAction::Allow { rule } => self.fw_allow(rule),
                 FwAction::Deny { rule } => self.fw_deny(rule),
             },
-            Some(NetAction::Wifi { action }) => match action {
+            Some(NetworkAction::Wifi { action }) => match action {
                 WifiAction::Scan => self.wifi_scan(),
                 WifiAction::Connect { ssid } => self.wifi_connect(ssid),
             },

@@ -50,13 +50,13 @@ pub struct MonitorArgs {
 }
 
 #[derive(Args)]
-pub struct PkgArgs {
+pub struct PackageArgs {
     #[command(subcommand)]
-    pub action: Option<PkgAction>,
+    pub action: Option<PackageAction>,
 }
 
 #[derive(Subcommand)]
-pub enum PkgAction {
+pub enum PackageAction {
     /// Adds one or more packages.
     Add {
         /// Packages to add
@@ -89,13 +89,13 @@ pub enum PkgAction {
 }
 
 #[derive(Args)]
-pub struct SvcArgs {
+pub struct ServiceArgs {
     #[command(subcommand)]
-    pub action: Option<SvcAction>,
+    pub action: Option<ServiceAction>,
 }
 
 #[derive(Subcommand)]
-pub enum SvcAction {
+pub enum ServiceAction {
     /// Stops and disables a service from starting on boot.
     Down {
         /// The service name
@@ -254,6 +254,25 @@ pub enum DiskAction {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
+        /// Show loop devices
+        #[arg(long = "loop", short = 'l')]
+        loop_devices: bool,
+    },
+}
+
+#[derive(Args)]
+pub struct PartitionArgs {
+    #[command(subcommand)]
+    pub action: Option<PartitionAction>,
+}
+
+#[derive(Subcommand)]
+pub enum PartitionAction {
+    /// Lists all partitions
+    Ls {
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
     },
     /// Mounts a block device to a directory
     Mount {
@@ -285,13 +304,13 @@ pub enum DiskAction {
 }
 
 #[derive(Args)]
-pub struct SysArgs {
+pub struct SystemArgs {
     #[command(subcommand)]
-    pub action: Option<SysAction>,
+    pub action: Option<SystemAction>,
 }
 
 #[derive(Subcommand)]
-pub enum SysAction {
+pub enum SystemAction {
     /// Retrieves OS info, kernel version, uptime, etc.
     Info {
         /// The output format
@@ -418,13 +437,13 @@ pub enum LogAction {
 }
 
 #[derive(Args)]
-pub struct DistroArgs {
+pub struct DistributionArgs {
     #[command(subcommand)]
-    pub action: Option<DistroAction>,
+    pub action: Option<DistributionAction>,
 }
 
 #[derive(Subcommand)]
-pub enum DistroAction {
+pub enum DistributionAction {
     /// Shows detailed distribution metadata.
     Info {
         /// The output format
@@ -436,13 +455,13 @@ pub enum DistroAction {
 }
 
 #[derive(Args)]
-pub struct NetArgs {
+pub struct NetworkArgs {
     #[command(subcommand)]
-    pub action: Option<NetAction>,
+    pub action: Option<NetworkAction>,
 }
 
 #[derive(Subcommand)]
-pub enum NetAction {
+pub enum NetworkAction {
     /// Lists all network interfaces
     Interfaces {
         /// The output format
@@ -558,13 +577,13 @@ pub enum GuiDisplayAction {
 }
 
 #[derive(Args)]
-pub struct DevArgs {
+pub struct DeviceArgs {
     #[command(subcommand)]
-    pub action: Option<DevAction>,
+    pub action: Option<DeviceAction>,
 }
 
 #[derive(Subcommand)]
-pub enum DevAction {
+pub enum DeviceAction {
     /// Summarizes connected PCI and USB devices
     Ls {
         /// The output format
@@ -618,13 +637,13 @@ pub enum PrintAction {
 }
 
 #[derive(Args)]
-pub struct VirtArgs {
+pub struct VirtualizationArgs {
     #[command(subcommand)]
-    pub action: Option<VirtAction>,
+    pub action: Option<VirtualizationAction>,
 }
 
 #[derive(Subcommand)]
-pub enum VirtAction {
+pub enum VirtualizationAction {
     /// Lists all running containers and active VMs
     Ls {
         /// The output format
@@ -642,13 +661,13 @@ pub enum VirtAction {
 }
 
 #[derive(Args)]
-pub struct SecArgs {
+pub struct SecurityArgs {
     #[command(subcommand)]
-    pub action: Option<SecAction>,
+    pub action: Option<SecurityAction>,
 }
 
 #[derive(Subcommand)]
-pub enum SecAction {
+pub enum SecurityAction {
     /// Runs a basic security audit
     Audit {
         /// The output format

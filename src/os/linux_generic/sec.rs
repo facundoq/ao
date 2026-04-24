@@ -1,5 +1,5 @@
 use super::common::SystemCommand;
-use crate::cli::{SecAction, SecArgs};
+use crate::cli::{SecurityAction, SecurityArgs};
 use crate::os::{Domain, ExecutableCommand, OutputFormat, SecAuditInfo, SecManager};
 use anyhow::Result;
 use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
@@ -8,20 +8,20 @@ pub struct StandardSec;
 
 impl Domain for StandardSec {
     fn name(&self) -> &'static str {
-        "sec"
+        "security"
     }
     fn command(&self) -> ClapCommand {
-        SecArgs::augment_args(ClapCommand::new("sec").about("Manage system security"))
+        SecurityArgs::augment_args(ClapCommand::new("security").about("Manage system security"))
     }
     fn execute(
         &self,
         matches: &ArgMatches,
         _app: &ClapCommand,
     ) -> Result<Box<dyn ExecutableCommand>> {
-        let args = SecArgs::from_arg_matches(matches)?;
+        let args = SecurityArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(SecAction::Audit { format }) => self.audit(*format),
-            Some(SecAction::Context) => self.context(),
+            Some(SecurityAction::Audit { format }) => self.audit(*format),
+            Some(SecurityAction::Context) => self.context(),
             None => self.audit(OutputFormat::Table),
         }
     }

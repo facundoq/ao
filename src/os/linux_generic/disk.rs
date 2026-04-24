@@ -1,4 +1,4 @@
-use super::common::{Emoji, SystemCommand, is_completing_arg};
+use super::common::{Emoji, SystemCommand};
 use crate::cli::{DiskAction, DiskArgs};
 use crate::os::{DiskInfo, DiskManager, Domain, ExecutableCommand, OutputFormat};
 use anyhow::Result;
@@ -12,7 +12,7 @@ impl Domain for StandardDisk {
         "disk"
     }
     fn command(&self) -> ClapCommand {
-        DiskArgs::augment_args(ClapCommand::new("disk").about("Manage disks and storage"))
+        DiskArgs::augment_args(ClapCommand::new("disk").about("Manage actual block devices"))
     }
     fn execute(
         &self,
@@ -21,79 +21,31 @@ impl Domain for StandardDisk {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = DiskArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(DiskAction::Ls { format }) => self.ls(*format),
-            Some(DiskAction::Mount {
-                device,
-                path,
-                fstype,
-                options,
-            }) => self.mount(device, path, fstype.as_deref(), options.as_deref()),
-            Some(DiskAction::Unmount {
-                target,
-                lazy,
-                force,
-            }) => self.unmount(target, *lazy, *force),
-            Some(DiskAction::Usage { path, depth }) => self.usage(path, *depth),
-            None => self.ls(OutputFormat::Table),
+            Some(DiskAction::Ls { format, loop_devices }) => self.ls(*format, *loop_devices),
+            None => self.ls(OutputFormat::Table, false),
         }
     }
     fn complete(
         &self,
         _line: &str,
-        words: &[&str],
-        last_word_complete: bool,
+        _words: &[&str],
+        _last_word_complete: bool,
     ) -> Result<Vec<String>> {
-        if is_completing_arg(words, &["ao", "disk", "mount"], 1, last_word_complete) {
-            return self.get_devices();
-        }
-        if is_completing_arg(words, &["ao", "disk", "unmount"], 1, last_word_complete) {
-            return self.get_mount_points();
-        }
         Ok(vec![])
     }
 }
 
 impl DiskManager for StandardDisk {
-    fn ls(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
+    fn ls(&self, format: OutputFormat, show_loop: bool) -> Result<Box<dyn ExecutableCommand>> {
         if matches!(format, OutputFormat::Original) {
-            return Ok(Box::new(SystemCommand::new("lsblk")));
+            return Ok(Box::new(SystemCommand::new("lsblk").arg("-d")));
         }
-        Ok(Box::new(DiskListCommand { format }))
-    }
-    fn mount(
-        &self,
-        device: &str,
-        path: &str,
-        fstype: Option<&str>,
-        options: Option<&str>,
-    ) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(DiskMountCommand {
-            device: device.to_string(),
-            path: path.to_string(),
-            fstype: fstype.map(|s| s.to_string()),
-            options: options.map(|s| s.to_string()),
-        }))
-    }
-    fn unmount(&self, target: &str, lazy: bool, force: bool) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(DiskUnmountCommand {
-            target: target.to_string(),
-            lazy,
-            force,
-        }))
-    }
-    fn usage(&self, path: &str, depth: Option<u32>) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(
-            DiskUsageCommand {
-                path: path.to_string(),
-                depth,
-                ignore_exit_code: false,
-            }
-            .ignore_exit_code(),
-        ))
+        Ok(Box::new(DiskListCommand { format, show_loop }))
     }
 
     fn get_devices(&self) -> Result<Vec<String>> {
         let output = Command::new("lsblk")
+            .arg("-d")
             .arg("-n")
             .arg("-o")
             .arg("NAME,PATH")
@@ -105,31 +57,20 @@ impl DiskManager for StandardDisk {
             .map(|s| s.trim().to_string())
             .collect())
     }
-
-    fn get_mount_points(&self) -> Result<Vec<String>> {
-        let output = Command::new("lsblk")
-            .arg("-n")
-            .arg("-o")
-            .arg("MOUNTPOINT")
-            .output()?;
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        Ok(stdout
-            .lines()
-            .filter(|l| !l.is_empty())
-            .map(|s| s.trim().to_string())
-            .collect())
-    }
 }
 
 pub struct DiskListCommand {
     pub format: OutputFormat,
+    pub show_loop: bool,
 }
+
 impl ExecutableCommand for DiskListCommand {
     fn execute(&self) -> Result<()> {
         let output = Command::new("lsblk")
+            .arg("-d") // only devices, no partitions
             .arg("--json")
             .arg("-o")
-            .arg("NAME,PATH,SIZE,MOUNTPOINT,FSTYPE,TYPE,ROTA,TRAN")
+            .arg("NAME,PATH,SIZE,FSTYPE,TYPE,ROTA,TRAN")
             .output()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -139,38 +80,14 @@ impl ExecutableCommand for DiskListCommand {
         }
         let raw: LsblkOutput = serde_json::from_str(&stdout)?;
 
-        fn flatten_disks(disks: Vec<DiskInfo>, parent_tran: Option<String>) -> Vec<DiskInfo> {
-            let mut flat = Vec::new();
-            for mut d in disks {
-                if d.tran.is_none() {
-                    d.tran = parent_tran.clone();
-                }
-                let children = d.children.take();
-                let current_tran = d.tran.clone();
-                flat.push(d);
-                if let Some(c) = children {
-                    flat.extend(flatten_disks(c, current_tran));
-                }
+        let mut disks = Vec::new();
+        for d in raw.blockdevices {
+            if d.device_type == "disk" || (self.show_loop && d.device_type == "loop") {
+                disks.push(d);
             }
-            flat
         }
 
-        let mut disks = flatten_disks(raw.blockdevices, None);
-
-        // Sort: physical first, virtual later.
-        let is_physical = |t: &str| matches!(t, "disk" | "part" | "rom" | "crypt");
-
-        disks.sort_by(|a, b| {
-            let a_phys = is_physical(&a.device_type);
-            let b_phys = is_physical(&b.device_type);
-            if a_phys == b_phys {
-                a.name.cmp(&b.name)
-            } else if a_phys {
-                std::cmp::Ordering::Less
-            } else {
-                std::cmp::Ordering::Greater
-            }
-        });
+        disks.sort_by(|a, b| a.name.cmp(&b.name));
 
         match self.format {
             OutputFormat::Table => {
@@ -180,20 +97,11 @@ impl ExecutableCommand for DiskListCommand {
                     "Name",
                     "Path",
                     "Size",
-                    "Type",
-                    "Class",
-                    "Mountpoint",
-                    "FSType",
+                    "Medium",
+                    "Transport",
+                    "SMART Status",
                 ]);
                 for d in disks {
-                    let class_is_phys = is_physical(&d.device_type);
-                    let class_emoji = if class_is_phys {
-                        Emoji::Physical.get()
-                    } else {
-                        Emoji::Virtual.get()
-                    };
-                    let class_text = if class_is_phys { "Physical" } else { "Virtual" };
-
                     let type_emoji = match d.device_type.as_str() {
                         "loop" => Emoji::Loop.get(),
                         _ => {
@@ -209,27 +117,34 @@ impl ExecutableCommand for DiskListCommand {
                                     }
                                     _ => Emoji::Disk.get(),
                                 }
-                            } else if d.device_type == "disk" || d.device_type == "part" {
-                                if d.rota {
-                                    Emoji::Hdd.get()
-                                } else {
-                                    Emoji::Ssd.get()
-                                }
+                            } else if d.rota {
+                                Emoji::Hdd.get()
                             } else {
-                                Emoji::Disk.get()
+                                Emoji::Ssd.get()
                             }
                         }
                     };
 
+                    let medium = if d.device_type == "loop" {
+                        "Loop"
+                    } else if d.rota {
+                        "HDD"
+                    } else {
+                        "SSD"
+                    };
+
+                    let transport = d.tran.clone().unwrap_or_else(|| "Unknown".to_string()).to_uppercase();
+
+                    let smart_status = get_smart_status(&d.path);
+
                     table.add_row(vec![
-                        format!("{} {}", class_emoji, type_emoji),
+                        format!("{} {}", Emoji::Physical.get(), type_emoji),
                         d.name,
-                        d.path,
+                        d.path.clone(),
                         d.size,
-                        d.device_type,
-                        class_text.to_string(),
-                        d.mountpoint.unwrap_or_default(),
-                        d.fstype.unwrap_or_default(),
+                        medium.to_string(),
+                        transport,
+                        smart_status,
                     ]);
                 }
                 println!("{}", table);
@@ -245,7 +160,7 @@ impl ExecutableCommand for DiskListCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        "lsblk --json".to_string()
+        "lsblk -d --json".to_string()
     }
     fn is_structured(&self) -> bool {
         matches!(
@@ -255,96 +170,29 @@ impl ExecutableCommand for DiskListCommand {
     }
 }
 
-pub struct DiskMountCommand {
-    pub device: String,
-    pub path: String,
-    pub fstype: Option<String>,
-    pub options: Option<String>,
-}
-impl ExecutableCommand for DiskMountCommand {
-    fn execute(&self) -> Result<()> {
-        let mut cmd = SystemCommand::new("mount");
-        if let Some(ref fs) = self.fstype {
-            cmd = cmd.arg("-t").arg(fs);
-        }
-        if let Some(ref opts) = self.options {
-            cmd = cmd.arg("-o").arg(opts);
-        }
-        cmd.arg("--").arg(&self.device).arg(&self.path).execute()
-    }
-    fn as_string(&self) -> String {
-        let mut s = "mount".to_string();
-        if let Some(ref fs) = self.fstype {
-            s.push_str(&format!(" -t {}", fs));
-        }
-        if let Some(ref opts) = self.options {
-            s.push_str(&format!(" -o {}", opts));
-        }
-        s.push_str(&format!(" -- {} {}", self.device, self.path));
-        s
-    }
-}
+fn get_smart_status(path: &str) -> String {
+    // Try smartctl JSON output
+    let output = Command::new("smartctl")
+        .arg("-j")
+        .arg("-H")
+        .arg(path)
+        .output();
 
-pub struct DiskUnmountCommand {
-    pub target: String,
-    pub lazy: bool,
-    pub force: bool,
-}
-impl ExecutableCommand for DiskUnmountCommand {
-    fn execute(&self) -> Result<()> {
-        let mut cmd = SystemCommand::new("umount");
-        if self.lazy {
-            cmd = cmd.arg("-l");
-        }
-        if self.force {
-            cmd = cmd.arg("-f");
-        }
-        cmd.arg("--").arg(&self.target).execute()
-    }
-    fn as_string(&self) -> String {
-        let mut s = "umount".to_string();
-        if self.lazy {
-            s.push_str(" -l");
-        }
-        if self.force {
-            s.push_str(" -f");
-        }
-        s.push_str(&format!(" -- {}", self.target));
-        s
-    }
-}
-
-pub struct DiskUsageCommand {
-    pub path: String,
-    pub depth: Option<u32>,
-    pub ignore_exit_code: bool,
-}
-
-impl DiskUsageCommand {
-    pub fn ignore_exit_code(mut self) -> Self {
-        self.ignore_exit_code = true;
-        self
-    }
-}
-
-impl ExecutableCommand for DiskUsageCommand {
-    fn execute(&self) -> Result<()> {
-        let mut cmd = SystemCommand::new("du");
-        if self.ignore_exit_code {
-            cmd = cmd.ignore_exit_code();
-        }
-        if let Some(d) = self.depth {
-            cmd = cmd.arg("-h").arg(&format!("--max-depth={}", d));
-        } else {
-            cmd = cmd.arg("-sh");
-        }
-        cmd.arg("--").arg(&self.path).execute()
-    }
-    fn as_string(&self) -> String {
-        if let Some(d) = self.depth {
-            format!("du -h --max-depth={} -- {}", d, self.path)
-        } else {
-            format!("du -sh -- {}", self.path)
+    if let Ok(out) = output {
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) {
+            if let Some(status) = json.get("smart_status") {
+                if let Some(passed) = status.get("passed") {
+                    if passed.as_bool() == Some(true) {
+                        return "PASSED".to_string();
+                    } else {
+                        return "FAILED".to_string();
+                    }
+                }
+            }
         }
     }
+    
+    // Fallback if smartctl fails or format is unrecognized
+    "Unknown".to_string()
 }

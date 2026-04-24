@@ -176,6 +176,12 @@ pub struct DiskInfo {
 
 /// Abstracts system disk management operations.
 pub trait DiskManager: Domain {
+    fn ls(&self, format: OutputFormat, show_loop: bool) -> Result<Box<dyn ExecutableCommand>>;
+    fn get_devices(&self) -> Result<Vec<String>>;
+}
+
+/// Abstracts system partition management operations.
+pub trait PartitionManager: Domain {
     fn ls(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
     fn mount(
         &self,
@@ -186,7 +192,6 @@ pub trait DiskManager: Domain {
     ) -> Result<Box<dyn ExecutableCommand>>;
     fn unmount(&self, target: &str, lazy: bool, force: bool) -> Result<Box<dyn ExecutableCommand>>;
     fn usage(&self, path: &str, depth: Option<u32>) -> Result<Box<dyn ExecutableCommand>>;
-    fn get_devices(&self) -> Result<Vec<String>>;
     fn get_mount_points(&self) -> Result<Vec<String>>;
 }
 

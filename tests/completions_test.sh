@@ -48,22 +48,22 @@ test_bash "ao user mod root " "shell"
 test_bash "ao user mod root shell " "/bin/"
 test_bash "ao self completions generate " "bash"
 test_bash "ao self completions setup " "zsh"
-test_bash "ao svc status " ".service"
-test_bash "ao sys power " "reboot"
+test_bash "ao service status " ".service"
+test_bash "ao system power " "reboot"
 test_bash "ao log tail " ".service"
-test_bash "ao distro " "upgrade"
-test_bash "ao net " "interfaces"
-test_bash "ao net fw " "status"
-test_bash "ao net wifi " "scan"
+test_bash "ao distribution " "upgrade"
+test_bash "ao network " "interfaces"
+test_bash "ao network fw " "status"
+test_bash "ao network wifi " "scan"
 test_bash "ao boot " "ls"
 test_bash "ao boot mod " "ls"
 test_bash "ao gui " "info"
 test_bash "ao gui display " "ls"
-test_bash "ao dev " "ls"
-test_bash "ao dev bt " "scan"
-test_bash "ao virt " "ls"
-test_bash "ao virt start " "help"
-test_bash "ao sec " "audit"
+test_bash "ao device " "ls"
+test_bash "ao device bt " "scan"
+test_bash "ao virtualization " "ls"
+test_bash "ao virtualization start " "help"
+test_bash "ao security " "audit"
 
 echo ""
 echo "--- Testing Zsh Completions ---"
@@ -99,22 +99,22 @@ test_zsh "ao user mod root" "shell" 4
 test_zsh "ao user mod root shell" "/bin/" 5
 test_zsh "ao self completions generate" "bash" 4
 test_zsh "ao self completions setup" "zsh" 4
-test_zsh "ao svc status" ".service" 3
-test_zsh "ao sys power" "reboot" 3
+test_zsh "ao service status" ".service" 3
+test_zsh "ao system power" "reboot" 3
 test_zsh "ao log tail" ".service" 3
-test_zsh "ao distro" "upgrade" 2
-test_zsh "ao net" "interfaces" 2
-test_zsh "ao net fw" "status" 3
-test_zsh "ao net wifi" "scan" 3
+test_zsh "ao distribution" "upgrade" 2
+test_zsh "ao network" "interfaces" 2
+test_zsh "ao network fw" "status" 3
+test_zsh "ao network wifi" "scan" 3
 test_zsh "ao boot" "ls" 2
 test_zsh "ao boot mod" "ls" 3
 test_zsh "ao gui" "info" 2
 test_zsh "ao gui display" "ls" 3
-test_zsh "ao dev" "ls" 2
-test_zsh "ao dev bt" "scan" 3
-test_zsh "ao virt" "ls" 2
-test_zsh "ao virt start" "help" 3
-test_zsh "ao sec" "audit" 2
+test_zsh "ao device" "ls" 2
+test_zsh "ao device bt" "scan" 3
+test_zsh "ao virtualization" "ls" 2
+test_zsh "ao virtualization start" "help" 3
+test_zsh "ao security" "audit" 2
 
 echo ""
 echo "All completion tests passed!"
