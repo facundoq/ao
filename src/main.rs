@@ -109,13 +109,12 @@ fn run_interactive(domains: &[&dyn Domain]) -> Result<()> {
         let mut aborted = false;
 
         loop {
-            let subcommands: Vec<_> = cmd.get_subcommands().collect();
-            if subcommands.is_empty() {
+            if !cmd.has_subcommands() {
                 break; // leaf node
             }
 
-            let mut sub_names: Vec<String> = subcommands
-                .iter()
+            let mut sub_names: Vec<String> = cmd
+                .get_subcommands()
                 .filter(|s| s.get_name() != "help")
                 .map(|s| s.get_name().to_string())
                 .collect();
@@ -139,11 +138,11 @@ fn run_interactive(domains: &[&dyn Domain]) -> Result<()> {
             }
 
             args_vec.push(selected_name.to_string());
-            cmd = subcommands
-                .into_iter()
+            cmd = cmd
+                .get_subcommands()
                 .find(|s| s.get_name() == selected_name)
-                .unwrap()
-                .clone();
+                .cloned()
+                .unwrap();
         }
 
         if aborted {
