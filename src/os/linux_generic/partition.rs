@@ -1,6 +1,6 @@
 use super::common::{Emoji, SystemCommand, is_completing_arg};
 use crate::cli::{PartitionAction, PartitionArgs};
-use crate::os::{DiskInfo, PartitionManager, Domain, ExecutableCommand, OutputFormat};
+use crate::os::{DiskInfo, Domain, ExecutableCommand, OutputFormat, PartitionManager};
 use anyhow::Result;
 use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
 use std::process::Command;
@@ -12,7 +12,9 @@ impl Domain for StandardPartition {
         "partition"
     }
     fn command(&self) -> ClapCommand {
-        PartitionArgs::augment_args(ClapCommand::new("partition").about("Manage partitions and mounts"))
+        PartitionArgs::augment_args(
+            ClapCommand::new("partition").about("Manage partitions and mounts"),
+        )
     }
     fn execute(
         &self,
@@ -21,7 +23,7 @@ impl Domain for StandardPartition {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = PartitionArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(PartitionAction::Ls { format }) => self.ls(*format),
+            Some(PartitionAction::List { format }) => self.ls(*format),
             Some(PartitionAction::Mount {
                 device,
                 path,
@@ -45,13 +47,28 @@ impl Domain for StandardPartition {
     ) -> Result<Vec<String>> {
         if is_completing_arg(words, &["ao", "partition", "mount"], 1, last_word_complete) {
             let mut devices = Vec::new();
-            if let Ok(output) = Command::new("lsblk").arg("-n").arg("-o").arg("NAME,PATH").output() {
+            if let Ok(output) = Command::new("lsblk")
+                .arg("-n")
+                .arg("-o")
+                .arg("NAME,PATH")
+                .output()
+            {
                 let stdout = String::from_utf8_lossy(&output.stdout);
-                devices.extend(stdout.lines().filter_map(|l| l.split_whitespace().last()).map(|s| s.trim().to_string()));
+                devices.extend(
+                    stdout
+                        .lines()
+                        .filter_map(|l| l.split_whitespace().last())
+                        .map(|s| s.trim().to_string()),
+                );
             }
             return Ok(devices);
         }
-        if is_completing_arg(words, &["ao", "partition", "unmount"], 1, last_word_complete) {
+        if is_completing_arg(
+            words,
+            &["ao", "partition", "unmount"],
+            1,
+            last_word_complete,
+        ) {
             return self.get_mount_points();
         }
         Ok(vec![])
@@ -147,7 +164,16 @@ impl ExecutableCommand for PartitionListCommand {
         }
 
         let disks = flatten_disks(raw.blockdevices, None);
-        let mut partitions: Vec<_> = disks.into_iter().filter(|d| d.device_type == "part" || d.device_type == "crypt" || d.device_type == "lvm" || d.device_type == "rom" || d.mountpoint.is_some()).collect();
+        let mut partitions: Vec<_> = disks
+            .into_iter()
+            .filter(|d| {
+                d.device_type == "part"
+                    || d.device_type == "crypt"
+                    || d.device_type == "lvm"
+                    || d.device_type == "rom"
+                    || d.mountpoint.is_some()
+            })
+            .collect();
 
         partitions.sort_by(|a, b| a.name.cmp(&b.name));
 

@@ -21,10 +21,10 @@ impl Domain for StandardGroup {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = GroupArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(GroupAction::Ls { format }) => self.ls(*format),
+            Some(GroupAction::List { format }) => self.ls(*format),
             Some(GroupAction::Add { groupname }) => self.add(groupname),
-            Some(GroupAction::Del { groupname }) => self.del(groupname),
-            Some(GroupAction::Mod { groupname, gid }) => self.mod_group(groupname, *gid),
+            Some(GroupAction::Delete { groupname }) => self.del(groupname),
+            Some(GroupAction::Modify { groupname, gid }) => self.mod_group(groupname, *gid),
             None => self.ls(OutputFormat::Table),
         }
     }
@@ -34,8 +34,8 @@ impl Domain for StandardGroup {
         words: &[&str],
         last_word_complete: bool,
     ) -> Result<Vec<String>> {
-        if is_completing_arg(words, &["ao", "group", "del"], 1, last_word_complete)
-            || is_completing_arg(words, &["ao", "group", "mod"], 1, last_word_complete)
+        if is_completing_arg(words, &["ao", "group", "delete"], 1, last_word_complete)
+            || is_completing_arg(words, &["ao", "group", "modify"], 1, last_word_complete)
         {
             return self.get_groups();
         }

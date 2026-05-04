@@ -1,5 +1,5 @@
 use super::common::{Emoji, SystemCommand};
-use crate::cli::{BtAction, DeviceAction, DeviceArgs, PrintAction};
+use crate::cli::{BluetoothAction, DeviceAction, DeviceArgs, PrintAction};
 use crate::os::{DevManager, DeviceInfo, Domain, ExecutableCommand, OutputFormat, PrinterInfo};
 use anyhow::Result;
 use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
@@ -21,17 +21,17 @@ impl Domain for StandardDev {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = DeviceArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(DeviceAction::Ls { format }) => self.ls(*format),
+            Some(DeviceAction::List { format }) => self.ls(*format),
             Some(DeviceAction::Pci { format }) => self.pci(*format),
             Some(DeviceAction::Usb { format }) => self.usb(*format),
-            Some(DeviceAction::Bt { action }) => match action {
-                BtAction::Status => self.bt_status(),
-                BtAction::Scan => self.bt_scan(),
-                BtAction::Pair { address } => self.bt_pair(address),
-                BtAction::Connect { address } => self.bt_connect(address),
+            Some(DeviceAction::Bluetooth { action }) => match action {
+                BluetoothAction::Status => self.bt_status(),
+                BluetoothAction::Scan => self.bt_scan(),
+                BluetoothAction::Pair { address } => self.bt_pair(address),
+                BluetoothAction::Connect { address } => self.bt_connect(address),
             },
             Some(DeviceAction::Print { action }) => match action {
-                PrintAction::Ls { format } => self.ls_printers(*format),
+                PrintAction::List { format } => self.ls_printers(*format),
             },
             None => self.ls(OutputFormat::Table),
         }

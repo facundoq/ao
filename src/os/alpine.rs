@@ -23,9 +23,9 @@ impl Domain for Apk {
         match &args.action {
             Some(PackageAction::Update) => self.update(),
             Some(PackageAction::Add { packages }) => self.add(packages),
-            Some(PackageAction::Del { packages, purge }) => self.del(packages, *purge),
+            Some(PackageAction::Delete { packages, purge }) => self.del(packages, *purge),
             Some(PackageAction::Search { query }) => self.search(query),
-            Some(PackageAction::Ls { format }) => self.ls(*format),
+            Some(PackageAction::List { format }) => self.ls(*format),
             None => self.ls(OutputFormat::Table),
         }
     }
@@ -38,7 +38,7 @@ impl Domain for Apk {
         if is_completing_arg(words, &["ao", "package", "add"], 1, last_word_complete) {
             return self.get_available_packages();
         }
-        if is_completing_arg(words, &["ao", "package", "del"], 1, last_word_complete) {
+        if is_completing_arg(words, &["ao", "package", "delete"], 1, last_word_complete) {
             return self.get_installed_packages();
         }
         Ok(vec![])
@@ -62,7 +62,7 @@ impl PackageManager for Apk {
     fn del(&self, packages: &[String], _purge: bool) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(
             SystemCommand::new("apk")
-                .arg("del")
+                .arg("delete")
                 .arg("--")
                 .args(packages),
         ))

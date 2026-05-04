@@ -21,7 +21,10 @@ impl Domain for StandardDisk {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = DiskArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(DiskAction::Ls { format, loop_devices }) => self.ls(*format, *loop_devices),
+            Some(DiskAction::List {
+                format,
+                loop_devices,
+            }) => self.ls(*format, *loop_devices),
             None => self.ls(OutputFormat::Table, false),
         }
     }
@@ -133,7 +136,11 @@ impl ExecutableCommand for DiskListCommand {
                         "SSD"
                     };
 
-                    let transport = d.tran.clone().unwrap_or_else(|| "Unknown".to_string()).to_uppercase();
+                    let transport = d
+                        .tran
+                        .clone()
+                        .unwrap_or_else(|| "Unknown".to_string())
+                        .to_uppercase();
 
                     let smart_status = get_smart_status(&d.path);
 
@@ -180,19 +187,18 @@ fn get_smart_status(path: &str) -> String {
 
     if let Ok(out) = output {
         let stdout = String::from_utf8_lossy(&out.stdout);
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) {
-            if let Some(status) = json.get("smart_status") {
-                if let Some(passed) = status.get("passed") {
-                    if passed.as_bool() == Some(true) {
-                        return "PASSED".to_string();
-                    } else {
-                        return "FAILED".to_string();
-                    }
-                }
-            }
+        if let Some(passed) = serde_json::from_str::<serde_json::Value>(&stdout)
+            .ok()
+            .and_then(|json| json.get("smart_status")?.get("passed")?.as_bool())
+        {
+            return if passed {
+                "PASSED".to_string()
+            } else {
+                "FAILED".to_string()
+            };
         }
     }
-    
+
     // Fallback if smartctl fails or format is unrecognized
     "Unknown".to_string()
 }

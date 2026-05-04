@@ -4,13 +4,13 @@ use super::debian::Apt;
 use super::fedora::Dnf;
 use super::linux_generic::{
     StandardBoot, StandardDev, StandardDisk, StandardDistro, StandardGroup, StandardGui,
-    StandardLog, StandardMonitor, StandardNet, StandardPartition, StandardSec, StandardSelf, StandardSys,
-    StandardUser, StandardVirt, Systemd,
+    StandardLog, StandardMonitor, StandardNet, StandardPartition, StandardSec, StandardSelf,
+    StandardSys, StandardUser, StandardVirt, Systemd,
 };
 use super::{
     BootManager, DevManager, DiskManager, DistroManager, Domain, GroupManager, GuiManager,
-    LogManager, MonitorManager, NetManager, PartitionManager, PackageManager, SecManager, SelfManager,
-    ServiceManager, SysManager, UserManager, VirtManager,
+    LogManager, MonitorManager, NetManager, PackageManager, PartitionManager, SecManager,
+    SelfManager, ServiceManager, SysManager, UserManager, VirtManager,
 };
 use anyhow::{Result, bail};
 use std::fs::File;

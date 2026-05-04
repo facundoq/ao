@@ -23,7 +23,7 @@ impl Domain for StandardGui {
         match &args.action {
             Some(GuiAction::Info) => self.info(),
             Some(GuiAction::Display { action }) => match action {
-                GuiDisplayAction::Ls { format } => self.ls_displays(*format),
+                GuiDisplayAction::List { format } => self.ls_displays(*format),
             },
             None => self.ls_displays(OutputFormat::Table),
         }

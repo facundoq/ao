@@ -11,7 +11,9 @@ impl Domain for StandardDistro {
         "distribution"
     }
     fn command(&self) -> ClapCommand {
-        DistributionArgs::augment_args(ClapCommand::new("distribution").about("Manage distributions"))
+        DistributionArgs::augment_args(
+            ClapCommand::new("distribution").about("Manage distributions"),
+        )
     }
     fn execute(
         &self,

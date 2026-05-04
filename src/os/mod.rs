@@ -13,7 +13,7 @@ pub mod linux_generic;
 /// Unified trait for a system domain (e.g., packages, services).
 /// It defines both the CLI interface and the execution logic.
 pub trait Domain {
-    /// The name of the subcommand (e.g., "pkg", "user")
+    /// The name of the subcommand (e.g., "package", "user")
     fn name(&self) -> &'static str;
 
     /// Build the clap Command for this domain
@@ -113,9 +113,19 @@ pub struct UserInfo {
     pub user_type: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct UserSessionInfo {
+    pub username: String,
+    pub line: String,
+    pub host: String,
+    pub start: String,
+    pub end: String,
+    pub duration: String,
+}
+
 /// Abstracts system user management operations.
 pub trait UserManager: Domain {
-    fn ls(
+    fn list(
         &self,
         all: bool,
         groups: bool,
@@ -132,14 +142,21 @@ pub trait UserManager: Domain {
         system: bool,
         no_create_home: bool,
     ) -> Result<Box<dyn ExecutableCommand>>;
-    fn del(&self, username: &str, purge: bool) -> Result<Box<dyn ExecutableCommand>>;
-    fn mod_user(
+    fn delete(&self, username: &str, purge: bool) -> Result<Box<dyn ExecutableCommand>>;
+    fn modify_user(
         &self,
         username: &str,
         action: &str,
         value: &str,
     ) -> Result<Box<dyn ExecutableCommand>>;
     fn passwd(&self, username: &str) -> Result<Box<dyn ExecutableCommand>>;
+    fn session(
+        &self,
+        username: Option<&str>,
+        all: bool,
+        n: Option<u32>,
+        format: OutputFormat,
+    ) -> Result<Box<dyn ExecutableCommand>>;
     fn get_users(&self) -> Result<Vec<String>>;
     fn get_shells(&self) -> Result<Vec<String>>;
 }
@@ -283,6 +300,7 @@ pub struct NetInterfaceInfo {
     pub mac: String,
     #[serde(rename = "type")]
     pub interface_type: String,
+    pub ips: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize)]

@@ -12,7 +12,9 @@ impl Domain for StandardVirt {
         "virtualization"
     }
     fn command(&self) -> ClapCommand {
-        VirtualizationArgs::augment_args(ClapCommand::new("virtualization").about("Manage containers and VMs"))
+        VirtualizationArgs::augment_args(
+            ClapCommand::new("virtualization").about("Manage containers and VMs"),
+        )
     }
     fn execute(
         &self,
@@ -21,10 +23,10 @@ impl Domain for StandardVirt {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = VirtualizationArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(VirtualizationAction::Ls { format }) => self.ls(*format),
+            Some(VirtualizationAction::List { format }) => self.ls(*format),
             Some(VirtualizationAction::Start { name }) => self.start(name),
             Some(VirtualizationAction::Stop { name }) => self.stop(name),
-            Some(VirtualizationAction::Rm { name }) => self.del(name),
+            Some(VirtualizationAction::Remove { name }) => self.del(name),
             Some(VirtualizationAction::Logs { name }) => self.logs(name),
             None => self.ls(OutputFormat::Table),
         }
@@ -57,7 +59,7 @@ impl VirtManager for StandardVirt {
     fn del(&self, name: &str) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(
             SystemCommand::new("docker")
-                .arg("rm")
+                .arg("remove")
                 .arg("-f")
                 .arg("--")
                 .arg(name),

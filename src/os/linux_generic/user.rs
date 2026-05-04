@@ -1,6 +1,6 @@
 use super::common::{SystemCommand, is_completing_arg};
 use crate::cli::{UserAction, UserArgs};
-use crate::os::{Domain, ExecutableCommand, OutputFormat, UserInfo, UserManager};
+use crate::os::{Domain, ExecutableCommand, OutputFormat, UserInfo, UserManager, UserSessionInfo};
 use anyhow::Result;
 use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
 use std::process::Command;
@@ -21,11 +21,11 @@ impl Domain for StandardUser {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = UserArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(UserAction::Ls {
+            Some(UserAction::List {
                 all,
                 groups,
                 format,
-            }) => self.ls(*all, *groups, *format),
+            }) => self.list(*all, *groups, *format),
             Some(UserAction::Add {
                 username,
                 name,
@@ -43,14 +43,20 @@ impl Domain for StandardUser {
                 *system,
                 *no_create_home,
             ),
-            Some(UserAction::Del { username, purge }) => self.del(username, *purge),
-            Some(UserAction::Mod {
+            Some(UserAction::Delete { username, purge }) => self.delete(username, *purge),
+            Some(UserAction::Modify {
                 username,
                 action,
                 value,
-            }) => self.mod_user(username, action, value),
+            }) => self.modify_user(username, action, value),
             Some(UserAction::Passwd { username }) => self.passwd(username),
-            None => self.ls(false, false, OutputFormat::Table),
+            Some(UserAction::Session {
+                username,
+                all,
+                n,
+                format,
+            }) => self.session(username.as_deref(), *all, *n, *format),
+            None => self.list(false, false, OutputFormat::Table),
         }
     }
     fn complete(
@@ -59,14 +65,14 @@ impl Domain for StandardUser {
         words: &[&str],
         last_word_complete: bool,
     ) -> Result<Vec<String>> {
-        if is_completing_arg(words, &["ao", "user", "del"], 1, last_word_complete)
-            || is_completing_arg(words, &["ao", "user", "mod"], 1, last_word_complete)
+        if is_completing_arg(words, &["ao", "user", "delete"], 1, last_word_complete)
+            || is_completing_arg(words, &["ao", "user", "modify"], 1, last_word_complete)
             || is_completing_arg(words, &["ao", "user", "passwd"], 1, last_word_complete)
         {
             return self.get_users();
         }
 
-        if is_completing_arg(words, &["ao", "user", "mod"], 2, last_word_complete) {
+        if is_completing_arg(words, &["ao", "user", "modify"], 2, last_word_complete) {
             return Ok(vec![
                 "add-group".to_string(),
                 "del-group".to_string(),
@@ -75,7 +81,7 @@ impl Domain for StandardUser {
             ]);
         }
 
-        if is_completing_arg(words, &["ao", "user", "mod"], 3, last_word_complete) {
+        if is_completing_arg(words, &["ao", "user", "modify"], 3, last_word_complete) {
             let action = words.get(words.len() - 2).copied().unwrap_or("");
             if action == "add-group" || action == "del-group" {
                 let output = Command::new("cut")
@@ -94,7 +100,7 @@ impl Domain for StandardUser {
 }
 
 impl UserManager for StandardUser {
-    fn ls(
+    fn list(
         &self,
         all: bool,
         groups: bool,
@@ -131,14 +137,14 @@ impl UserManager for StandardUser {
         }))
     }
 
-    fn del(&self, username: &str, purge: bool) -> Result<Box<dyn ExecutableCommand>> {
+    fn delete(&self, username: &str, purge: bool) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(UserDelCommand {
             username: username.to_string(),
             purge,
         }))
     }
 
-    fn mod_user(
+    fn modify_user(
         &self,
         username: &str,
         action: &str,
@@ -154,6 +160,21 @@ impl UserManager for StandardUser {
     fn passwd(&self, username: &str) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(PasswdCommand {
             username: username.to_string(),
+        }))
+    }
+
+    fn session(
+        &self,
+        username: Option<&str>,
+        all: bool,
+        n: Option<u32>,
+        format: OutputFormat,
+    ) -> Result<Box<dyn ExecutableCommand>> {
+        Ok(Box::new(UserSessionCommand {
+            username: username.map(|s| s.to_string()),
+            all,
+            n,
+            format,
         }))
     }
 
@@ -408,5 +429,217 @@ impl ExecutableCommand for PasswdCommand {
     }
     fn as_string(&self) -> String {
         format!("chpasswd (for user {})", self.username)
+    }
+}
+
+pub struct UserSessionCommand {
+    pub username: Option<String>,
+    pub all: bool,
+    pub n: Option<u32>,
+    pub format: OutputFormat,
+}
+
+impl ExecutableCommand for UserSessionCommand {
+    fn execute(&self) -> Result<()> {
+        let mut cmd = Command::new("last");
+        cmd.arg("--time-format").arg("iso");
+
+        if let Some(n) = self.n {
+            cmd.arg("-n").arg(n.to_string());
+        }
+
+        if let Some(ref u) = self.username {
+            cmd.arg(u);
+        } else if !self.all {
+            // Get current user using whoami
+            let whoami_output = Command::new("whoami").output()?;
+            let current_user = String::from_utf8_lossy(&whoami_output.stdout)
+                .trim()
+                .to_string();
+            if !current_user.is_empty() {
+                cmd.arg(current_user);
+            }
+        }
+
+        let output = cmd.output()?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        let mut sessions = Vec::new();
+        for line in stdout.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with("wtmp begins") {
+                continue;
+            }
+
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() < 3 {
+                continue;
+            }
+
+            let username = parts[0].to_string();
+            let tty = parts[1].to_string();
+
+            // Find the first part that looks like an ISO date (contains 'T' and '-')
+            let mut start_idx = None;
+            for (i, part) in parts.iter().enumerate().skip(2) {
+                if part.contains('T')
+                    && part.contains('-')
+                    && part.chars().next().unwrap_or(' ').is_ascii_digit()
+                {
+                    start_idx = Some(i);
+                    break;
+                }
+            }
+
+            let start_idx = match start_idx {
+                Some(idx) => idx,
+                None => continue,
+            };
+
+            let start_time = parts[start_idx].to_string();
+
+            // Host is between TTY and start time
+            let tty_pos = line.find(&tty).unwrap() + tty.len();
+            let start_pos = line.find(&start_time).unwrap();
+            let host = line[tty_pos..start_pos].trim().to_string();
+
+            let mut end_time = String::new();
+            let mut duration = String::new();
+
+            if start_idx + 2 < parts.len() && parts[start_idx + 1] == "-" {
+                let next_part = parts[start_idx + 2];
+                if next_part.contains('T') && next_part.contains('-') {
+                    end_time = next_part.to_string();
+                    // Duration is usually the last part, e.g. (00:00)
+                    if let Some(last_part) = parts.last() {
+                        duration = last_part.trim_matches(|c| c == '(' || c == ')').to_string();
+                    }
+                }
+            }
+
+            if end_time.is_empty() {
+                if line.contains("still logged in") {
+                    end_time = "still logged in".to_string();
+                } else if line.contains("gone - no logout") {
+                    end_time = "gone - no logout".to_string();
+                } else if line.contains("crash") {
+                    end_time = "crash".to_string();
+                } else if line.contains("down") {
+                    end_time = "down".to_string();
+                }
+            }
+
+            sessions.push(UserSessionInfo {
+                username,
+                line: tty,
+                host,
+                start: start_time,
+                end: end_time,
+                duration,
+            });
+        }
+
+        sessions.reverse();
+
+        match self.format {
+            OutputFormat::Table => {
+                use colored::Colorize;
+                let mut table = comfy_table::Table::new();
+                table.set_header(vec![
+                    "User",
+                    "TTY",
+                    "Host",
+                    "Start Date",
+                    "Start Time",
+                    "End Date",
+                    "End Time",
+                    "Duration",
+                ]);
+
+                let split_date_time = |dt: &str| -> (String, String) {
+                    if dt.contains('T') {
+                        let parts: Vec<&str> = dt.split('T').collect();
+                        let date = parts[0].to_string();
+                        let time_tz = parts[1];
+                        let time =
+                            if let Some(pos) = time_tz.find('+').or_else(|| time_tz.find('-')) {
+                                time_tz[..pos].to_string()
+                            } else {
+                                time_tz.to_string()
+                            };
+                        (date, time)
+                    } else {
+                        (dt.to_string(), String::new())
+                    }
+                };
+
+                for s in sessions {
+                    let is_active = s.end == "still logged in";
+                    let is_error =
+                        s.end == "crash" || s.end == "down" || s.end == "gone - no logout";
+
+                    let (s_date_str, s_time_str) = split_date_time(&s.start);
+                    let (e_date_str, e_time_str) = split_date_time(&s.end);
+
+                    let (start_date, start_time) = if is_active {
+                        (s_date_str.green(), s_time_str.green())
+                    } else if is_error {
+                        (s_date_str.red(), s_time_str.red())
+                    } else {
+                        (s_date_str.yellow(), s_time_str.yellow())
+                    };
+
+                    let (end_date, end_time) = if is_active {
+                        (e_date_str.green().bold(), e_time_str.green().bold())
+                    } else if is_error {
+                        (e_date_str.red().bold(), e_time_str.red().bold())
+                    } else {
+                        (e_date_str.yellow(), e_time_str.yellow())
+                    };
+
+                    let duration = s.duration.yellow();
+
+                    table.add_row(vec![
+                        s.username.normal(),
+                        s.line.normal(),
+                        s.host.dimmed(),
+                        start_date,
+                        start_time,
+                        end_date,
+                        end_time,
+                        duration,
+                    ]);
+                }
+                println!("{}", table);
+            }
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(&sessions)?);
+            }
+            OutputFormat::Yaml => {
+                println!("{}", serde_yaml::to_string(&sessions)?);
+            }
+            OutputFormat::Original => {
+                println!("{}", stdout);
+            }
+        }
+        Ok(())
+    }
+
+    fn is_structured(&self) -> bool {
+        matches!(
+            self.format,
+            OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original
+        )
+    }
+
+    fn as_string(&self) -> String {
+        let mut s = "last --time-format iso".to_string();
+        if let Some(n) = self.n {
+            s.push_str(&format!(" -n {}", n));
+        }
+        if let Some(ref u) = self.username {
+            s.push_str(&format!(" {}", u));
+        }
+        s
     }
 }

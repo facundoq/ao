@@ -64,13 +64,13 @@ pub enum PackageAction {
         packages: Vec<String>,
     },
     /// Lists all explicitly installed user packages.
-    Ls {
+    List {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
     },
     /// Deletes packages.
-    Del {
+    Delete {
         /// Packages to delete
         #[arg(required = true, value_hint = ValueHint::Other)]
         packages: Vec<String>,
@@ -103,7 +103,7 @@ pub enum ServiceAction {
         name: String,
     },
     /// Lists all active and failed services on the system.
-    Ls {
+    List {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
@@ -167,14 +167,14 @@ pub enum UserAction {
         no_create_home: bool,
     },
     /// Deletes a user
-    Del {
+    Delete {
         #[arg(required = true, value_hint = ValueHint::Other)]
         username: String,
         #[arg(long, short)]
         purge: bool,
     },
     /// Lists users
-    Ls {
+    List {
         #[arg(long)]
         all: bool,
         #[arg(long)]
@@ -184,7 +184,7 @@ pub enum UserAction {
         format: OutputFormat,
     },
     /// Modifies a user
-    Mod {
+    Modify {
         #[arg(required = true, value_hint = ValueHint::Other)]
         username: String,
         #[arg(required = true)]
@@ -196,6 +196,21 @@ pub enum UserAction {
     Passwd {
         #[arg(required = true, value_hint = ValueHint::Other)]
         username: String,
+    },
+    /// Shows login/logout sessions
+    Session {
+        /// Target username (optional, defaults to current user)
+        #[arg(value_hint = ValueHint::Other)]
+        username: Option<String>,
+        /// Show sessions for ALL users
+        #[arg(long, short)]
+        all: bool,
+        /// Limit the number of entries to show
+        #[arg(long, short)]
+        n: Option<u32>,
+        /// The output format
+        #[arg(long, short, default_value = "table")]
+        format: OutputFormat,
     },
 }
 
@@ -213,18 +228,18 @@ pub enum GroupAction {
         groupname: String,
     },
     /// Deletes a group
-    Del {
+    Delete {
         #[arg(required = true, value_hint = ValueHint::Other)]
         groupname: String,
     },
     /// Lists all groups
-    Ls {
+    List {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
     },
     /// Modifies a group
-    Mod {
+    Modify {
         #[arg(required = true, value_hint = ValueHint::Other)]
         groupname: String,
         #[arg(long)]
@@ -250,7 +265,7 @@ impl DiskArgs {
 #[derive(Subcommand)]
 pub enum DiskAction {
     /// Lists all block devices and usage
-    Ls {
+    List {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
@@ -269,7 +284,7 @@ pub struct PartitionArgs {
 #[derive(Subcommand)]
 pub enum PartitionAction {
     /// Lists all partitions
-    Ls {
+    List {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
@@ -408,13 +423,13 @@ pub enum LogAction {
         follow: bool,
     },
     /// Shows package manager history and update logs.
-    Pkg {
+    Package {
         /// Number of lines to show
         #[arg(long, short, default_value = "50")]
         lines: u32,
     },
     /// Shows logs for a specific system service.
-    Svc {
+    Service {
         /// The service name
         #[arg(required = true, value_hint = ValueHint::Other)]
         name: String,
@@ -426,7 +441,7 @@ pub enum LogAction {
         follow: bool,
     },
     /// Shows general system-wide logs.
-    Sys {
+    System {
         /// Number of lines to show
         #[arg(long, short, default_value = "50")]
         lines: u32,
@@ -481,9 +496,9 @@ pub enum NetworkAction {
         format: OutputFormat,
     },
     /// Firewall management
-    Fw {
+    Firewall {
         #[command(subcommand)]
-        action: FwAction,
+        action: FirewallAction,
     },
     /// Wi-Fi management
     Wifi {
@@ -493,7 +508,7 @@ pub enum NetworkAction {
 }
 
 #[derive(Subcommand)]
-pub enum FwAction {
+pub enum FirewallAction {
     /// Shows firewall status
     Status {
         /// The output format
@@ -523,22 +538,22 @@ pub struct BootArgs {
 #[derive(Subcommand)]
 pub enum BootAction {
     /// Lists boot entries
-    Ls {
+    List {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
     },
     /// Kernel module management
-    Mod {
+    Module {
         #[command(subcommand)]
-        action: BootModAction,
+        action: BootModuleAction,
     },
 }
 
 #[derive(Subcommand)]
-pub enum BootModAction {
+pub enum BootModuleAction {
     /// Lists loaded kernel modules
-    Ls {
+    List {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
@@ -569,7 +584,7 @@ pub enum GuiAction {
 #[derive(Subcommand)]
 pub enum GuiDisplayAction {
     /// Lists connected displays and resolutions
-    Ls {
+    List {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
@@ -585,7 +600,7 @@ pub struct DeviceArgs {
 #[derive(Subcommand)]
 pub enum DeviceAction {
     /// Summarizes connected PCI and USB devices
-    Ls {
+    List {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
@@ -603,9 +618,9 @@ pub enum DeviceAction {
         format: OutputFormat,
     },
     /// Bluetooth management
-    Bt {
+    Bluetooth {
         #[command(subcommand)]
-        action: BtAction,
+        action: BluetoothAction,
     },
     /// Printer management
     Print {
@@ -615,7 +630,7 @@ pub enum DeviceAction {
 }
 
 #[derive(Subcommand)]
-pub enum BtAction {
+pub enum BluetoothAction {
     /// Checks bluetooth status
     Status,
     /// Scans for nearby devices
@@ -629,7 +644,7 @@ pub enum BtAction {
 #[derive(Subcommand)]
 pub enum PrintAction {
     /// Lists configured printers
-    Ls {
+    List {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
@@ -645,7 +660,7 @@ pub struct VirtualizationArgs {
 #[derive(Subcommand)]
 pub enum VirtualizationAction {
     /// Lists all running containers and active VMs
-    Ls {
+    List {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
@@ -655,7 +670,7 @@ pub enum VirtualizationAction {
     /// Stops a running container or VM
     Stop { name: String },
     /// Removes a container or VM
-    Rm { name: String },
+    Remove { name: String },
     /// Tails the logs of a running container
     Logs { name: String },
 }

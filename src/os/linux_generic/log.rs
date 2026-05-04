@@ -1,4 +1,4 @@
-use super::common::{SystemCommand, is_completing_arg};
+use super::common::{CompoundCommand, SystemCommand, is_completing_arg};
 use crate::cli::{LogAction, LogArgs};
 use crate::os::{Domain, ExecutableCommand, LogManager};
 use anyhow::Result;
@@ -35,13 +35,13 @@ impl Domain for StandardLog {
                 lines,
                 follow,
             }) => self.file(path, *lines, *follow),
-            Some(LogAction::Pkg { lines }) => self.pkg(*lines),
-            Some(LogAction::Svc {
+            Some(LogAction::Package { lines }) => self.pkg(*lines),
+            Some(LogAction::Service {
                 name,
                 lines,
                 follow,
             }) => self.svc(name, *lines, *follow),
-            Some(LogAction::Sys { lines, follow }) => self.sys_logs(*lines, *follow),
+            Some(LogAction::System { lines, follow }) => self.sys_logs(*lines, *follow),
             None => self.sys_logs(50, false),
         }
     }
@@ -51,7 +51,7 @@ impl Domain for StandardLog {
         words: &[&str],
         last_word_complete: bool,
     ) -> Result<Vec<String>> {
-        if is_completing_arg(words, &["ao", "log", "svc"], 1, last_word_complete) {
+        if is_completing_arg(words, &["ao", "log", "service"], 1, last_word_complete) {
             // Suggest services for log tail
             let output = Command::new("systemctl")
                 .arg("list-units")
@@ -79,8 +79,8 @@ impl LogManager for StandardLog {
         Ok(Box::new(
             cmd.arg("-n")
                 .arg(&lines.to_string())
-                .arg("_FACILITY=4")
-                .arg("_FACILITY=10")
+                .arg("SYSLOG_FACILITY=4")
+                .arg("SYSLOG_FACILITY=10")
                 .arg("--"),
         ))
     }
@@ -154,7 +154,31 @@ impl LogManager for StandardLog {
     }
 
     fn pkg(&self, lines: u32) -> Result<Box<dyn ExecutableCommand>> {
-        // Distro-aware package history. Try common paths or journal tags.
+        // Distro-aware package history. Try common paths first, then journal tags.
+        let log_sources = [
+            ("/var/log/dpkg.log", "DPKG History"),
+            ("/var/log/apt/history.log", "APT History"),
+            ("/var/log/dnf.log", "DNF History"),
+            ("/var/log/pacman.log", "Pacman History"),
+            ("/var/log/zypp/history", "Zypper History"),
+            ("/var/log/emerge.log", "Emerge History"),
+        ];
+
+        let mut commands: Vec<Box<dyn ExecutableCommand>> = Vec::new();
+
+        for (path, label) in log_sources {
+            if std::path::Path::new(path).exists() {
+                commands.push(Box::new(LogHeaderCommand {
+                    text: label.to_string(),
+                }));
+                commands.push(self.file(path, lines, false)?);
+            }
+        }
+
+        if !commands.is_empty() {
+            return Ok(Box::new(CompoundCommand::new(commands)));
+        }
+
         let cmd = SystemCommand::new("journalctl");
         // Debian/Ubuntu uses 'apt' and 'dpkg', Fedora uses 'dnf'
         Ok(Box::new(
@@ -190,5 +214,20 @@ impl LogManager for StandardLog {
             cmd = cmd.arg("-f");
         }
         Ok(Box::new(cmd.arg("-n").arg(&lines.to_string()).arg("--")))
+    }
+}
+
+struct LogHeaderCommand {
+    text: String,
+}
+
+impl ExecutableCommand for LogHeaderCommand {
+    fn execute(&self) -> Result<()> {
+        use colored::Colorize;
+        println!("\n--- {} ---", self.text.blue().bold());
+        Ok(())
+    }
+    fn as_string(&self) -> String {
+        format!("echo --- {} ---", self.text)
     }
 }

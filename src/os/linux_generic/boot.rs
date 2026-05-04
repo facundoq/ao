@@ -1,5 +1,5 @@
 use super::common::SystemCommand;
-use crate::cli::{BootAction, BootArgs, BootModAction};
+use crate::cli::{BootAction, BootArgs, BootModuleAction};
 use crate::os::{
     BootEntryInfo, BootManager, Domain, ExecutableCommand, KernelModInfo, OutputFormat,
 };
@@ -25,11 +25,11 @@ impl Domain for StandardBoot {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = BootArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(BootAction::Ls { format }) => self.ls_entries(*format),
-            Some(BootAction::Mod { action }) => match action {
-                BootModAction::Ls { format } => self.ls_modules(*format),
-                BootModAction::Load { name } => self.load_module(name),
-                BootModAction::Unload { name } => self.unload_module(name),
+            Some(BootAction::List { format }) => self.ls_entries(*format),
+            Some(BootAction::Module { action }) => match action {
+                BootModuleAction::List { format } => self.ls_modules(*format),
+                BootModuleAction::Load { name } => self.load_module(name),
+                BootModuleAction::Unload { name } => self.unload_module(name),
             },
             None => self.ls_entries(OutputFormat::Table),
         }

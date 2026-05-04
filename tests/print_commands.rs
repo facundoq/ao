@@ -30,7 +30,7 @@ fn test_command_printing() {
     }
 
     // 1. User List
-    assert_eq!(run_print(&["user", "ls"]), "cat /etc/passwd");
+    assert_eq!(run_print(&["user", "list"]), "cat /etc/passwd");
 
     // 2. Network Interfaces
     assert_eq!(run_print(&["network", "interfaces"]), "ip addr");
@@ -42,7 +42,7 @@ fn test_command_printing() {
     );
 
     // 4. Disk List
-    assert_eq!(run_print(&["disk", "ls"]), "lsblk -d --json");
+    assert_eq!(run_print(&["disk", "list"]), "lsblk -d --json");
 
     // 5. System Info (Library usage)
     assert_eq!(run_print(&["system", "info"]), "sysinfo (Rust library)");
@@ -50,7 +50,7 @@ fn test_command_printing() {
     // 6. Auth Logs
     assert_eq!(
         run_print(&["log", "auth", "--lines", "10"]),
-        "journalctl -n 10 _FACILITY=4 _FACILITY=10 --"
+        "journalctl -n 10 SYSLOG_FACILITY=4 SYSLOG_FACILITY=10 --"
     );
 
     // 7. Package Install (Distro specific, but assuming debian/apt for this environment)
@@ -64,11 +64,11 @@ fn test_command_printing() {
 
     // 8. User Modification
     assert_eq!(
-        run_print(&["user", "mod", "john", "add-group", "docker"]),
+        run_print(&["user", "modify", "john", "add-group", "docker"]),
         "usermod -aG docker -- john"
     );
     assert_eq!(
-        run_print(&["user", "mod", "john", "shell", "/bin/zsh"]),
+        run_print(&["user", "modify", "john", "shell", "/bin/zsh"]),
         "usermod -s /bin/zsh -- john"
     );
 }

@@ -21,7 +21,7 @@ impl Domain for Systemd {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = ServiceArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(ServiceAction::Ls { format }) => self.ls(*format),
+            Some(ServiceAction::List { format }) => self.ls(*format),
             Some(ServiceAction::Up { name }) => self.up(name),
             Some(ServiceAction::Down { name }) => self.down(name),
             Some(ServiceAction::Restart { name }) => self.restart(name),

@@ -1,5 +1,5 @@
 use super::common::{Emoji, SystemCommand, command_exists};
-use crate::cli::{FwAction, NetworkAction, NetworkArgs, WifiAction};
+use crate::cli::{FirewallAction, NetworkAction, NetworkArgs, WifiAction};
 use crate::os::{
     Domain, ExecutableCommand, FwRuleInfo, NetInterfaceInfo, NetIpInfo, NetManager, NetRouteInfo,
     OutputFormat,
@@ -30,10 +30,10 @@ impl Domain for StandardNet {
             Some(NetworkAction::Interfaces { format }) => self.interfaces(*format),
             Some(NetworkAction::Ips { format }) => self.ips(*format),
             Some(NetworkAction::Routes { format }) => self.routes(*format),
-            Some(NetworkAction::Fw { action }) => match action {
-                FwAction::Status { format } => self.fw_status(*format),
-                FwAction::Allow { rule } => self.fw_allow(rule),
-                FwAction::Deny { rule } => self.fw_deny(rule),
+            Some(NetworkAction::Firewall { action }) => match action {
+                FirewallAction::Status { format } => self.fw_status(*format),
+                FirewallAction::Allow { rule } => self.fw_allow(rule),
+                FirewallAction::Deny { rule } => self.fw_deny(rule),
             },
             Some(NetworkAction::Wifi { action }) => match action {
                 WifiAction::Scan => self.wifi_scan(),
@@ -80,7 +80,7 @@ impl NetManager for StandardNet {
         Ok(Box::new(NetRoutesCommand { format }))
     }
     fn fw_status(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(FwStatusCommand { format }))
+        Ok(Box::new(FirewallStatusCommand { format }))
     }
     fn fw_allow(&self, rule: &str) -> Result<Box<dyn ExecutableCommand>> {
         if !is_safe_fw_rule(rule) {
@@ -154,6 +154,11 @@ impl ExecutableCommand for NetInterfacesCommand {
             operstate: String,
             mtu: u32,
             address: Option<String>,
+            addr_info: Vec<RawAddrInfo>,
+        }
+        #[derive(serde::Deserialize)]
+        struct RawAddrInfo {
+            local: String,
         }
         let raw: Vec<RawInterface> = serde_json::from_str(&stdout)?;
         let interfaces: Vec<NetInterfaceInfo> = raw
@@ -174,6 +179,7 @@ impl ExecutableCommand for NetInterfacesCommand {
                     mtu: r.mtu,
                     mac: r.address.unwrap_or_default(),
                     interface_type: itype,
+                    ips: r.addr_info.into_iter().map(|a| a.local).collect(),
                 }
             })
             .collect();
@@ -181,7 +187,7 @@ impl ExecutableCommand for NetInterfacesCommand {
         match self.format {
             OutputFormat::Table => {
                 let mut table = comfy_table::Table::new();
-                table.set_header(vec!["", "Interface", "Type", "State", "MTU", "MAC"]);
+                table.set_header(vec!["", "Interface", "Type", "State", "MTU", "IPs", "MAC"]);
                 for iface in interfaces {
                     let state_emoji = match iface.state.to_lowercase().as_str() {
                         "up" => Emoji::Up.get(),
@@ -200,6 +206,7 @@ impl ExecutableCommand for NetInterfacesCommand {
                         iface.interface_type,
                         iface.state,
                         iface.mtu.to_string(),
+                        iface.ips.join(", "),
                         iface.mac,
                     ]);
                 }
@@ -355,10 +362,10 @@ impl ExecutableCommand for NetRoutesCommand {
     }
 }
 
-pub struct FwStatusCommand {
+pub struct FirewallStatusCommand {
     pub format: OutputFormat,
 }
-impl ExecutableCommand for FwStatusCommand {
+impl ExecutableCommand for FirewallStatusCommand {
     fn execute(&self) -> Result<()> {
         if matches!(self.format, OutputFormat::Original) {
             if command_exists("ufw") {
@@ -419,7 +426,7 @@ impl ExecutableCommand for FwStatusCommand {
     }
 }
 
-impl FwStatusCommand {
+impl FirewallStatusCommand {
     fn parse_ufw(&self, stdout: &str) -> (Vec<FwRuleInfo>, String) {
         let mut rules = Vec::new();
         let mut status = "unknown".to_string();
