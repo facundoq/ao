@@ -1,4 +1,4 @@
-use super::common::SystemCommand;
+use super::common::{BIN_DOCKER, SystemCommand};
 use crate::cli::{VirtualizationAction, VirtualizationArgs};
 use crate::os::{ContainerInfo, Domain, ExecutableCommand, OutputFormat, VirtManager};
 use anyhow::Result;
@@ -36,14 +36,14 @@ impl Domain for StandardVirt {
 impl VirtManager for StandardVirt {
     fn ls(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
         if matches!(format, OutputFormat::Original) {
-            return Ok(Box::new(SystemCommand::new("docker").arg("ps")));
+            return Ok(Box::new(SystemCommand::new(BIN_DOCKER).arg("ps")));
         }
         Ok(Box::new(VirtPsCommand { format }))
     }
 
     fn start(&self, name: &str) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(
-            SystemCommand::new("docker")
+            SystemCommand::new(BIN_DOCKER)
                 .arg("start")
                 .arg("--")
                 .arg(name),
@@ -52,13 +52,16 @@ impl VirtManager for StandardVirt {
 
     fn stop(&self, name: &str) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(
-            SystemCommand::new("docker").arg("stop").arg("--").arg(name),
+            SystemCommand::new(BIN_DOCKER)
+                .arg("stop")
+                .arg("--")
+                .arg(name),
         ))
     }
 
     fn del(&self, name: &str) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(
-            SystemCommand::new("docker")
+            SystemCommand::new(BIN_DOCKER)
                 .arg("remove")
                 .arg("-f")
                 .arg("--")
@@ -68,22 +71,18 @@ impl VirtManager for StandardVirt {
 
     fn logs(&self, name: &str) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(
-            SystemCommand::new("docker")
+            SystemCommand::new(BIN_DOCKER)
                 .arg("logs")
                 .arg("-f")
                 .arg("--")
                 .arg(name),
         ))
     }
-}
 
-pub struct VirtPsCommand {
-    pub format: OutputFormat,
-}
-impl ExecutableCommand for VirtPsCommand {
-    fn execute(&self) -> Result<()> {
-        let output = Command::new("docker")
+    fn get_containers(&self) -> Result<Vec<ContainerInfo>> {
+        let output = Command::new(BIN_DOCKER)
             .arg("ps")
+            .arg("-a")
             .arg("--format")
             .arg("{{.ID}}\t{{.Image}}\t{{.Command}}\t{{.CreatedAt}}\t{{.Status}}\t{{.Names}}")
             .output()?;
@@ -102,6 +101,17 @@ impl ExecutableCommand for VirtPsCommand {
                 });
             }
         }
+        Ok(containers)
+    }
+}
+
+pub struct VirtPsCommand {
+    pub format: OutputFormat,
+}
+impl ExecutableCommand for VirtPsCommand {
+    fn execute(&self) -> Result<()> {
+        let system = crate::os::detector::detect_system()?;
+        let containers = system.virt.get_containers()?;
 
         match self.format {
             OutputFormat::Table => {

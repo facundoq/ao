@@ -2,10 +2,14 @@ use crate::os::ExecutableCommand;
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueHint};
 use clap_complete::Shell;
+use strum_macros::{AsRefStr, Display};
 
-#[derive(clap::ValueEnum, Clone, Copy, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(
+    clap::ValueEnum, Clone, Copy, Debug, serde::Serialize, serde::Deserialize, PartialEq, Default,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum OutputFormat {
+    #[default]
     Table,
     Json,
     Yaml,
@@ -40,6 +44,8 @@ pub struct Cli {
 pub enum CliCommand {
     /// Starts an interactive session to browse and execute commands
     Interactive,
+    /// Launches an interactive system dashboard
+    Dashboard,
 }
 
 #[derive(Args)]
@@ -55,7 +61,8 @@ pub struct PackageArgs {
     pub action: Option<PackageAction>,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, AsRefStr, Display)]
+#[strum(serialize_all = "lowercase")]
 pub enum PackageAction {
     /// Adds one or more packages.
     Add {
@@ -94,7 +101,8 @@ pub struct ServiceArgs {
     pub action: Option<ServiceAction>,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, AsRefStr, Display)]
+#[strum(serialize_all = "lowercase")]
 pub enum ServiceAction {
     /// Stops and disables a service from starting on boot.
     Down {
@@ -140,7 +148,8 @@ pub struct UserArgs {
     pub action: Option<UserAction>,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, AsRefStr, Display)]
+#[strum(serialize_all = "lowercase")]
 pub enum UserAction {
     /// Creates a new user
     Add {
@@ -220,7 +229,8 @@ pub struct GroupArgs {
     pub action: Option<GroupAction>,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, AsRefStr, Display)]
+#[strum(serialize_all = "lowercase")]
 pub enum GroupAction {
     /// Creates a new group
     Add {
@@ -281,7 +291,8 @@ pub struct PartitionArgs {
     pub action: Option<PartitionAction>,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, AsRefStr, Display)]
+#[strum(serialize_all = "lowercase")]
 pub enum PartitionAction {
     /// Lists all partitions
     List {
@@ -324,7 +335,8 @@ pub struct SystemArgs {
     pub action: Option<SystemAction>,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, AsRefStr, Display)]
+#[strum(serialize_all = "lowercase")]
 pub enum SystemAction {
     /// Retrieves OS info, kernel version, uptime, etc.
     Info {
@@ -475,7 +487,8 @@ pub struct NetworkArgs {
     pub action: Option<NetworkAction>,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, AsRefStr, Display)]
+#[strum(serialize_all = "lowercase")]
 pub enum NetworkAction {
     /// Lists all network interfaces
     Interfaces {

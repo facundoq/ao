@@ -1,4 +1,4 @@
-use super::common::{SystemCommand, format_duration, is_completing_arg};
+use super::common::{SystemCommand, format_duration, is_completing_action};
 use crate::cli::{SystemAction, SystemArgs};
 use crate::os::{Domain, ExecutableCommand, OutputFormat, SysInfoData, SysManager, SysTimeData};
 use anyhow::Result;
@@ -38,9 +38,9 @@ impl Domain for StandardSys {
         &self,
         _line: &str,
         words: &[&str],
-        last_word_complete: bool,
+        _last_word_complete: bool,
     ) -> Result<Vec<String>> {
-        if is_completing_arg(words, &["ao", "system", "power"], 1, last_word_complete) {
+        if is_completing_action(words, self.name(), "power", 1) {
             return Ok(vec![
                 "reboot".to_string(),
                 "shutdown".to_string(),
@@ -48,7 +48,7 @@ impl Domain for StandardSys {
                 "hibernate".to_string(),
             ]);
         }
-        if is_completing_arg(words, &["ao", "system", "time"], 1, last_word_complete) {
+        if is_completing_action(words, self.name(), "time", 1) {
             return Ok(vec![
                 "status".to_string(),
                 "set".to_string(),

@@ -117,6 +117,13 @@ impl ExecutableCommand for NoopCommand {
     }
 }
 
+pub const BIN_SYSTEMCTL: &str = "systemctl";
+pub const BIN_DOCKER: &str = "docker";
+pub const BIN_LSBLK: &str = "lsblk";
+pub const BIN_IP: &str = "ip";
+pub const BIN_UFW: &str = "ufw";
+pub const BIN_NMCLI: &str = "nmcli";
+
 pub fn is_completing_arg(
     words: &[&str],
     cmd_parts: &[&str],
@@ -132,6 +139,20 @@ pub fn is_completing_arg(
 
     let words_after_cmd = words.len() - cmd_parts.len();
     words_after_cmd == arg_pos
+}
+
+pub fn is_completing_action(
+    words: &[&str],
+    domain_name: &str,
+    action: &str,
+    arg_pos: usize,
+) -> bool {
+    is_completing_arg(
+        words,
+        &[crate::os::EXECUTABLE_NAME, domain_name, action],
+        arg_pos,
+        false,
+    )
 }
 
 pub fn command_exists(binary: &str) -> bool {

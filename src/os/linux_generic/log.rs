@@ -1,4 +1,4 @@
-use super::common::{CompoundCommand, SystemCommand, is_completing_arg};
+use super::common::{CompoundCommand, SystemCommand, is_completing_action};
 use crate::cli::{LogAction, LogArgs};
 use crate::os::{Domain, ExecutableCommand, LogManager};
 use anyhow::Result;
@@ -49,9 +49,9 @@ impl Domain for StandardLog {
         &self,
         _line: &str,
         words: &[&str],
-        last_word_complete: bool,
+        _last_word_complete: bool,
     ) -> Result<Vec<String>> {
-        if is_completing_arg(words, &["ao", "log", "service"], 1, last_word_complete) {
+        if is_completing_action(words, self.name(), "service", 1) {
             // Suggest services for log tail
             let output = Command::new("systemctl")
                 .arg("list-units")

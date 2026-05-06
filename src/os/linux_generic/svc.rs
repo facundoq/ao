@@ -1,4 +1,5 @@
-use super::common::{SystemCommand, is_completing_arg};
+use super::common::{BIN_SYSTEMCTL, SystemCommand, is_completing_action};
+
 use crate::cli::{ServiceAction, ServiceArgs};
 use crate::os::{Domain, ExecutableCommand, OutputFormat, ServiceInfo, ServiceManager};
 use anyhow::Result;
@@ -34,11 +35,10 @@ impl Domain for Systemd {
         &self,
         _line: &str,
         words: &[&str],
-        last_word_complete: bool,
+        _last_word_complete: bool,
     ) -> Result<Vec<String>> {
-        let svc_actions = ["up", "down", "restart", "reload", "status"];
-        for action in svc_actions {
-            if is_completing_arg(words, &["ao", "service", action], 1, last_word_complete) {
+        for action in ["up", "down", "restart", "reload", "status"] {
+            if is_completing_action(words, self.name(), action, 1) {
                 return self.get_services();
             }
         }
@@ -82,7 +82,7 @@ impl ServiceManager for Systemd {
     }
 
     fn get_services(&self) -> Result<Vec<String>> {
-        let output = Command::new("systemctl")
+        let output = Command::new(BIN_SYSTEMCTL)
             .arg("list-unit-files")
             .arg("--type=service")
             .arg("--no-legend")
@@ -94,20 +94,9 @@ impl ServiceManager for Systemd {
             .map(|s| s.to_string())
             .collect())
     }
-}
 
-pub struct ServiceListCommand {
-    pub format: OutputFormat,
-}
-impl ExecutableCommand for ServiceListCommand {
-    fn execute(&self) -> Result<()> {
-        if matches!(self.format, OutputFormat::Original) {
-            return SystemCommand::new("systemctl")
-                .arg("list-units")
-                .arg("--type=service")
-                .execute();
-        }
-        let output = Command::new("systemctl")
+    fn get_all_services_info(&self) -> Result<Vec<ServiceInfo>> {
+        let output = Command::new(BIN_SYSTEMCTL)
             .arg("list-units")
             .arg("--type=service")
             .arg("--no-legend")
@@ -127,6 +116,24 @@ impl ExecutableCommand for ServiceListCommand {
                 });
             }
         }
+        Ok(services)
+    }
+}
+
+pub struct ServiceListCommand {
+    pub format: OutputFormat,
+}
+impl ExecutableCommand for ServiceListCommand {
+    fn execute(&self) -> Result<()> {
+        if matches!(self.format, OutputFormat::Original) {
+            return SystemCommand::new(BIN_SYSTEMCTL)
+                .arg("list-units")
+                .arg("--type=service")
+                .execute();
+        }
+
+        let system = crate::os::detector::detect_system()?;
+        let services = system.svc.get_all_services_info()?;
 
         match self.format {
             OutputFormat::Table => {
@@ -197,7 +204,7 @@ pub struct ServiceUpCommand {
 }
 impl ExecutableCommand for ServiceUpCommand {
     fn execute(&self) -> Result<()> {
-        SystemCommand::new("systemctl")
+        SystemCommand::new(BIN_SYSTEMCTL)
             .arg("enable")
             .arg("--now")
             .arg("--")
@@ -214,7 +221,7 @@ pub struct ServiceDownCommand {
 }
 impl ExecutableCommand for ServiceDownCommand {
     fn execute(&self) -> Result<()> {
-        SystemCommand::new("systemctl")
+        SystemCommand::new(BIN_SYSTEMCTL)
             .arg("disable")
             .arg("--now")
             .arg("--")
@@ -231,7 +238,7 @@ pub struct ServiceRestartCommand {
 }
 impl ExecutableCommand for ServiceRestartCommand {
     fn execute(&self) -> Result<()> {
-        SystemCommand::new("systemctl")
+        SystemCommand::new(BIN_SYSTEMCTL)
             .arg("restart")
             .arg("--")
             .arg(&self.service)
@@ -247,7 +254,7 @@ pub struct ServiceReloadCommand {
 }
 impl ExecutableCommand for ServiceReloadCommand {
     fn execute(&self) -> Result<()> {
-        SystemCommand::new("systemctl")
+        SystemCommand::new(BIN_SYSTEMCTL)
             .arg("reload")
             .arg("--")
             .arg(&self.service)
@@ -263,7 +270,7 @@ pub struct ServiceStatusCommand {
 }
 impl ExecutableCommand for ServiceStatusCommand {
     fn execute(&self) -> Result<()> {
-        SystemCommand::new("systemctl")
+        SystemCommand::new(BIN_SYSTEMCTL)
             .arg("status")
             .arg("--")
             .arg(&self.service)

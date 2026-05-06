@@ -10,6 +10,57 @@ pub mod detector;
 pub mod fedora;
 pub mod linux_generic;
 
+pub const EXECUTABLE_NAME: &str = "ao";
+
+pub struct PackageDomain {
+    pub manager: Box<dyn PackageManager>,
+}
+
+impl Domain for PackageDomain {
+    fn name(&self) -> &'static str {
+        "package"
+    }
+
+    fn command(&self) -> Command {
+        use crate::cli::PackageArgs;
+        use clap::Args;
+        PackageArgs::augment_args(
+            Command::new(self.name()).about(format!("Manage packages ({})", self.manager.name())),
+        )
+    }
+
+    fn execute(&self, matches: &ArgMatches, _app: &Command) -> Result<Box<dyn ExecutableCommand>> {
+        use crate::cli::{PackageAction, PackageArgs};
+        use clap::FromArgMatches;
+        let args = PackageArgs::from_arg_matches(matches)?;
+        match &args.action {
+            Some(PackageAction::Update) => self.manager.update(),
+            Some(PackageAction::Add { packages }) => self.manager.add(packages),
+            Some(PackageAction::Delete { packages, purge }) => self.manager.del(packages, *purge),
+            Some(PackageAction::Search { query }) => self.manager.search(query),
+            Some(PackageAction::List { format }) => self.manager.ls(*format),
+            None => self.manager.ls(OutputFormat::Table),
+        }
+    }
+
+    fn complete(
+        &self,
+        _line: &str,
+        words: &[&str],
+        _last_word_complete: bool,
+    ) -> Result<Vec<String>> {
+        use crate::os::linux_generic::is_completing_action;
+
+        if is_completing_action(words, self.name(), "add", 1) {
+            return self.manager.get_available_packages();
+        }
+        if is_completing_action(words, self.name(), "delete", 1) {
+            return self.manager.get_installed_packages();
+        }
+        Ok(vec![])
+    }
+}
+
 /// Unified trait for a system domain (e.g., packages, services).
 /// It defines both the CLI interface and the execution logic.
 pub trait Domain {
@@ -71,8 +122,10 @@ pub struct PackageInfo {
 }
 
 /// Abstracts system package management operations.
-pub trait PackageManager: Domain {
+pub trait PackageManager: Send + Sync {
+    fn name(&self) -> &'static str;
     fn update(&self) -> Result<Box<dyn ExecutableCommand>>;
+
     fn add(&self, packages: &[String]) -> Result<Box<dyn ExecutableCommand>>;
     fn del(&self, packages: &[String], purge: bool) -> Result<Box<dyn ExecutableCommand>>;
     fn search(&self, query: &str) -> Result<Box<dyn ExecutableCommand>>;
@@ -99,6 +152,7 @@ pub trait ServiceManager: Domain {
     fn reload(&self, service: &str) -> Result<Box<dyn ExecutableCommand>>;
     fn status(&self, service: &str) -> Result<Box<dyn ExecutableCommand>>;
     fn get_services(&self) -> Result<Vec<String>>;
+    fn get_all_services_info(&self) -> Result<Vec<ServiceInfo>>;
 }
 
 #[derive(Serialize, Deserialize)]
@@ -157,6 +211,12 @@ pub trait UserManager: Domain {
         n: Option<u32>,
         format: OutputFormat,
     ) -> Result<Box<dyn ExecutableCommand>>;
+    fn get_sessions(
+        &self,
+        username: Option<&str>,
+        all: bool,
+        n: Option<u32>,
+    ) -> Result<Vec<UserSessionInfo>>;
     fn get_users(&self) -> Result<Vec<String>>;
     fn get_shells(&self) -> Result<Vec<String>>;
 }
@@ -339,6 +399,9 @@ pub trait NetManager: Domain {
     fn fw_deny(&self, rule: &str) -> Result<Box<dyn ExecutableCommand>>;
     fn wifi_scan(&self) -> Result<Box<dyn ExecutableCommand>>;
     fn wifi_connect(&self, ssid: &str) -> Result<Box<dyn ExecutableCommand>>;
+
+    fn get_interfaces(&self) -> Result<Vec<NetInterfaceInfo>>;
+    fn get_fw_rules(&self) -> Result<Vec<FwRuleInfo>>;
 }
 
 #[derive(Serialize, Deserialize)]
@@ -418,6 +481,8 @@ pub trait VirtManager: Domain {
     fn stop(&self, name: &str) -> Result<Box<dyn ExecutableCommand>>;
     fn del(&self, name: &str) -> Result<Box<dyn ExecutableCommand>>;
     fn logs(&self, name: &str) -> Result<Box<dyn ExecutableCommand>>;
+
+    fn get_containers(&self) -> Result<Vec<ContainerInfo>>;
 }
 
 #[derive(Serialize, Deserialize)]
@@ -448,7 +513,7 @@ pub trait SelfManager: Domain {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct MonitorEntry {
+pub struct OverviewEntry {
     #[serde(rename = "type")]
     pub entry_type: String,
     pub subtype: String,
@@ -457,6 +522,6 @@ pub struct MonitorEntry {
 }
 
 /// Abstracts system monitoring operations.
-pub trait MonitorManager: Domain {
+pub trait OverviewManager: Domain {
     fn live_stats(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
 }

@@ -9,13 +9,13 @@ The modern Linux ecosystem is powerful but highly fragmented. Administrators mus
 
 * **Ergonomic Speed:** The base command (`ao`) is designed for optimal left-right-left keystroke flow (`A` -> `O` -> `TAB`). Subcommands should prioritize short, memorable, noun-verb structures. The goal is that typing `ao` becomes muscle memory. For a system administrator, speed and accuracy are paramount. By standardizing the prefix and verb structures, we reduce cognitive load significantly. Every command is predictable.
 
-* **Discoverability over Memorization:** Users should not need to read `man` pages to remember how to add a user to a group, or what flags are needed to configure a static IP. The command tree must be intuitively navigable via terminal auto-completion (`ao <TAB><TAB>`). A hierarchical domain-action-target structure means users can intuitively guess the right command: `ao net list`, `ao user add`, `ao service restart`. It makes administration accessible to newcomers and frictionless for veterans.
+* **Discoverability over Memorization:** Users should not need to read `man` pages to remember how to add a user to a group, or what flags are needed to configure a static IP. The command tree must be intuitively navigable via terminal auto-completion (`ao <TAB><TAB>`). A hierarchical domain-action-target structure means users can intuitively guess the right command: `ao network list`, `ao user add`, `ao service restart`. It makes administration accessible to newcomers and frictionless for veterans.
 
 * **Zero Overhead:** Written in compiled Rust, `ao` must execute instantaneously. There should be no noticeable interpreter startup lag (unlike Python-based wrappers or heavy Node.js tools). System administration often involves scripts looping over many entities; `ao` must be lean enough to be used inside shell loops without causing performance degradation. It must be as fast as calling the native underlying binaries.
 
 * **Safe Execution:** System administration is destructive by nature. A typo can take down a network interface, delete a critical user, or format the wrong partition. `ao` should support dry-runs (`--dry-run`) where applicable, showing the exact underlying shell commands it intends to execute before pulling the trigger. Furthermore, destructive commands (like purging a user or formatting a disk) should have interactive confirmations by default unless explicitly overridden (e.g., `--force` or `-y`).
 
-* **Abstraction, Not Replacement:** `ao` does not reinvent `systemd`, `iproute2`, or `apt`. It orchestrates them. It abstracts the underlying OS differences where possible. For instance, `ao pkg install` should seamlessly map to `apt` on Debian/Ubuntu, `dnf` on Fedora, `pacman` on Arch, and `zypper` on openSUSE. The goal is not to write a new init system, but to provide a consistent interface over whatever init system is present.
+* **Abstraction, Not Replacement:** `ao` does not reinvent `systemd`, `iproute2`, or `apt`. It orchestrates them. It abstracts the underlying OS differences where possible. For instance, `ao package add` should seamlessly map to `apt` on Debian/Ubuntu, `dnf` on Fedora, `pacman` on Arch, and `zypper` on openSUSE. The goal is not to write a new init system, but to provide a consistent interface over whatever init system is present.
 
 * **Standardized Output:** Across all commands, `ao` should provide standardized tabular output for listing items (users, interfaces, disks) and consistent key-value output for details. This consistency makes it easier for users to scan information visually and parse it programmatically (e.g., with `--json` or `--yaml` output modes).
 
@@ -24,7 +24,7 @@ The modern Linux ecosystem is powerful but highly fragmented. Administrators mus
 **In-Scope:**
 * Local system administration and configuration. This covers the everyday tasks of a sysadmin managing a single node, from setting up networks to managing storage arrays.
 * Wrapping standard Linux utilities (networking, services, users, storage, packages). The wrapper must handle the complexities of these underlying tools, providing a simplified, consistent interface.
-* Providing normalized, human-readable tabular output for system state. When querying state (e.g., `ao net list`), the output should be structured, optionally color-coded, and easy to parse both by humans and machines.
+* Providing normalized, human-readable tabular output for system state. When querying state (e.g., `ao network list`), the output should be structured, optionally color-coded, and easy to parse both by humans and machines.
 * Advanced system aspects previously untouched by traditional wrappers, including bootloaders, display servers, security contexts (SELinux/AppArmor), and virtualization/containerization layers.
 * Integration with standard system logs, providing a unified way to tail logs for services, containers, or the entire system.
 

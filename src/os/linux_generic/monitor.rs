@@ -1,6 +1,6 @@
 use super::common::{Emoji, format_bytes};
 use crate::cli::{MonitorArgs, OutputFormat};
-use crate::os::{Domain, ExecutableCommand, MonitorEntry, MonitorManager};
+use crate::os::{Domain, ExecutableCommand, OverviewEntry, OverviewManager};
 use anyhow::Result;
 use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
 use sysinfo::{Components, Disks, Networks, System};
@@ -9,10 +9,10 @@ pub struct StandardMonitor;
 
 impl Domain for StandardMonitor {
     fn name(&self) -> &'static str {
-        "monitor"
+        "overview"
     }
     fn command(&self) -> ClapCommand {
-        MonitorArgs::augment_args(ClapCommand::new("monitor").about("Monitor live system stats"))
+        MonitorArgs::augment_args(ClapCommand::new("overview").about("Monitor live system stats"))
     }
     fn execute(
         &self,
@@ -24,7 +24,7 @@ impl Domain for StandardMonitor {
     }
 }
 
-impl MonitorManager for StandardMonitor {
+impl OverviewManager for StandardMonitor {
     fn live_stats(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(LiveStatsCommand { format }))
     }
@@ -49,7 +49,7 @@ impl ExecutableCommand for LiveStatsCommand {
             .map(|c| c.brand().to_string())
             .unwrap_or_else(|| "Unknown".to_string());
 
-        entries.push(MonitorEntry {
+        entries.push(OverviewEntry {
             entry_type: "CPU".to_string(),
             subtype: "Physical".to_string(),
             value: format!("{:.1}%", sys.global_cpu_usage()),
@@ -62,7 +62,7 @@ impl ExecutableCommand for LiveStatsCommand {
                 || comp.label().to_lowercase().contains("core"))
                 && comp.temperature().is_some()
             {
-                entries.push(MonitorEntry {
+                entries.push(OverviewEntry {
                     entry_type: "CPU Temp".to_string(),
                     subtype: "Physical".to_string(),
                     value: format!("{:.1}°C", comp.temperature().unwrap()),
@@ -72,7 +72,7 @@ impl ExecutableCommand for LiveStatsCommand {
         }
 
         // RAM
-        entries.push(MonitorEntry {
+        entries.push(OverviewEntry {
             entry_type: "RAM".to_string(),
             subtype: "Physical".to_string(),
             value: format!(
@@ -95,7 +95,7 @@ impl ExecutableCommand for LiveStatsCommand {
                 subtype = "Physical".to_string();
             }
 
-            entries.push(MonitorEntry {
+            entries.push(OverviewEntry {
                 entry_type: "Network".to_string(),
                 subtype,
                 value: format!(
@@ -118,7 +118,7 @@ impl ExecutableCommand for LiveStatsCommand {
                 "Physical".to_string()
             };
 
-            entries.push(MonitorEntry {
+            entries.push(OverviewEntry {
                 entry_type: "Disk".to_string(),
                 subtype,
                 value: format!(

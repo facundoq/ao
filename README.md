@@ -31,40 +31,38 @@ Admin Operations (`ao`) is a centralized, unified command line wrapper written i
 ```text
 ao
 ├── interactive
+├── dashboard
 ├── boot
-│   ├── ls
-│   └── mod
-│       ├── ls
+│   ├── list
+│   └── module
+│       ├── list
 │       ├── load
 │       └── unload
-├── dev
-│   ├── ls
+├── device
+│   ├── list
 │   ├── pci
 │   ├── usb
-│   ├── bt
+│   ├── bluetooth
 │   │   ├── status
 │   │   ├── scan
 │   │   ├── pair
 │   │   └── connect
 │   └── print
-│       └── ls
+│       └── list
 ├── disk
-│   ├── ls
-│   ├── mount
-│   ├── unmount
-│   └── usage
-├── distro
+│   └── list
+├── distribution
 │   ├── info
 │   └── upgrade
 ├── group
 │   ├── add
-│   ├── del
-│   ├── ls
-│   └── mod
+│   ├── delete
+│   ├── list
+│   └── modify
 ├── gui
 │   ├── info
 │   └── display
-│       └── ls
+│       └── list
 ├── log
 │   ├── auth
 │   ├── boot
@@ -72,28 +70,33 @@ ao
 │   ├── dev
 │   ├── error
 │   ├── file
-│   ├── pkg
-│   ├── svc
-│   └── sys
+│   ├── package
+│   ├── service
+│   └── system
 ├── monitor
-├── net
+├── network
 │   ├── interfaces
 │   ├── ips
 │   ├── routes
-│   ├── fw
+│   ├── firewall
 │   │   ├── status
 │   │   ├── allow
 │   │   └── deny
 │   └── wifi
 │       ├── scan
 │       └── connect
-├── pkg
+├── package
 │   ├── add
-│   ├── ls
-│   ├── del
+│   ├── list
+│   ├── delete
 │   ├── search
 │   └── update
-├── sec
+├── partition
+│   ├── list
+│   ├── mount
+│   ├── unmount
+│   └── usage
+├── security
 │   ├── audit
 │   └── context
 ├── self
@@ -103,28 +106,29 @@ ao
 │   │   └── setup
 │   ├── info
 │   └── update
-├── svc
+├── service
 │   ├── down
-│   ├── ls
+│   ├── list
 │   ├── reload
 │   ├── restart
 │   ├── status
 │   └── up
-├── sys
+├── system
 │   ├── info
 │   ├── power
 │   └── time
 ├── user
 │   ├── add
-│   ├── del
-│   ├── ls
-│   ├── mod
-│   └── passwd
-└── virt
-    ├── ls
+│   ├── delete
+│   ├── list
+│   ├── modify
+│   ├── passwd
+│   └── session
+└── virtualization
+    ├── list
     ├── start
     ├── stop
-    ├── rm
+    ├── remove
     └── logs
 ```
 

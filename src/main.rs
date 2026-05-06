@@ -5,6 +5,7 @@ use os::Domain;
 
 pub mod cli;
 pub mod config;
+pub mod dashboard;
 pub mod os;
 
 fn main() -> Result<()> {
@@ -36,6 +37,10 @@ fn main() -> Result<()> {
 
     if let Some(CliCommand::Interactive) = cli.command {
         return run_interactive(&domains);
+    }
+
+    if let Some(CliCommand::Dashboard) = cli.command {
+        return dashboard::run(&system);
     }
 
     if cli.dump_tree {

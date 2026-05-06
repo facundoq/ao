@@ -1,4 +1,4 @@
-use super::common::{Emoji, SystemCommand};
+use super::common::{BIN_LSBLK, Emoji, SystemCommand};
 use crate::cli::{DiskAction, DiskArgs};
 use crate::os::{DiskInfo, DiskManager, Domain, ExecutableCommand, OutputFormat};
 use anyhow::Result;
@@ -41,13 +41,13 @@ impl Domain for StandardDisk {
 impl DiskManager for StandardDisk {
     fn ls(&self, format: OutputFormat, show_loop: bool) -> Result<Box<dyn ExecutableCommand>> {
         if matches!(format, OutputFormat::Original) {
-            return Ok(Box::new(SystemCommand::new("lsblk").arg("-d")));
+            return Ok(Box::new(SystemCommand::new(BIN_LSBLK).arg("-d")));
         }
         Ok(Box::new(DiskListCommand { format, show_loop }))
     }
 
     fn get_devices(&self) -> Result<Vec<String>> {
-        let output = Command::new("lsblk")
+        let output = Command::new(BIN_LSBLK)
             .arg("-d")
             .arg("-n")
             .arg("-o")
@@ -69,7 +69,7 @@ pub struct DiskListCommand {
 
 impl ExecutableCommand for DiskListCommand {
     fn execute(&self) -> Result<()> {
-        let output = Command::new("lsblk")
+        let output = Command::new(BIN_LSBLK)
             .arg("-d") // only devices, no partitions
             .arg("--json")
             .arg("-o")

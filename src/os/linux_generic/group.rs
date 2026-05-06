@@ -1,4 +1,4 @@
-use super::common::{SystemCommand, is_completing_arg};
+use super::common::{SystemCommand, is_completing_action};
 use crate::cli::{GroupAction, GroupArgs};
 use crate::os::{Domain, ExecutableCommand, GroupInfo, GroupManager, OutputFormat};
 use anyhow::Result;
@@ -32,10 +32,10 @@ impl Domain for StandardGroup {
         &self,
         _line: &str,
         words: &[&str],
-        last_word_complete: bool,
+        _last_word_complete: bool,
     ) -> Result<Vec<String>> {
-        if is_completing_arg(words, &["ao", "group", "delete"], 1, last_word_complete)
-            || is_completing_arg(words, &["ao", "group", "modify"], 1, last_word_complete)
+        if is_completing_action(words, self.name(), "delete", 1)
+            || is_completing_action(words, self.name(), "modify", 1)
         {
             return self.get_groups();
         }

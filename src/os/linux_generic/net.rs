@@ -1,4 +1,4 @@
-use super::common::{Emoji, SystemCommand, command_exists};
+use super::common::{BIN_IP, BIN_NMCLI, BIN_UFW, Emoji, SystemCommand, command_exists};
 use crate::cli::{FirewallAction, NetworkAction, NetworkArgs, WifiAction};
 use crate::os::{
     Domain, ExecutableCommand, FwRuleInfo, NetInterfaceInfo, NetIpInfo, NetManager, NetRouteInfo,
@@ -88,7 +88,7 @@ impl NetManager for StandardNet {
         }
         if std::path::Path::new("/usr/sbin/ufw").exists() {
             Ok(Box::new(
-                SystemCommand::new("ufw").arg("allow").arg("--").arg(rule),
+                SystemCommand::new(BIN_UFW).arg("allow").arg("--").arg(rule),
             ))
         } else {
             Ok(Box::new(
@@ -105,7 +105,7 @@ impl NetManager for StandardNet {
         }
         if std::path::Path::new("/usr/sbin/ufw").exists() {
             Ok(Box::new(
-                SystemCommand::new("ufw").arg("deny").arg("--").arg(rule),
+                SystemCommand::new(BIN_UFW).arg("deny").arg("--").arg(rule),
             ))
         } else {
             Ok(Box::new(
@@ -118,7 +118,7 @@ impl NetManager for StandardNet {
     }
     fn wifi_scan(&self) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(
-            SystemCommand::new("nmcli")
+            SystemCommand::new(BIN_NMCLI)
                 .arg("dev")
                 .arg("wifi")
                 .arg("list"),
@@ -126,7 +126,7 @@ impl NetManager for StandardNet {
     }
     fn wifi_connect(&self, ssid: &str) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(
-            SystemCommand::new("nmcli")
+            SystemCommand::new(BIN_NMCLI)
                 .arg("dev")
                 .arg("wifi")
                 .arg("connect")
@@ -134,18 +134,9 @@ impl NetManager for StandardNet {
                 .arg(ssid),
         ))
     }
-}
 
-pub struct NetInterfacesCommand {
-    pub format: OutputFormat,
-}
-impl ExecutableCommand for NetInterfacesCommand {
-    fn execute(&self) -> Result<()> {
-        if matches!(self.format, OutputFormat::Original) {
-            return SystemCommand::new("ip").arg("addr").execute();
-        }
-
-        let output = Command::new("ip").arg("--json").arg("addr").output()?;
+    fn get_interfaces(&self) -> Result<Vec<NetInterfaceInfo>> {
+        let output = Command::new(BIN_IP).arg("--json").arg("addr").output()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
 
         #[derive(serde::Deserialize)]
@@ -183,6 +174,34 @@ impl ExecutableCommand for NetInterfacesCommand {
                 }
             })
             .collect();
+        Ok(interfaces)
+    }
+
+    fn get_fw_rules(&self) -> Result<Vec<FwRuleInfo>> {
+        if command_exists(BIN_UFW) {
+            let output = Command::new(BIN_UFW).arg("status").output()?;
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let (rules, _) = FirewallStatusCommand {
+                format: OutputFormat::Table,
+            }
+            .parse_ufw(&stdout);
+            return Ok(rules);
+        }
+        Ok(vec![])
+    }
+}
+
+pub struct NetInterfacesCommand {
+    pub format: OutputFormat,
+}
+impl ExecutableCommand for NetInterfacesCommand {
+    fn execute(&self) -> Result<()> {
+        if matches!(self.format, OutputFormat::Original) {
+            return SystemCommand::new(BIN_IP).arg("addr").execute();
+        }
+
+        let system = crate::os::detector::detect_system()?;
+        let interfaces = system.net.get_interfaces()?;
 
         match self.format {
             OutputFormat::Table => {
@@ -201,9 +220,9 @@ impl ExecutableCommand for NetInterfacesCommand {
                     };
 
                     table.add_row(vec![
-                        format!("{} {}", type_emoji, state_emoji),
+                        state_emoji.to_string(),
                         iface.name,
-                        iface.interface_type,
+                        format!("{} {}", type_emoji, iface.interface_type),
                         iface.state,
                         iface.mtu.to_string(),
                         iface.ips.join(", "),
@@ -212,7 +231,6 @@ impl ExecutableCommand for NetInterfacesCommand {
                 }
                 println!("{}", table);
             }
-
             OutputFormat::Json => {
                 println!("{}", serde_json::to_string_pretty(&interfaces)?);
             }
@@ -223,14 +241,13 @@ impl ExecutableCommand for NetInterfacesCommand {
         }
         Ok(())
     }
+
+    fn is_structured(&self) -> bool {
+        matches!(self.format, OutputFormat::Json | OutputFormat::Yaml)
+    }
+
     fn as_string(&self) -> String {
         "ip addr".to_string()
-    }
-    fn is_structured(&self) -> bool {
-        matches!(
-            self.format,
-            OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Original
-        )
     }
 }
 
@@ -240,10 +257,10 @@ pub struct NetIpsCommand {
 impl ExecutableCommand for NetIpsCommand {
     fn execute(&self) -> Result<()> {
         if matches!(self.format, OutputFormat::Original) {
-            return SystemCommand::new("ip").arg("addr").execute();
+            return SystemCommand::new(BIN_IP).arg("addr").execute();
         }
 
-        let output = Command::new("ip").arg("--json").arg("addr").output()?;
+        let output = Command::new(BIN_IP).arg("--json").arg("addr").output()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
 
         #[derive(serde::Deserialize)]
@@ -305,10 +322,10 @@ pub struct NetRoutesCommand {
 impl ExecutableCommand for NetRoutesCommand {
     fn execute(&self) -> Result<()> {
         if matches!(self.format, OutputFormat::Original) {
-            return SystemCommand::new("ip").arg("route").execute();
+            return SystemCommand::new(BIN_IP).arg("route").execute();
         }
 
-        let output = Command::new("ip").arg("--json").arg("route").output()?;
+        let output = Command::new(BIN_IP).arg("--json").arg("route").output()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
 
         #[derive(serde::Deserialize)]
@@ -368,8 +385,8 @@ pub struct FirewallStatusCommand {
 impl ExecutableCommand for FirewallStatusCommand {
     fn execute(&self) -> Result<()> {
         if matches!(self.format, OutputFormat::Original) {
-            if command_exists("ufw") {
-                return SystemCommand::new("ufw").arg("status").execute();
+            if command_exists(BIN_UFW) {
+                return SystemCommand::new(BIN_UFW).arg("status").execute();
             } else if command_exists("firewall-cmd") {
                 return SystemCommand::new("firewall-cmd")
                     .arg("--list-all")
@@ -379,8 +396,8 @@ impl ExecutableCommand for FirewallStatusCommand {
             }
         }
 
-        let (rules, status_msg) = if command_exists("ufw") {
-            let output = Command::new("ufw").arg("status").output()?;
+        let (rules, status_msg) = if command_exists(BIN_UFW) {
+            let output = Command::new(BIN_UFW).arg("status").output()?;
             let stdout = String::from_utf8_lossy(&output.stdout);
             self.parse_ufw(&stdout)
         } else if command_exists("firewall-cmd") {

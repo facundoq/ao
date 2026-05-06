@@ -1,4 +1,5 @@
-use super::common::{Emoji, SystemCommand, is_completing_arg};
+use super::common::{BIN_LSBLK, Emoji, SystemCommand, is_completing_action};
+
 use crate::cli::{PartitionAction, PartitionArgs};
 use crate::os::{DiskInfo, Domain, ExecutableCommand, OutputFormat, PartitionManager};
 use anyhow::Result;
@@ -43,11 +44,11 @@ impl Domain for StandardPartition {
         &self,
         _line: &str,
         words: &[&str],
-        last_word_complete: bool,
+        _last_word_complete: bool,
     ) -> Result<Vec<String>> {
-        if is_completing_arg(words, &["ao", "partition", "mount"], 1, last_word_complete) {
+        if is_completing_action(words, self.name(), "mount", 1) {
             let mut devices = Vec::new();
-            if let Ok(output) = Command::new("lsblk")
+            if let Ok(output) = Command::new(BIN_LSBLK)
                 .arg("-n")
                 .arg("-o")
                 .arg("NAME,PATH")
@@ -63,12 +64,7 @@ impl Domain for StandardPartition {
             }
             return Ok(devices);
         }
-        if is_completing_arg(
-            words,
-            &["ao", "partition", "unmount"],
-            1,
-            last_word_complete,
-        ) {
+        if is_completing_action(words, self.name(), "unmount", 1) {
             return self.get_mount_points();
         }
         Ok(vec![])
@@ -78,7 +74,7 @@ impl Domain for StandardPartition {
 impl PartitionManager for StandardPartition {
     fn ls(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
         if matches!(format, OutputFormat::Original) {
-            return Ok(Box::new(SystemCommand::new("lsblk")));
+            return Ok(Box::new(SystemCommand::new(BIN_LSBLK)));
         }
         Ok(Box::new(PartitionListCommand { format }))
     }
@@ -115,7 +111,7 @@ impl PartitionManager for StandardPartition {
     }
 
     fn get_mount_points(&self) -> Result<Vec<String>> {
-        let output = Command::new("lsblk")
+        let output = Command::new(BIN_LSBLK)
             .arg("-n")
             .arg("-o")
             .arg("MOUNTPOINT")
@@ -134,7 +130,7 @@ pub struct PartitionListCommand {
 }
 impl ExecutableCommand for PartitionListCommand {
     fn execute(&self) -> Result<()> {
-        let output = Command::new("lsblk")
+        let output = Command::new(BIN_LSBLK)
             .arg("--json")
             .arg("-o")
             .arg("NAME,PATH,SIZE,MOUNTPOINT,FSTYPE,TYPE,ROTA,TRAN")

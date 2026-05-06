@@ -1,4 +1,4 @@
-use super::common::{SystemCommand, is_completing_arg};
+use super::common::{SystemCommand, is_completing_action};
 use crate::cli::{UserAction, UserArgs};
 use crate::os::{Domain, ExecutableCommand, OutputFormat, UserInfo, UserManager, UserSessionInfo};
 use anyhow::Result;
@@ -63,16 +63,16 @@ impl Domain for StandardUser {
         &self,
         _line: &str,
         words: &[&str],
-        last_word_complete: bool,
+        _last_word_complete: bool,
     ) -> Result<Vec<String>> {
-        if is_completing_arg(words, &["ao", "user", "delete"], 1, last_word_complete)
-            || is_completing_arg(words, &["ao", "user", "modify"], 1, last_word_complete)
-            || is_completing_arg(words, &["ao", "user", "passwd"], 1, last_word_complete)
+        if is_completing_action(words, self.name(), "delete", 1)
+            || is_completing_action(words, self.name(), "modify", 1)
+            || is_completing_action(words, self.name(), "passwd", 1)
         {
             return self.get_users();
         }
 
-        if is_completing_arg(words, &["ao", "user", "modify"], 2, last_word_complete) {
+        if is_completing_action(words, self.name(), "modify", 2) {
             return Ok(vec![
                 "add-group".to_string(),
                 "del-group".to_string(),
@@ -81,7 +81,7 @@ impl Domain for StandardUser {
             ]);
         }
 
-        if is_completing_arg(words, &["ao", "user", "modify"], 3, last_word_complete) {
+        if is_completing_action(words, self.name(), "modify", 3) {
             let action = words.get(words.len() - 2).copied().unwrap_or("");
             if action == "add-group" || action == "del-group" {
                 let output = Command::new("cut")
@@ -176,6 +176,113 @@ impl UserManager for StandardUser {
             n,
             format,
         }))
+    }
+
+    fn get_sessions(
+        &self,
+        username: Option<&str>,
+        all: bool,
+        n: Option<u32>,
+    ) -> Result<Vec<UserSessionInfo>> {
+        let mut cmd = Command::new("last");
+        cmd.arg("--time-format").arg("iso");
+
+        if let Some(n) = n {
+            cmd.arg("-n").arg(n.to_string());
+        }
+
+        if let Some(u) = username {
+            cmd.arg(u);
+        } else if !all {
+            // Get current user using whoami
+            let whoami_output = Command::new("whoami").output()?;
+            let current_user = String::from_utf8_lossy(&whoami_output.stdout)
+                .trim()
+                .to_string();
+            if !current_user.is_empty() {
+                cmd.arg(current_user);
+            }
+        }
+
+        let output = cmd.output()?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        let mut sessions = Vec::new();
+        for line in stdout.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with("wtmp begins") {
+                continue;
+            }
+
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() < 3 {
+                continue;
+            }
+
+            let username = parts[0].to_string();
+            let tty = parts[1].to_string();
+
+            // Find the first part that looks like an ISO date (contains 'T' and '-')
+            let mut start_idx = None;
+            for (i, part) in parts.iter().enumerate().skip(2) {
+                if part.contains('T')
+                    && part.contains('-')
+                    && part.chars().next().unwrap_or(' ').is_ascii_digit()
+                {
+                    start_idx = Some(i);
+                    break;
+                }
+            }
+
+            let start_idx = match start_idx {
+                Some(idx) => idx,
+                None => continue,
+            };
+
+            let start_time = parts[start_idx].to_string();
+
+            // Host is between TTY and start time
+            let tty_pos = line.find(&tty).unwrap() + tty.len();
+            let start_pos = line.find(&start_time).unwrap();
+            let host = line[tty_pos..start_pos].trim().to_string();
+
+            let mut end_time = String::new();
+            let mut duration = String::new();
+
+            if start_idx + 2 < parts.len() && parts[start_idx + 1] == "-" {
+                let next_part = parts[start_idx + 2];
+                if next_part.contains('T') && next_part.contains('-') {
+                    end_time = next_part.to_string();
+                    // Duration is usually the last part, e.g. (00:00)
+                    if let Some(last_part) = parts.last() {
+                        duration = last_part.trim_matches(|c| c == '(' || c == ')').to_string();
+                    }
+                }
+            }
+
+            if end_time.is_empty() {
+                if line.contains("still logged in") {
+                    end_time = "still logged in".to_string();
+                } else if line.contains("gone - no logout") {
+                    end_time = "gone - no logout".to_string();
+                } else if line.contains("crash") {
+                    end_time = "crash".to_string();
+                } else if line.contains("down") {
+                    end_time = "down".to_string();
+                }
+            }
+
+            sessions.push(UserSessionInfo {
+                username,
+                line: tty,
+                host,
+                start: start_time,
+                end: end_time,
+                duration,
+            });
+        }
+        sessions.reverse();
+        Ok(sessions)
     }
 
     fn get_users(&self) -> Result<Vec<String>> {
@@ -441,105 +548,10 @@ pub struct UserSessionCommand {
 
 impl ExecutableCommand for UserSessionCommand {
     fn execute(&self) -> Result<()> {
-        let mut cmd = Command::new("last");
-        cmd.arg("--time-format").arg("iso");
-
-        if let Some(n) = self.n {
-            cmd.arg("-n").arg(n.to_string());
-        }
-
-        if let Some(ref u) = self.username {
-            cmd.arg(u);
-        } else if !self.all {
-            // Get current user using whoami
-            let whoami_output = Command::new("whoami").output()?;
-            let current_user = String::from_utf8_lossy(&whoami_output.stdout)
-                .trim()
-                .to_string();
-            if !current_user.is_empty() {
-                cmd.arg(current_user);
-            }
-        }
-
-        let output = cmd.output()?;
-        let stdout = String::from_utf8_lossy(&output.stdout);
-
-        let mut sessions = Vec::new();
-        for line in stdout.lines() {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with("wtmp begins") {
-                continue;
-            }
-
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() < 3 {
-                continue;
-            }
-
-            let username = parts[0].to_string();
-            let tty = parts[1].to_string();
-
-            // Find the first part that looks like an ISO date (contains 'T' and '-')
-            let mut start_idx = None;
-            for (i, part) in parts.iter().enumerate().skip(2) {
-                if part.contains('T')
-                    && part.contains('-')
-                    && part.chars().next().unwrap_or(' ').is_ascii_digit()
-                {
-                    start_idx = Some(i);
-                    break;
-                }
-            }
-
-            let start_idx = match start_idx {
-                Some(idx) => idx,
-                None => continue,
-            };
-
-            let start_time = parts[start_idx].to_string();
-
-            // Host is between TTY and start time
-            let tty_pos = line.find(&tty).unwrap() + tty.len();
-            let start_pos = line.find(&start_time).unwrap();
-            let host = line[tty_pos..start_pos].trim().to_string();
-
-            let mut end_time = String::new();
-            let mut duration = String::new();
-
-            if start_idx + 2 < parts.len() && parts[start_idx + 1] == "-" {
-                let next_part = parts[start_idx + 2];
-                if next_part.contains('T') && next_part.contains('-') {
-                    end_time = next_part.to_string();
-                    // Duration is usually the last part, e.g. (00:00)
-                    if let Some(last_part) = parts.last() {
-                        duration = last_part.trim_matches(|c| c == '(' || c == ')').to_string();
-                    }
-                }
-            }
-
-            if end_time.is_empty() {
-                if line.contains("still logged in") {
-                    end_time = "still logged in".to_string();
-                } else if line.contains("gone - no logout") {
-                    end_time = "gone - no logout".to_string();
-                } else if line.contains("crash") {
-                    end_time = "crash".to_string();
-                } else if line.contains("down") {
-                    end_time = "down".to_string();
-                }
-            }
-
-            sessions.push(UserSessionInfo {
-                username,
-                line: tty,
-                host,
-                start: start_time,
-                end: end_time,
-                duration,
-            });
-        }
-
-        sessions.reverse();
+        let system = crate::os::detector::detect_system()?;
+        let sessions = system
+            .user
+            .get_sessions(self.username.as_deref(), self.all, self.n)?;
 
         match self.format {
             OutputFormat::Table => {
@@ -619,7 +631,16 @@ impl ExecutableCommand for UserSessionCommand {
                 println!("{}", serde_yaml::to_string(&sessions)?);
             }
             OutputFormat::Original => {
-                println!("{}", stdout);
+                let mut cmd = Command::new("last");
+                cmd.arg("--time-format").arg("iso");
+                if let Some(n) = self.n {
+                    cmd.arg("-n").arg(n.to_string());
+                }
+                if let Some(ref u) = self.username {
+                    cmd.arg(u);
+                }
+                let output = cmd.output()?;
+                println!("{}", String::from_utf8_lossy(&output.stdout));
             }
         }
         Ok(())

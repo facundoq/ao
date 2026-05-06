@@ -1,51 +1,15 @@
-use super::linux_generic::{SystemCommand, is_completing_arg};
-use super::{Domain, ExecutableCommand, OutputFormat, PackageManager};
-use crate::cli::{PackageAction, PackageArgs};
+use super::linux_generic::SystemCommand;
+use super::{ExecutableCommand, OutputFormat, PackageManager};
 use anyhow::Result;
-use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
 use std::process::Command;
 
 pub struct Pacman;
 
-impl Domain for Pacman {
-    fn name(&self) -> &'static str {
-        "package"
-    }
-    fn command(&self) -> ClapCommand {
-        PackageArgs::augment_args(ClapCommand::new("package").about("Manage packages (Pacman)"))
-    }
-    fn execute(
-        &self,
-        matches: &ArgMatches,
-        _app: &ClapCommand,
-    ) -> Result<Box<dyn ExecutableCommand>> {
-        let args = PackageArgs::from_arg_matches(matches)?;
-        match &args.action {
-            Some(PackageAction::Update) => self.update(),
-            Some(PackageAction::Add { packages }) => self.add(packages),
-            Some(PackageAction::Delete { packages, purge }) => self.del(packages, *purge),
-            Some(PackageAction::Search { query }) => self.search(query),
-            Some(PackageAction::List { format }) => self.ls(*format),
-            None => self.ls(OutputFormat::Table),
-        }
-    }
-    fn complete(
-        &self,
-        _line: &str,
-        words: &[&str],
-        last_word_complete: bool,
-    ) -> Result<Vec<String>> {
-        if is_completing_arg(words, &["ao", "package", "add"], 1, last_word_complete) {
-            return self.get_available_packages();
-        }
-        if is_completing_arg(words, &["ao", "package", "delete"], 1, last_word_complete) {
-            return self.get_installed_packages();
-        }
-        Ok(vec![])
-    }
-}
-
 impl PackageManager for Pacman {
+    fn name(&self) -> &'static str {
+        "Pacman"
+    }
+
     fn update(&self) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(SystemCommand::new("pacman").arg("-Syu")))
     }
