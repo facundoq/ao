@@ -10,35 +10,21 @@ impl PackageManager for Apk {
         "APK"
     }
 
-    fn update(&self) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(SystemCommand::new("apk").arg("update")))
+    fn cmd(&self) -> SystemCommand {
+        SystemCommand::new("apk")
     }
 
     fn add(&self, packages: &[String]) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(
-            SystemCommand::new("apk")
-                .arg("add")
-                .arg("--")
-                .args(packages),
-        ))
+        Ok(Box::new(self.cmd().arg("add").arg("--").args(packages)))
     }
 
     fn del(&self, packages: &[String], _purge: bool) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(
-            SystemCommand::new("apk")
-                .arg("delete")
-                .arg("--")
-                .args(packages),
-        ))
+        Ok(Box::new(self.cmd().arg("delete").arg("--").args(packages)))
     }
 
     fn search(&self, query: &str) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(
-            SystemCommand::new("apk")
-                .arg("search")
-                .arg("-v")
-                .arg("--")
-                .arg(query),
+            self.cmd().arg("search").arg("-v").arg("--").arg(query),
         ))
     }
 

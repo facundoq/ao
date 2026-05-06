@@ -10,13 +10,17 @@ impl PackageManager for Apt {
         "APT"
     }
 
+    fn cmd(&self) -> SystemCommand {
+        SystemCommand::new("apt-get")
+    }
+
     fn update(&self) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(SystemCommand::new("apt-get").arg("update")))
+        Ok(Box::new(self.cmd().arg("update")))
     }
 
     fn add(&self, packages: &[String]) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(
-            SystemCommand::new("apt-get")
+            self.cmd()
                 .arg("install")
                 .arg("-y")
                 .arg("--")
@@ -25,7 +29,7 @@ impl PackageManager for Apt {
     }
 
     fn del(&self, packages: &[String], purge: bool) -> Result<Box<dyn ExecutableCommand>> {
-        let mut cmd = SystemCommand::new("apt-get");
+        let mut cmd = self.cmd();
         if purge {
             cmd = cmd.arg("purge");
         } else {
