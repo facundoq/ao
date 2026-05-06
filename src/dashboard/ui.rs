@@ -637,8 +637,8 @@ fn draw_network(f: &mut Frame, app: &App, area: Rect) {
 
             let (rx_speed, tx_speed) = app.network_speeds.get(&i.name).cloned().unwrap_or((0, 0));
             let network_data = app.networks.get(&i.name);
-            let total_rx = network_data.map(|n| n.received()).unwrap_or(0);
-            let total_tx = network_data.map(|n| n.transmitted()).unwrap_or(0);
+            let total_rx = network_data.map(|n| n.total_received()).unwrap_or(0);
+            let total_tx = network_data.map(|n| n.total_transmitted()).unwrap_or(0);
 
             Row::new(vec![
                 Cell::from(i.name.clone()),

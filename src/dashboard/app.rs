@@ -105,7 +105,10 @@ impl<'a> App<'a> {
 
         let mut prev_network_data = HashMap::new();
         for (name, network) in &networks {
-            prev_network_data.insert(name.clone(), (network.received(), network.transmitted()));
+            prev_network_data.insert(
+                name.clone(),
+                (network.total_received(), network.total_transmitted()),
+            );
         }
 
         let mut app = Self {
@@ -220,8 +223,8 @@ impl<'a> App<'a> {
         let mut total_tx_speed = 0.0;
 
         for (name, network) in &self.networks {
-            let rx = network.received();
-            let tx = network.transmitted();
+            let rx = network.total_received();
+            let tx = network.total_transmitted();
 
             if let Some((old_rx, old_tx)) = self.prev_network_data.get(name) {
                 let rx_delta = rx.saturating_sub(*old_rx);
