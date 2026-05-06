@@ -1,6 +1,6 @@
 use super::common::{Emoji, format_bytes};
 use crate::cli::{MonitorArgs, OutputFormat};
-use crate::os::{Domain, ExecutableCommand, OverviewEntry, OverviewManager};
+use crate::os::{Domain, ExecutableCommand, OverviewEntry, OverviewManager, SensorInfo};
 use anyhow::Result;
 use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
 use sysinfo::{Components, Disks, Networks, System};
@@ -12,7 +12,7 @@ impl Domain for StandardMonitor {
         "overview"
     }
     fn command(&self) -> ClapCommand {
-        MonitorArgs::augment_args(ClapCommand::new("overview").about("Monitor live system stats"))
+        MonitorArgs::augment_args(ClapCommand::new("overview").about("Show system overview"))
     }
     fn execute(
         &self,
@@ -27,6 +27,20 @@ impl Domain for StandardMonitor {
 impl OverviewManager for StandardMonitor {
     fn live_stats(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(LiveStatsCommand { format }))
+    }
+
+    fn get_sensors(&self) -> Result<Vec<SensorInfo>> {
+        let components = Components::new_with_refreshed_list();
+        let sensors = components
+            .iter()
+            .map(|c| SensorInfo {
+                label: c.label().to_string(),
+                temperature: c.temperature().unwrap_or(0.0),
+                critical: c.critical(),
+                max: c.max(),
+            })
+            .collect();
+        Ok(sensors)
     }
 }
 
@@ -182,7 +196,7 @@ impl ExecutableCommand for LiveStatsCommand {
                     ]);
                 }
                 println!(
-                    "=== System Monitor ({} Used / {} Total) ===",
+                    "=== System Overview ({} Used / {} Total) ===",
                     Emoji::Used.get(),
                     Emoji::Total.get()
                 );

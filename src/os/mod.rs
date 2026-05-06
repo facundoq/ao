@@ -287,6 +287,8 @@ pub struct SysInfoData {
     pub used_memory_readable: String,
     pub ram_type: String,
     pub ram_model: String,
+    pub ram_config: String,
+    pub ram_speed: String,
     pub physical_drives: usize,
     pub lan_adapters: Vec<String>,
     pub wifi_adapters: Vec<String>,
@@ -310,6 +312,7 @@ pub struct SysTimeData {
 /// Abstracts system management operations.
 pub trait SysManager: Domain {
     fn info(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
+    fn get_info(&self) -> Result<SysInfoData>;
     fn power(&self, state: &str, now: bool, force: bool) -> Result<Box<dyn ExecutableCommand>>;
     fn time(
         &self,
@@ -521,7 +524,16 @@ pub struct OverviewEntry {
     pub description: String,
 }
 
-/// Abstracts system monitoring operations.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SensorInfo {
+    pub label: String,
+    pub temperature: f32,
+    pub critical: Option<f32>,
+    pub max: Option<f32>,
+}
+
+/// Abstracts system overview operations.
 pub trait OverviewManager: Domain {
     fn live_stats(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
+    fn get_sensors(&self) -> Result<Vec<SensorInfo>>;
 }

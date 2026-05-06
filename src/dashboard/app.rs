@@ -1,5 +1,5 @@
 use crate::os::detector::DetectedSystem;
-use crate::os::{ContainerInfo, NetInterfaceInfo, ServiceInfo, UserSessionInfo};
+use crate::os::{ContainerInfo, NetInterfaceInfo, SensorInfo, ServiceInfo, UserSessionInfo};
 use std::collections::HashMap;
 use std::time::Instant;
 use sysinfo::{
@@ -30,6 +30,17 @@ pub struct App<'a> {
     pub interfaces: Vec<NetInterfaceInfo>,
     pub services: Vec<ServiceInfo>,
     pub containers: Vec<ContainerInfo>,
+    pub sensors: Vec<SensorInfo>,
+    pub ram_config: String,
+    pub ram_speed: String,
+
+    // Chart history (last 60 seconds)
+    pub cpu_history: Vec<(f64, f64)>,
+    pub mem_history: Vec<(f64, f64)>,
+    pub swap_history: Vec<(f64, f64)>,
+    pub net_rx_history: Vec<(f64, f64)>,
+    pub net_tx_history: Vec<(f64, f64)>,
+    pub history_start: Instant,
 
     // Network speed tracking
     pub last_tick_time: Instant,
@@ -81,6 +92,16 @@ impl<'a> App<'a> {
             .get_all_services_info()
             .unwrap_or_default();
         let containers = detected_system.virt.get_containers().unwrap_or_default();
+        let sensors = detected_system.overview.get_sensors().unwrap_or_default();
+        let sys_info = detected_system.sys.get_info().ok();
+        let ram_config = sys_info
+            .as_ref()
+            .map(|s| s.ram_config.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
+        let ram_speed = sys_info
+            .as_ref()
+            .map(|s| s.ram_speed.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
 
         let mut prev_network_data = HashMap::new();
         for (name, network) in &networks {
@@ -101,6 +122,8 @@ impl<'a> App<'a> {
                 "Network",
                 "Service",
                 "Virtualization",
+                "Sensors",
+                "Charts",
             ],
             selected_index: 0,
             sessions,
@@ -108,6 +131,15 @@ impl<'a> App<'a> {
             interfaces,
             services,
             containers,
+            sensors,
+            ram_config,
+            ram_speed,
+            cpu_history: Vec::with_capacity(61),
+            mem_history: Vec::with_capacity(61),
+            swap_history: Vec::with_capacity(61),
+            net_rx_history: Vec::with_capacity(61),
+            net_tx_history: Vec::with_capacity(61),
+            history_start: Instant::now(),
             last_tick_time: Instant::now(),
             prev_network_data,
             network_speeds: HashMap::new(),
@@ -145,8 +177,47 @@ impl<'a> App<'a> {
         self.system_info.refresh_all();
         self.disks.refresh(true);
 
+        // Update history for charts
+        let now_sec = now.duration_since(self.history_start).as_secs_f64();
+
+        // CPU
+        self.cpu_history
+            .push((now_sec, self.system_info.global_cpu_usage() as f64));
+        if self.cpu_history.len() > 60 {
+            self.cpu_history.remove(0);
+        }
+
+        // Memory
+        let mem_used = self.system_info.used_memory() as f64;
+        let mem_total = self.system_info.total_memory() as f64;
+        let mem_percent = if mem_total > 0.0 {
+            (mem_used / mem_total) * 100.0
+        } else {
+            0.0
+        };
+        self.mem_history.push((now_sec, mem_percent));
+        if self.mem_history.len() > 60 {
+            self.mem_history.remove(0);
+        }
+
+        // Swap
+        let swap_used = self.system_info.used_swap() as f64;
+        let swap_total = self.system_info.total_swap() as f64;
+        let swap_percent = if swap_total > 0.0 {
+            (swap_used / swap_total) * 100.0
+        } else {
+            0.0
+        };
+        self.swap_history.push((now_sec, swap_percent));
+        if self.swap_history.len() > 60 {
+            self.swap_history.remove(0);
+        }
+
         // Update network speeds
         self.networks.refresh(true);
+
+        let mut total_rx_speed = 0.0;
+        let mut total_tx_speed = 0.0;
 
         for (name, network) in &self.networks {
             let rx = network.received();
@@ -159,8 +230,20 @@ impl<'a> App<'a> {
                 let tx_speed = (tx_delta as f64 / elapsed) as u64;
                 self.network_speeds
                     .insert(name.clone(), (rx_speed, tx_speed));
+
+                total_rx_speed += rx_speed as f64;
+                total_tx_speed += tx_speed as f64;
             }
             self.prev_network_data.insert(name.clone(), (rx, tx));
+        }
+
+        self.net_rx_history.push((now_sec, total_rx_speed));
+        if self.net_rx_history.len() > 60 {
+            self.net_rx_history.remove(0);
+        }
+        self.net_tx_history.push((now_sec, total_tx_speed));
+        if self.net_tx_history.len() > 60 {
+            self.net_tx_history.remove(0);
         }
 
         // Refresh based on tab
@@ -184,6 +267,11 @@ impl<'a> App<'a> {
             5 => {
                 if let Ok(c) = self.detected_system.virt.get_containers() {
                     self.containers = c;
+                }
+            }
+            6 => {
+                if let Ok(s) = self.detected_system.overview.get_sensors() {
+                    self.sensors = s;
                 }
             }
             _ => {}
@@ -343,6 +431,8 @@ impl<'a> App<'a> {
             3 => self.interfaces.len(),
             4 => self.services.len(),
             5 => self.containers.len(),
+            6 => self.sensors.len(),
+            7 => 0, // Charts have no scrollable list
             _ => 0,
         }
     }

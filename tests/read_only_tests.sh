@@ -34,8 +34,8 @@ run_test() {
 
 # List of read-only, non-interactive commands to test
 commands=(
-    "ao monitor"
-    "ao monitor -f json"
+    "ao overview"
+    "ao overview -f json"
     "ao package list"
     "ao package search rust"
     "ao service list"

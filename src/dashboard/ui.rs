@@ -4,7 +4,9 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Gauge, Paragraph, Row, Table, Tabs},
+    widgets::{
+        Axis, Block, Borders, Cell, Chart, Dataset, Gauge, GraphType, Paragraph, Row, Table, Tabs,
+    },
 };
 use sysinfo::System;
 
@@ -88,6 +90,8 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         3 => draw_network(f, app, area),
         4 => draw_services(f, app, area),
         5 => draw_virtualization(f, app, area),
+        6 => draw_sensors(f, app, area),
+        7 => draw_charts(f, app, area),
         _ => {
             let block = Block::default().borders(Borders::ALL);
             let paragraph = Paragraph::new("Coming Soon...").block(block);
@@ -105,10 +109,10 @@ fn draw_overview(f: &mut Frame, app: &App, area: Rect) {
     let left_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // Global CPU
-            Constraint::Min(0),    // CPU Cores
             Constraint::Length(3), // RAM
             Constraint::Length(3), // Swap
+            Constraint::Length(3), // Global CPU
+            Constraint::Min(0),    // CPU Cores
         ])
         .split(main_chunks[0]);
 
@@ -123,28 +127,88 @@ fn draw_overview(f: &mut Frame, app: &App, area: Rect) {
 
     // --- LEFT COLUMN ---
 
-    // 1. Global CPU Gauge
+    // 1. RAM
+    let mem_used = app.system_info.used_memory();
+    let mem_total = app.system_info.total_memory();
+    let mem_percent = mem_used
+        .checked_mul(100)
+        .and_then(|v| v.checked_div(mem_total))
+        .unwrap_or(0) as u16;
+    let ram_title = if app.ram_config != "Unknown" && app.ram_speed != "Unknown" {
+        format!(" RAM ({}), {} ", app.ram_config, app.ram_speed)
+    } else if app.ram_config != "Unknown" {
+        format!(" RAM ({}) ", app.ram_config)
+    } else {
+        " RAM ".to_string()
+    };
+    let mem_gauge = Gauge::default()
+        .block(Block::default().borders(Borders::ALL).title(ram_title))
+        .gauge_style(Style::default().fg(Color::Green))
+        .percent(mem_percent)
+        .label(format!(
+            "{} / {} ({}%)",
+            format_bytes(mem_used),
+            format_bytes(mem_total),
+            mem_percent
+        ));
+    f.render_widget(mem_gauge, left_chunks[0]);
+
+    // 2. Swap
+    let swap_used = app.system_info.used_swap();
+    let swap_total = app.system_info.total_swap();
+    let swap_percent = swap_used
+        .checked_mul(100)
+        .and_then(|v| v.checked_div(swap_total))
+        .unwrap_or(0) as u16;
+    let swap_gauge = Gauge::default()
+        .block(Block::default().borders(Borders::ALL).title(" Swap "))
+        .gauge_style(Style::default().fg(Color::Magenta))
+        .percent(swap_percent)
+        .label(format!(
+            "{} / {} ({}%)",
+            format_bytes(swap_used),
+            format_bytes(swap_total),
+            swap_percent
+        ));
+    f.render_widget(swap_gauge, left_chunks[1]);
+
+    // 3. Global CPU Gauge
+    let cpu_brand = app
+        .system_info
+        .cpus()
+        .first()
+        .map(|c| c.brand())
+        .unwrap_or("Unknown CPU");
     let cpu_usage = app.system_info.global_cpu_usage();
     let cpu_gauge = Gauge::default()
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" Global CPU Usage "),
+                .title(format!(" CPU {} ", cpu_brand)),
         )
         .gauge_style(Style::default().fg(Color::Rgb(255, 200, 150))) // "Tan"-like color
         .percent(cpu_usage as u16);
-    f.render_widget(cpu_gauge, left_chunks[0]);
+    f.render_widget(cpu_gauge, left_chunks[2]);
 
-    // 2. CPU Cores Area
+    // 4. CPU Cores Area
     let core_count = app.system_info.cpus().len();
     let cores_block = Block::default()
         .borders(Borders::ALL)
         .title(format!(" CPU Cores ({}) ", core_count));
-    let cores_inner = cores_block.inner(left_chunks[1]);
-    f.render_widget(cores_block, left_chunks[1]);
+    let cores_inner = cores_block.inner(left_chunks[3]);
+    f.render_widget(cores_block, left_chunks[3]);
 
-    // Sub-layout for cores inside the block. Scale to fit.
-    let core_constraints = vec![Constraint::Ratio(1, core_count as u32); core_count];
+    // Determine consistent height to avoid "strange" mixing of full and compact views.
+    // If we can fit all cores with height 3, use it. Otherwise use height 1.
+    let core_height = if cores_inner.height >= (core_count as u16 * 3) {
+        3
+    } else {
+        1
+    };
+
+    let mut core_constraints = vec![Constraint::Length(core_height); core_count];
+    core_constraints.push(Constraint::Min(0)); // Align to top, no gaps
+
     let core_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(core_constraints)
@@ -155,7 +219,7 @@ fn draw_overview(f: &mut Frame, app: &App, area: Rect) {
             let usage = cpu.cpu_usage();
             let chunk = core_chunks[i];
 
-            if chunk.height >= 3 {
+            if core_height >= 3 {
                 let row_chunks = Layout::default()
                     .direction(Direction::Horizontal)
                     .constraints([Constraint::Length(4), Constraint::Min(0)])
@@ -195,44 +259,6 @@ fn draw_overview(f: &mut Frame, app: &App, area: Rect) {
             }
         }
     }
-
-    // 3. RAM
-    let mem_used = app.system_info.used_memory();
-    let mem_total = app.system_info.total_memory();
-    let mem_percent = mem_used
-        .checked_mul(100)
-        .and_then(|v| v.checked_div(mem_total))
-        .unwrap_or(0) as u16;
-    let mem_gauge = Gauge::default()
-        .block(Block::default().borders(Borders::ALL).title(" RAM "))
-        .gauge_style(Style::default().fg(Color::Green))
-        .percent(mem_percent)
-        .label(format!(
-            "{} / {} ({}%)",
-            format_bytes(mem_used),
-            format_bytes(mem_total),
-            mem_percent
-        ));
-    f.render_widget(mem_gauge, left_chunks[2]);
-
-    // 4. Swap
-    let swap_used = app.system_info.used_swap();
-    let swap_total = app.system_info.total_swap();
-    let swap_percent = swap_used
-        .checked_mul(100)
-        .and_then(|v| v.checked_div(swap_total))
-        .unwrap_or(0) as u16;
-    let swap_gauge = Gauge::default()
-        .block(Block::default().borders(Borders::ALL).title(" Swap "))
-        .gauge_style(Style::default().fg(Color::Magenta))
-        .percent(swap_percent)
-        .label(format!(
-            "{} / {} ({}%)",
-            format_bytes(swap_used),
-            format_bytes(swap_total),
-            swap_percent
-        ));
-    f.render_widget(swap_gauge, left_chunks[3]);
 
     // --- RIGHT COLUMN ---
 
@@ -313,7 +339,10 @@ fn draw_overview(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(mem_proc_table, right_chunks[1]);
 
     // 3. Disks
-    let disk_rows = app.disks.iter().map(|d| {
+    let mut sorted_disks: Vec<_> = app.disks.iter().collect();
+    sorted_disks.sort_by_key(|b| std::cmp::Reverse(b.total_space()));
+
+    let disk_rows = sorted_disks.iter().map(|d| {
         let total = d.total_space();
         let available = d.available_space();
         let used = total - available;
@@ -322,12 +351,18 @@ fn draw_overview(f: &mut Frame, app: &App, area: Rect) {
             .and_then(|v| v.checked_div(total))
             .unwrap_or(0);
         let bar = make_bar(percent as u16, 15);
+        let usage_style = if percent > 80 {
+            Style::default().fg(Color::Red)
+        } else {
+            Style::default()
+        };
+
         Row::new(vec![
             Cell::from(d.name().to_string_lossy().to_string()),
             Cell::from(d.mount_point().to_string_lossy().to_string()),
             Cell::from(format_bytes(used)),
             Cell::from(format_bytes(total)),
-            Cell::from(format!("{:>3}% {}", percent, bar)),
+            Cell::from(format!("{:>3}% {}", percent, bar)).style(usage_style),
         ])
     });
     let disk_table = Table::new(
@@ -572,6 +607,7 @@ fn draw_network(f: &mut Frame, app: &App, area: Rect) {
         "Interface",
         "Type",
         "State",
+        "IPs",
         "Rx Speed",
         "Tx Speed",
         "Total Rx",
@@ -608,6 +644,7 @@ fn draw_network(f: &mut Frame, app: &App, area: Rect) {
                 Cell::from(i.name.clone()),
                 Cell::from(i.interface_type.clone()),
                 Cell::from(i.state.clone()),
+                Cell::from(i.ips.join(", ")),
                 Cell::from(format!("{}/s", format_bytes(rx_speed))),
                 Cell::from(format!("{}/s", format_bytes(tx_speed))),
                 Cell::from(format_bytes(total_rx)),
@@ -622,6 +659,7 @@ fn draw_network(f: &mut Frame, app: &App, area: Rect) {
             Constraint::Length(12),
             Constraint::Length(10),
             Constraint::Length(8),
+            Constraint::Min(20), // IPs
             Constraint::Length(12),
             Constraint::Length(12),
             Constraint::Length(12),
@@ -902,4 +940,190 @@ fn format_bytes(bytes: u64) -> String {
     } else {
         format!("{} B", bytes)
     }
+}
+
+fn draw_sensors(f: &mut Frame, app: &App, area: Rect) {
+    let header_cells = ["Device/Label", "Temperature", "Max", "Critical"]
+        .iter()
+        .map(|h| Cell::from(*h).style(Style::default().add_modifier(Modifier::BOLD)));
+    let header = Row::new(header_cells).height(1).bottom_margin(1);
+
+    let rows = app.sensors.iter().map(|s| {
+        let temp_style = if let Some(crit) = s.critical {
+            if s.temperature >= crit {
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+            } else if s.temperature >= crit * 0.8 {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default().fg(Color::Green)
+            }
+        } else if s.temperature >= 80.0 {
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+        } else if s.temperature >= 60.0 {
+            Style::default().fg(Color::Yellow)
+        } else {
+            Style::default().fg(Color::Green)
+        };
+
+        let max_str = s
+            .max
+            .map(|m| format!("{:.1}°C", m))
+            .unwrap_or_else(|| "N/A".to_string());
+        let crit_str = s
+            .critical
+            .map(|c| format!("{:.1}°C", c))
+            .unwrap_or_else(|| "N/A".to_string());
+
+        Row::new(vec![
+            Cell::from(s.label.clone()),
+            Cell::from(format!("{:.1}°C", s.temperature)).style(temp_style),
+            Cell::from(max_str),
+            Cell::from(crit_str),
+        ])
+    });
+
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Min(30),
+            Constraint::Length(15),
+            Constraint::Length(10),
+            Constraint::Length(10),
+        ],
+    )
+    .header(header)
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Hardware Sensors "),
+    );
+    f.render_widget(table, area);
+}
+
+fn draw_charts(f: &mut Frame, app: &App, area: Rect) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(area);
+
+    let top_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(chunks[0]);
+
+    let bottom_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(chunks[1]);
+
+    // Helper to get time range
+    let x_bounds = if app.cpu_history.is_empty() {
+        [0.0, 60.0]
+    } else {
+        [
+            app.cpu_history[0].0,
+            app.cpu_history
+                .last()
+                .unwrap()
+                .0
+                .max(app.cpu_history[0].0 + 60.0),
+        ]
+    };
+
+    // 1. CPU Chart
+    let cpu_dataset = Dataset::default()
+        .name("CPU %")
+        .marker(ratatui::symbols::Marker::Braille)
+        .graph_type(GraphType::Line)
+        .style(Style::default().fg(Color::Cyan))
+        .data(&app.cpu_history);
+
+    let cpu_chart = Chart::new(vec![cpu_dataset])
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" CPU Usage (%) "),
+        )
+        .x_axis(Axis::default().bounds(x_bounds))
+        .y_axis(Axis::default().bounds([0.0, 100.0]).labels(vec![
+            Span::raw("0"),
+            Span::raw("50"),
+            Span::raw("100"),
+        ]));
+    f.render_widget(cpu_chart, top_chunks[0]);
+
+    // 2. Memory Chart
+    let mem_dataset = Dataset::default()
+        .name("Mem %")
+        .marker(ratatui::symbols::Marker::Braille)
+        .graph_type(GraphType::Line)
+        .style(Style::default().fg(Color::Green))
+        .data(&app.mem_history);
+
+    let swap_dataset = Dataset::default()
+        .name("Swap %")
+        .marker(ratatui::symbols::Marker::Braille)
+        .graph_type(GraphType::Line)
+        .style(Style::default().fg(Color::Magenta))
+        .data(&app.swap_history);
+
+    let mem_chart = Chart::new(vec![mem_dataset, swap_dataset])
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Memory & Swap (%) "),
+        )
+        .x_axis(Axis::default().bounds(x_bounds))
+        .y_axis(Axis::default().bounds([0.0, 100.0]).labels(vec![
+            Span::raw("0"),
+            Span::raw("50"),
+            Span::raw("100"),
+        ]));
+    f.render_widget(mem_chart, top_chunks[1]);
+
+    // 3. Network RX Chart
+    let max_rx = app
+        .net_rx_history
+        .iter()
+        .map(|(_, v)| *v)
+        .fold(0.0, f64::max)
+        .max(1024.0);
+    let rx_dataset = Dataset::default()
+        .name("RX")
+        .marker(ratatui::symbols::Marker::Braille)
+        .graph_type(GraphType::Line)
+        .style(Style::default().fg(Color::Yellow))
+        .data(&app.net_rx_history);
+
+    let rx_chart = Chart::new(vec![rx_dataset])
+        .block(Block::default().borders(Borders::ALL).title(format!(
+            " Total Network RX (Max: {}/s) ",
+            format_bytes(max_rx as u64)
+        )))
+        .x_axis(Axis::default().bounds(x_bounds))
+        .y_axis(Axis::default().bounds([0.0, max_rx]));
+    f.render_widget(rx_chart, bottom_chunks[0]);
+
+    // 4. Network TX Chart
+    let max_tx = app
+        .net_tx_history
+        .iter()
+        .map(|(_, v)| *v)
+        .fold(0.0, f64::max)
+        .max(1024.0);
+    let tx_dataset = Dataset::default()
+        .name("TX")
+        .marker(ratatui::symbols::Marker::Braille)
+        .graph_type(GraphType::Line)
+        .style(Style::default().fg(Color::Blue))
+        .data(&app.net_tx_history);
+
+    let tx_chart = Chart::new(vec![tx_dataset])
+        .block(Block::default().borders(Borders::ALL).title(format!(
+            " Total Network TX (Max: {}/s) ",
+            format_bytes(max_tx as u64)
+        )))
+        .x_axis(Axis::default().bounds(x_bounds))
+        .y_axis(Axis::default().bounds([0.0, max_tx]));
+    f.render_widget(tx_chart, bottom_chunks[1]);
 }

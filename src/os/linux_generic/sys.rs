@@ -72,6 +72,10 @@ impl SysManager for StandardSys {
         Ok(Box::new(SysInfoCommand { format }))
     }
 
+    fn get_info(&self) -> Result<SysInfoData> {
+        get_sys_info_data()
+    }
+
     fn power(&self, state: &str, now: bool, force: bool) -> Result<Box<dyn ExecutableCommand>> {
         let mut cmd = SystemCommand::new("systemctl");
         match state {
@@ -119,156 +123,197 @@ impl SysManager for StandardSys {
     }
 }
 
+pub fn get_sys_info_data() -> Result<SysInfoData> {
+    let mut sys = System::new_all();
+    sys.refresh_all();
+
+    // Memory in GB
+    let total_memory_gb = sys.total_memory() as f64 / 1_073_741_824.0;
+    let used_memory_gb = sys.used_memory() as f64 / 1_073_741_824.0;
+    let total_memory_readable = format!("{:.2} GB", total_memory_gb);
+    let used_memory_readable = format!("{:.2} GB", used_memory_gb);
+
+    // CPU Model
+    let cpu_model = sys
+        .cpus()
+        .first()
+        .map(|c| c.brand().to_string())
+        .unwrap_or_else(|| "Unknown".to_string());
+
+    // Physical Drives
+    let physical_drives = Command::new("lsblk")
+        .arg("-d")
+        .arg("-n")
+        .arg("-o")
+        .arg("TYPE")
+        .output()
+        .map(|o| {
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .filter(|l| l.trim() == "disk")
+                .count()
+        })
+        .unwrap_or(0);
+
+    // Network Adapters
+    let mut lan_adapters = Vec::new();
+    let mut wifi_adapters = Vec::new();
+    if let Ok(entries) = std::fs::read_dir("/sys/class/net") {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name == "lo" {
+                continue;
+            }
+            let path = entry.path();
+            if !path.join("device").exists() {
+                continue;
+            }
+
+            let is_wifi = path.join("wireless").exists() || path.join("phy80211").exists();
+            if is_wifi {
+                wifi_adapters.push(name);
+            } else {
+                lan_adapters.push(name);
+            }
+        }
+    }
+
+    // BT Adapters
+    let mut bt_adapters = Vec::new();
+    if let Ok(output) = Command::new("hciconfig").output() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            if line.contains("hci")
+                && line.contains(':')
+                && let Some(name) = line.split(':').next()
+            {
+                bt_adapters.push(name.trim().to_string());
+            }
+        }
+    }
+    if bt_adapters.is_empty()
+        && let Ok(output) = Command::new("bluetoothctl").arg("list").output()
+    {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            if let Some(name) = line.split_whitespace().nth(1) {
+                bt_adapters.push(name.to_string());
+            }
+        }
+    }
+
+    // Monitors
+    let mut monitors = Vec::new();
+    let output = Command::new("xrandr")
+        .arg("--query")
+        .output()
+        .or_else(|_| Command::new("wlr-randr").output());
+
+    if let Ok(output) = output {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            if line.contains(" connected") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if !parts.is_empty() {
+                    let name = parts[0].to_string();
+                    monitors.push(name);
+                }
+            }
+        }
+    }
+
+    // Users
+    let mut system_users_count = 0;
+    let mut common_users_count = 0;
+    if let Ok(content) = std::fs::read_to_string("/etc/passwd") {
+        for line in content.lines() {
+            let parts: Vec<&str> = line.split(':').collect();
+            if parts.len() >= 3
+                && let Ok(uid) = parts[2].parse::<u32>()
+            {
+                if uid < 1000 {
+                    system_users_count += 1;
+                } else {
+                    common_users_count += 1;
+                }
+            }
+        }
+    }
+
+    // RAM Details
+    let mut ram_type = "Unknown".to_string();
+    let mut ram_config = "Unknown".to_string();
+    let mut ram_speed = "Unknown".to_string();
+    let ram_model = "Unknown".to_string();
+
+    if let Ok(output) = Command::new("dmidecode").arg("-t").arg("memory").output() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut sticks = Vec::new();
+        for line in stdout.lines() {
+            let line = line.trim();
+            if line.starts_with("Size:")
+                && !line.contains("No Module Installed")
+                && let Some(size) = line.split(':').nth(1)
+            {
+                sticks.push(size.trim().replace(" ", ""));
+            }
+            if line.starts_with("Type:")
+                && ram_type == "Unknown"
+                && let Some(t) = line.split(':').nth(1)
+            {
+                let t = t.trim();
+                if t != "Unknown" && !t.is_empty() {
+                    ram_type = t.to_string();
+                }
+            }
+            if (line.starts_with("Configured Memory Speed:") || line.starts_with("Speed:"))
+                && ram_speed == "Unknown"
+                && let Some(s) = line.split(':').nth(1)
+            {
+                let s = s.trim();
+                if s != "Unknown" && !s.is_empty() && !s.contains("Unknown") {
+                    ram_speed = s.to_string();
+                }
+            }
+        }
+        if !sticks.is_empty() {
+            ram_config = sticks.join("+");
+        }
+    }
+
+    Ok(SysInfoData {
+        hostname: System::host_name().unwrap_or_default(),
+        os: System::long_os_version().unwrap_or_default(),
+        kernel: System::kernel_version().unwrap_or_default(),
+        architecture: System::cpu_arch(),
+        uptime: format_duration(System::uptime()),
+        cpu_count: sys.cpus().len(),
+        cpu_model,
+        total_memory: sys.total_memory(),
+        used_memory: sys.used_memory(),
+        total_memory_readable,
+        used_memory_readable,
+        ram_type,
+        ram_model,
+        ram_config,
+        ram_speed,
+        physical_drives,
+        lan_adapters,
+        wifi_adapters,
+        bt_adapters,
+        monitors,
+        system_users_count,
+        common_users_count,
+    })
+}
+
 pub struct SysInfoCommand {
     pub format: OutputFormat,
 }
 
 impl ExecutableCommand for SysInfoCommand {
     fn execute(&self) -> Result<()> {
-        let mut sys = System::new_all();
-        sys.refresh_all();
-
-        // Memory in GB
-        let total_memory_gb = sys.total_memory() as f64 / 1_073_741_824.0;
-        let used_memory_gb = sys.used_memory() as f64 / 1_073_741_824.0;
-        let total_memory_readable = format!("{:.2} GB", total_memory_gb);
-        let used_memory_readable = format!("{:.2} GB", used_memory_gb);
-
-        // CPU Model
-        let cpu_model = sys
-            .cpus()
-            .first()
-            .map(|c| c.brand().to_string())
-            .unwrap_or_else(|| "Unknown".to_string());
-
-        // Physical Drives
-        let physical_drives = Command::new("lsblk")
-            .arg("-d")
-            .arg("-n")
-            .arg("-o")
-            .arg("TYPE")
-            .output()
-            .map(|o| {
-                String::from_utf8_lossy(&o.stdout)
-                    .lines()
-                    .filter(|l| l.trim() == "disk")
-                    .count()
-            })
-            .unwrap_or(0);
-
-        // Network Adapters
-        let mut lan_adapters = Vec::new();
-        let mut wifi_adapters = Vec::new();
-        if let Ok(entries) = std::fs::read_dir("/sys/class/net") {
-            for entry in entries.flatten() {
-                let name = entry.file_name().to_string_lossy().to_string();
-                if name == "lo" {
-                    continue;
-                }
-                let path = entry.path();
-                // Check if it's a physical device by looking for the 'device' symlink
-                if !path.join("device").exists() {
-                    continue;
-                }
-
-                let is_wifi = path.join("wireless").exists() || path.join("phy80211").exists();
-                if is_wifi {
-                    wifi_adapters.push(name);
-                } else {
-                    lan_adapters.push(name);
-                }
-            }
-        }
-
-        // BT Adapters
-        let mut bt_adapters = Vec::new();
-        if let Ok(output) = Command::new("hciconfig").output() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            for line in stdout.lines() {
-                if line.contains("hci")
-                    && line.contains(':')
-                    && let Some(name) = line.split(':').next()
-                {
-                    bt_adapters.push(name.trim().to_string());
-                }
-            }
-        }
-        if bt_adapters.is_empty()
-            && let Ok(output) = Command::new("bluetoothctl").arg("list").output()
-        {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            for line in stdout.lines() {
-                if let Some(name) = line.split_whitespace().nth(1) {
-                    bt_adapters.push(name.to_string());
-                }
-            }
-        }
-
-        // Monitors
-        let mut monitors = Vec::new();
-        let output = Command::new("xrandr")
-            .arg("--query")
-            .output()
-            .or_else(|_| Command::new("wlr-randr").output());
-
-        if let Ok(output) = output {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            for line in stdout.lines() {
-                if line.contains(" connected") {
-                    let parts: Vec<&str> = line.split_whitespace().collect();
-                    if !parts.is_empty() {
-                        let name = parts[0].to_string();
-                        // Try to get model from the next lines if possible
-                        monitors.push(name);
-                    }
-                }
-            }
-        }
-
-        // Users
-        let mut system_users_count = 0;
-        let mut common_users_count = 0;
-        if let Ok(content) = std::fs::read_to_string("/etc/passwd") {
-            for line in content.lines() {
-                let parts: Vec<&str> = line.split(':').collect();
-                if parts.len() >= 3
-                    && let Ok(uid) = parts[2].parse::<u32>()
-                {
-                    if uid < 1000 {
-                        system_users_count += 1;
-                    } else {
-                        common_users_count += 1;
-                    }
-                }
-            }
-        }
-
-        // RAM Type/Model (hard to get without root, try dmidecode if available)
-        let ram_type = "Unknown".to_string();
-        let ram_model = "Unknown".to_string();
-
-        let data = SysInfoData {
-            hostname: System::host_name().unwrap_or_default(),
-            os: System::long_os_version().unwrap_or_default(),
-            kernel: System::kernel_version().unwrap_or_default(),
-            architecture: System::cpu_arch(),
-            uptime: format_duration(System::uptime()),
-            cpu_count: sys.cpus().len(),
-            cpu_model,
-            total_memory: sys.total_memory(),
-            used_memory: sys.used_memory(),
-            total_memory_readable,
-            used_memory_readable,
-            ram_type,
-            ram_model,
-            physical_drives,
-            lan_adapters,
-            wifi_adapters,
-            bt_adapters,
-            monitors,
-            system_users_count,
-            common_users_count,
-        };
+        let data = get_sys_info_data()?;
 
         match self.format {
             OutputFormat::Table => {
@@ -284,7 +329,8 @@ impl ExecutableCommand for SysInfoCommand {
                 table.add_row(vec!["Total Memory", &data.total_memory_readable]);
                 table.add_row(vec!["Used Memory", &data.used_memory_readable]);
                 table.add_row(vec!["RAM Type", &data.ram_type]);
-                table.add_row(vec!["RAM Model", &data.ram_model]);
+                table.add_row(vec!["RAM Config", &data.ram_config]);
+                table.add_row(vec!["RAM Speed", &data.ram_speed]);
                 table.add_row(vec!["Physical Drives", &data.physical_drives.to_string()]);
                 table.add_row(vec!["LAN Adapters", &data.lan_adapters.join(", ")]);
                 table.add_row(vec!["WiFi Adapters", &data.wifi_adapters.join(", ")]);

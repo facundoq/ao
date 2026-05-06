@@ -38,11 +38,11 @@ Moving beyond `ao sec context` to active management.
 ### Tools to Wrap:
 - `semanage`, `setsebool`, `ausearch`
 
-## 4. Performance History (`ao monitor history`)
-`ao monitor` is currently live-only.
+## 4. Performance History (`ao overview history`)
+`ao overview` is currently live-only.
 
 ### Features:
-- `ao monitor history --last 24h`: Show average CPU/RAM/IO usage over a period.
+- `ao overview history --last 24h`: Show average CPU/RAM/IO usage over a period.
 - Requires a data collection backend.
 
 ### Implementation Strategy:
