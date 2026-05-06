@@ -17,6 +17,15 @@ fn test_shell_completions() {
         }
     }
 
+    let bash_check = Command::new("bash")
+        .arg("--version")
+        .output();
+
+    if bash_check.is_err() {
+        eprintln!("Warning: bash not found. Skipping shell completion tests.");
+        return;
+    }
+
     let output = Command::new("bash")
         .arg("tests/completions_test.sh")
         .output()
