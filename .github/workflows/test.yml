@@ -59,7 +59,7 @@ jobs:
         run: cargo build
 
       - name: Run Tests
-        run: cargo test --lib --bins
+        run: cargo test --bins
         
       - name: Run Integration Tests
         # Skip testcontainers tests in CI as it requires a docker daemon
