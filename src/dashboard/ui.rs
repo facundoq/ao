@@ -745,7 +745,15 @@ fn draw_users(f: &mut Frame, app: &App, area: Rect) {
         .skip(start)
         .take(users_items_per_page)
         .map(|(u, is_system)| {
-            let style = if *is_system {
+            let is_logged_in = app
+                .sessions
+                .iter()
+                .any(|s| s.username == *u && s.end == "still logged in");
+            let style = if is_logged_in {
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD)
+            } else if *is_system {
                 Style::default().fg(Color::DarkGray)
             } else {
                 Style::default().fg(Color::White)
