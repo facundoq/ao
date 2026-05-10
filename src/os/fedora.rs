@@ -10,40 +10,32 @@ impl PackageManager for Dnf {
         "DNF"
     }
 
+    fn cmd(&self) -> SystemCommand {
+        SystemCommand::new("dnf")
+    }
+
     fn update(&self) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(SystemCommand::new("dnf").arg("check-update")))
+        Ok(Box::new(self.cmd().arg("check-update")))
     }
 
     fn add(&self, packages: &[String]) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(
-            SystemCommand::new("dnf")
-                .arg("install")
-                .arg("-y")
-                .arg("--")
-                .args(packages),
+            self.cmd().arg("install").arg("-y").arg("--").args(packages),
         ))
     }
 
     fn del(&self, packages: &[String], _purge: bool) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(
-            SystemCommand::new("dnf")
-                .arg("remove")
-                .arg("-y")
-                .arg("--")
-                .args(packages),
+            self.cmd().arg("remove").arg("-y").arg("--").args(packages),
         ))
     }
 
     fn search(&self, query: &str) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(
-            SystemCommand::new("dnf").arg("search").arg("--").arg(query),
-        ))
+        Ok(Box::new(self.cmd().arg("search").arg("--").arg(query)))
     }
 
     fn ls(&self, _format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(
-            SystemCommand::new("dnf").arg("list").arg("--installed"),
-        ))
+        Ok(Box::new(self.cmd().arg("list").arg("--installed")))
     }
 
     fn get_installed_packages(&self) -> Result<Vec<String>> {

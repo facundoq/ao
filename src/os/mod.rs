@@ -124,7 +124,13 @@ pub struct PackageInfo {
 /// Abstracts system package management operations.
 pub trait PackageManager: Send + Sync {
     fn name(&self) -> &'static str;
-    fn update(&self) -> Result<Box<dyn ExecutableCommand>>;
+
+    /// Returns a new SystemCommand for the primary package manager binary.
+    fn cmd(&self) -> linux_generic::SystemCommand;
+
+    fn update(&self) -> Result<Box<dyn ExecutableCommand>> {
+        Ok(Box::new(self.cmd().arg("update")))
+    }
 
     fn add(&self, packages: &[String]) -> Result<Box<dyn ExecutableCommand>>;
     fn del(&self, packages: &[String], purge: bool) -> Result<Box<dyn ExecutableCommand>>;

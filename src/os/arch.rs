@@ -10,13 +10,17 @@ impl PackageManager for Pacman {
         "Pacman"
     }
 
+    fn cmd(&self) -> SystemCommand {
+        SystemCommand::new("pacman")
+    }
+
     fn update(&self) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(SystemCommand::new("pacman").arg("-Syu")))
+        Ok(Box::new(self.cmd().arg("-Syu")))
     }
 
     fn add(&self, packages: &[String]) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(
-            SystemCommand::new("pacman")
+            self.cmd()
                 .arg("-S")
                 .arg("--noconfirm")
                 .arg("--")
@@ -26,7 +30,7 @@ impl PackageManager for Pacman {
 
     fn del(&self, packages: &[String], _purge: bool) -> Result<Box<dyn ExecutableCommand>> {
         Ok(Box::new(
-            SystemCommand::new("pacman")
+            self.cmd()
                 .arg("-Rs")
                 .arg("--noconfirm")
                 .arg("--")
@@ -35,13 +39,11 @@ impl PackageManager for Pacman {
     }
 
     fn search(&self, query: &str) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(
-            SystemCommand::new("pacman").arg("-Ss").arg("--").arg(query),
-        ))
+        Ok(Box::new(self.cmd().arg("-Ss").arg("--").arg(query)))
     }
 
     fn ls(&self, _format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
-        Ok(Box::new(SystemCommand::new("pacman").arg("-Q")))
+        Ok(Box::new(self.cmd().arg("-Q")))
     }
 
     fn get_installed_packages(&self) -> Result<Vec<String>> {
