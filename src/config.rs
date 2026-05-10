@@ -19,7 +19,8 @@ pub struct UiConfig {
     pub preferred_format: OutputFormat,
     pub show_command: bool,
     pub use_colors: bool,
-    pub table_style: String, // e.g. "modern", "blank", "rounded"
+    pub table_style: String,
+    pub show_kernel_processes: bool,
 }
 
 impl Default for UiConfig {
@@ -29,6 +30,7 @@ impl Default for UiConfig {
             show_command: true,
             use_colors: true,
             table_style: "modern".to_string(),
+            show_kernel_processes: false,
         }
     }
 }
