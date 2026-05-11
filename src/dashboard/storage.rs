@@ -3,7 +3,7 @@ use crate::dashboard::utils::{format_bytes, make_bar};
 use ratatui::{
     Frame,
     layout::{Constraint, Rect},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     widgets::{Block, Borders, Cell, Row, Table},
 };
 
@@ -16,9 +16,10 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let disk_rows = app
         .disks
         .iter()
-        .skip(app.selected_index)
+        .enumerate()
+        .skip(app.scroll_offset)
         .take(items_per_page)
-        .map(|d| {
+        .map(|(i, d)| {
             let name = d.name().to_string_lossy().to_string();
             let is_physical = name.starts_with("/dev/sd")
                 || name.starts_with("/dev/nvme")
@@ -32,6 +33,16 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
                 .and_then(|v| v.checked_div(total))
                 .unwrap_or(0);
             let bar = make_bar(percent as u16, 20);
+
+            let style = if i == app.selected_index {
+                Style::default()
+                    .bg(Color::Yellow)
+                    .fg(Color::Black)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+            };
+
             Row::new(vec![
                 Cell::from(format!("{} {}", icon, name)),
                 Cell::from(d.mount_point().to_string_lossy().to_string()),
@@ -39,6 +50,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
                 Cell::from(format_bytes(total)),
                 Cell::from(format!("{:>3}% {}", percent, bar)),
             ])
+            .style(style)
         });
 
     let title = format!(" Storage [Page {}/{}] ", current_page, total_pages);

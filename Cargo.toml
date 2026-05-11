@@ -14,6 +14,10 @@ license = "AGPL-3.0-only"
 name = "ao"
 path = "src/main.rs"
 
+[lib]
+name = "ao_cli"
+path = "src/lib.rs"
+
 [dependencies]
 anyhow = "1.0.102"
 clap = { version = "4.6.0", features = ["derive"] }

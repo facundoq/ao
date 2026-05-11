@@ -330,6 +330,16 @@ Administrators can define defaults. If a user always prefers `/bin/zsh` for new 
 [user.add]
 default_shell = "/bin/zsh"
 default_groups = ["users"]
+
+[ui]
+show_kernel_processes = false
+show_user_threads = false
+process_sort = "Cpu"
+process_sort_descending = true
+process_use_tree_view = true
+process_tree_depth = 2
+process_current_user_only = false
+refresh_rate_ms = 250
 ```
 
 When `ao user add` executes, the parameter resolution order is:
@@ -398,10 +408,7 @@ The `ao dashboard` command provides a real-time, terminal-based monitoring and a
 The dashboard utilizes a decoupled architecture to ensure a responsive UI even during heavy system data processing:
 
 * **Separated Logic & Rendering**: The main event loop handles terminal events and tick intervals. All heavy system data processing (sorting, tree construction, memory aggregation) is offloaded to a background tick cycle. The UI `draw` calls strictly render pre-calculated data from the `App` state.
-* **Stratified Data Polling**: To minimize overhead, different metrics are polled at different frequencies:
-    * **Global System Data** (CPU usage, global RAM, Network speeds): Refreshed every **250ms**.
-    * **Tab-Specific Static Data** (Services list, Containers, Sessions): Refreshed every **250ms**.
-    * **Process-Heavy Data** (Sorting all processes, building parent-child tree, RSS calculation): Throttled to a **10-second** interval by default.
+    * **Stratified Data Polling**: Metrics are polled based on a global frequency (default **250ms**). This frequency can be adjusted in real-time using the `+` and `-` keys (200ms increments, 200ms minimum). The current rate is displayed in the dashboard header.
 * **Instant Feedback Mechanism**: While process data is normally throttled, any user input that changes filtering or sorting criteria triggers an **immediate** out-of-band data refresh to ensure the UI responds instantly to user commands.
 * **Memory Metric (RSS)**: To provide accurate physical memory usage without the performance penalty of calculating virtual memory sets, the dashboard implements a custom Resident Set Size (RSS) retrieval mechanism. It parses `/proc/[pid]/statm` directly to get actual resident pages, providing a true physical memory footprint for all processes.
 
@@ -410,7 +417,7 @@ The dashboard utilizes a decoupled architecture to ensure a responsive UI even d
 The dashboard layout is divided into four primary areas:
 
 1. **Header**: Provides global system identity, including hostname, detected distribution, AO version, and current system uptime.
-2. **Tabs Bar**: A navigable row of domain-specific tabs, each visually identified by a unique icon (🏠, 💽, ⚙, 👤, 🌐, 🛠, 🐳, 🌡, 📈).
+2. **Tabs Bar**: A navigable row of domain-specific tabs, each visually identified by a unique icon (🏠, ⚙, 💽, 👤, 🌐, 🛠, 🐳, 🌡, 📈).
 3. **Content Area**: The main interactive workspace. For tabs containing long datasets (Processes, Storage, Users, etc.), the content area provides **Page Indicators** (e.g., `[Page 2/15]`) in the block titles to assist in navigation.
 4. **Footer**: Displays a dynamic, context-aware hotkey guide.
 
@@ -419,11 +426,11 @@ The dashboard layout is divided into four primary areas:
 * **Overview (🏠)**: A dual-column summary view.
     * **Left Panel (20% width)**: Real-time gauges for RAM and Swap usage, global CPU usage, and individual core bars. Core bars align labels to the left and center the percentage value within the gauge.
     * **Right Panel (80% width)**: Top 10 CPU-consuming and Top 10 Memory-consuming processes (using individual RSS values).
-* **Storage (💽)**: Lists all block devices and mount points. Differentiates between physical disks (using 💽 icon) and virtual/other devices (using 💾 icon).
 * **Process (⚙)**: The primary resource management interface.
-    * **Tree View**: Toggled with `t`, shows hierarchical process relationships with aggregated (Total) CPU and Memory usage for subtrees.
-    * **Filtering**: Supports substring-based filtering (activated with `/`). Users can type a string, and only processes matching that name or command path will be displayed. It also supports toggling kernel process visibility (`k`) and own-user process filtering (`o`).
-    * **Depth Control**: Number keys `0-9` control the expansion depth of the tree view.
+    * **Tree View**: Toggled with `t`, shows hierarchical process relationships. Aggregation is depth-aware: parent nodes only show their own memory/CPU when children are expanded, while nodes at the edge of the current expansion depth show the total for their hidden subtrees. This prevents visual clutter while maintaining visibility of resource-heavy subtrees.
+    * **Filtering**: Supports substring-based filtering (activated with `/`). Users can type a string, and only processes matching that name or command path will be displayed. It also supports toggling kernel process visibility (`k`), own-user process filtering (`o`), and user-land thread visibility (`H`). Threads are hidden by default.
+    * **Depth Control**: Number keys `0-9` control the expansion depth of the tree view. Setting depth to `0` switches to a flat list view, while `1-9` sets the corresponding tree depth.
+* **Storage (💽)**: Lists all block devices and mount points. Differentiates between physical disks (using 💽 icon) and virtual/other devices (using 💾 icon).
 * **User (👤)**: Lists current login sessions and system users. Active users with current sessions are highlighted in **bold green**.
 * **Network (🌐)**: Monitors all network interfaces with real-time RX/TX speeds. Interfaces are categorized by type (📡 for Wifi, 🔗 for Ethernet, 🔄 for Loopback).
 * **Sensors (🌡)**: Real-time hardware temperature monitoring with an in-memory session maximum tracker.
@@ -433,7 +440,7 @@ The dashboard layout is divided into four primary areas:
 
 ### 7.4 Controls and Navigation
 
-* **Global**: `q` to quit, `Tab`/`Arrows` to switch tabs.
+* **Global**: `q` to quit, `Tab`/`Arrows` to switch tabs, `+/-` to change polling frequency.
 * **Navigation**: `Up`/`Down` for selection, `PgUp`/`PgDn` for faster scrolling.
 * **Process Contextual**: 
     * `i`: Sort by PID

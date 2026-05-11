@@ -22,9 +22,10 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
     let rows = sensors
         .iter()
-        .skip(app.selected_index)
+        .enumerate()
+        .skip(app.scroll_offset)
         .take(items_per_page)
-        .map(|s| {
+        .map(|(i, s)| {
             let label_lower = s.label.to_lowercase();
             let icon = if label_lower.contains("nvme") || label_lower.contains("disk") {
                 "💾"
@@ -49,7 +50,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
                 .get(&s.label)
                 .copied()
                 .unwrap_or(s.temperature);
-            let temp_style = if let Some(crit) = s.critical {
+            let mut temp_style = if let Some(crit) = s.critical {
                 if s.temperature >= crit {
                     Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
                 } else if s.temperature >= crit * 0.8 {
@@ -59,6 +60,19 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
                 }
             } else {
                 Style::default().fg(Color::Green)
+            };
+
+            if i == app.selected_index {
+                temp_style = Style::default();
+            }
+
+            let style = if i == app.selected_index {
+                Style::default()
+                    .bg(Color::Yellow)
+                    .fg(Color::Black)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
             };
 
             Row::new(vec![
@@ -71,6 +85,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
                         .unwrap_or_else(|| "N/A".to_string()),
                 ),
             ])
+            .style(style)
         });
 
     let title = format!(" Hardware Sensors [Page {}/{}] ", current_page, total_pages);

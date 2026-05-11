@@ -1,12 +1,10 @@
 use anyhow::{Context, Result};
+use ao_cli::cli::{Cli, CliCommand};
+use ao_cli::config;
+use ao_cli::dashboard;
+use ao_cli::os;
+use ao_cli::os::Domain;
 use clap::{CommandFactory, FromArgMatches};
-use cli::{Cli, CliCommand};
-use os::Domain;
-
-pub mod cli;
-pub mod config;
-pub mod dashboard;
-pub mod os;
 
 fn main() -> Result<()> {
     // 0. Load config

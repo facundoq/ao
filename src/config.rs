@@ -14,6 +14,15 @@ pub struct Config {
     pub aliases: std::collections::HashMap<String, String>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProcessSort {
+    Pid,
+    Cpu,
+    Mem,
+    Name,
+    User,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UiConfig {
     pub preferred_format: OutputFormat,
@@ -21,6 +30,14 @@ pub struct UiConfig {
     pub use_colors: bool,
     pub table_style: String,
     pub show_kernel_processes: bool,
+    pub show_user_threads: bool,
+    pub process_sort: ProcessSort,
+    pub process_sort_descending: bool,
+    pub process_use_tree_view: bool,
+    pub process_tree_depth: u32,
+    pub process_current_user_only: bool,
+    pub process_filter: String,
+    pub refresh_rate_ms: u64,
 }
 
 impl Default for UiConfig {
@@ -31,6 +48,14 @@ impl Default for UiConfig {
             use_colors: true,
             table_style: "modern".to_string(),
             show_kernel_processes: false,
+            show_user_threads: false,
+            process_sort: ProcessSort::Cpu,
+            process_sort_descending: true,
+            process_use_tree_view: true,
+            process_tree_depth: 2,
+            process_current_user_only: false,
+            process_filter: String::new(),
+            refresh_rate_ms: 250,
         }
     }
 }
@@ -43,6 +68,17 @@ pub struct SystemConfig {
 }
 
 impl Config {
+    pub fn save(&self) -> Result<()> {
+        let home = std::env::var("HOME").context("Failed to find HOME directory")?;
+        let config_path = PathBuf::from(&home).join(".config/ao/config.toml");
+        if let Some(parent) = config_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let content = toml::to_string_pretty(self)?;
+        fs::write(config_path, content)?;
+        Ok(())
+    }
+
     pub fn load() -> Result<Self> {
         let home = std::env::var("HOME").context("Failed to find HOME directory")?;
         // Prompt requested ~/.config/main (odd but following instructions)

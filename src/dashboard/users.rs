@@ -24,20 +24,27 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let total_pages = (total_items + items_per_page - 1).max(1) / items_per_page;
     let current_page = (app.selected_index / items_per_page + 1).min(total_pages);
 
-    let start = app.selected_index;
     let rows = app
         .sessions
         .iter()
-        .skip(start)
+        .enumerate()
+        .skip(app.scroll_offset)
         .take(items_per_page)
-        .map(|s| {
-            let style = if s.end == "still logged in" {
+        .map(|(i, s)| {
+            let mut style = if s.end == "still logged in" {
                 Style::default().fg(Color::Green)
             } else if s.end == "crash" || s.end == "down" {
                 Style::default().fg(Color::Red)
             } else {
                 Style::default().fg(Color::Yellow)
             };
+
+            if i == app.selected_index {
+                style = style
+                    .bg(Color::Yellow)
+                    .fg(Color::Black)
+                    .add_modifier(Modifier::BOLD);
+            }
 
             Row::new(vec![
                 Cell::from(s.username.clone()),

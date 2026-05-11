@@ -20,16 +20,24 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let rows = app
         .services
         .iter()
-        .skip(app.selected_index)
+        .enumerate()
+        .skip(app.scroll_offset)
         .take(items_per_page)
-        .map(|s| {
-            let style = if s.active == "active" {
+        .map(|(i, s)| {
+            let mut style = if s.active == "active" {
                 Style::default().fg(Color::Green)
             } else if s.active == "failed" {
                 Style::default().fg(Color::Red)
             } else {
                 Style::default().fg(Color::Yellow)
             };
+
+            if i == app.selected_index {
+                style = style
+                    .bg(Color::Yellow)
+                    .fg(Color::Black)
+                    .add_modifier(Modifier::BOLD);
+            }
 
             Row::new(vec![
                 Cell::from(s.name.clone()),

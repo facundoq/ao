@@ -4,7 +4,7 @@ use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Cell, Gauge, Paragraph, Row, Table},
+    widgets::{Block, Borders, Cell, Gauge, LineGauge, Paragraph, Row, Table},
 };
 
 pub fn draw(f: &mut Frame, app: &App, area: Rect) {
@@ -34,32 +34,35 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     // --- LEFT COLUMN ---
 
     // 1. RAM
-    let mem_used = app.system_info.used_memory();
     let mem_total = app.system_info.total_memory();
-    let mem_percent = mem_used
-        .checked_mul(100)
-        .and_then(|v| v.checked_div(mem_total))
-        .unwrap_or(0) as u16;
+    let mem_available = app.system_info.available_memory();
+    let mem_used = mem_total.saturating_sub(mem_available);
+    let mem_ratio = if mem_total > 0 {
+        mem_used as f64 / mem_total as f64
+    } else {
+        0.0
+    };
     let ram_title = format!(" RAM ({}) ", app.ram_config);
     let mem_gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL).title(ram_title))
         .gauge_style(Style::default().fg(Color::Green))
-        .percent(mem_percent)
-        .label(format!("{}%", mem_percent));
+        .ratio(mem_ratio)
+        .label(format!("{:.1}%", mem_ratio * 100.0));
     f.render_widget(mem_gauge, left_chunks[0]);
 
     // 2. Swap
     let swap_used = app.system_info.used_swap();
     let swap_total = app.system_info.total_swap();
-    let swap_percent = swap_used
-        .checked_mul(100)
-        .and_then(|v| v.checked_div(swap_total))
-        .unwrap_or(0) as u16;
+    let swap_ratio = if swap_total > 0 {
+        swap_used as f64 / swap_total as f64
+    } else {
+        0.0
+    };
     let swap_gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL).title(" Swap "))
         .gauge_style(Style::default().fg(Color::Magenta))
-        .percent(swap_percent)
-        .label(format!("{}%", swap_percent));
+        .ratio(swap_ratio)
+        .label(format!("{:.1}%", swap_ratio * 100.0));
     f.render_widget(swap_gauge, left_chunks[1]);
 
     // 3. Global CPU
@@ -67,7 +70,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let cpu_gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL).title(" CPU "))
         .gauge_style(Style::default().fg(Color::Rgb(255, 200, 150)))
-        .percent(cpu_usage as u16)
+        .ratio(cpu_usage as f64 / 100.0)
         .label(format!("{:.1}%", cpu_usage));
     f.render_widget(cpu_gauge, left_chunks[2]);
 
@@ -101,9 +104,9 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
                 row_chunks[0],
             );
 
-            let core_gauge = Gauge::default()
-                .gauge_style(Style::default().fg(Color::Rgb(255, 200, 150)))
-                .percent(usage as u16)
+            let core_gauge = LineGauge::default()
+                .filled_style(Style::default().fg(Color::Rgb(255, 200, 150)))
+                .ratio(usage as f64 / 100.0)
                 .label(format!("{:.1}%", usage));
             f.render_widget(core_gauge, row_chunks[1]);
         }
@@ -119,7 +122,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             Row::new(vec![
                 Cell::from(p.pid.to_string()),
                 Cell::from(p.user.clone()),
-                Cell::from(p.name.clone()),
+                Cell::from(p.executable.clone()),
                 Cell::from(format!("{:.1}%", p.cpu)),
                 Cell::from(format_bytes(p.memory)),
             ])
@@ -136,7 +139,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         ],
     )
     .header(
-        Row::new(vec!["PID", "User", "Name", "CPU%", "RSS"])
+        Row::new(vec!["PID", "User", "Executable", "CPU%", "RSS"])
             .style(Style::default().add_modifier(Modifier::BOLD)),
     )
     .block(
@@ -154,7 +157,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             Row::new(vec![
                 Cell::from(p.pid.to_string()),
                 Cell::from(p.user.clone()),
-                Cell::from(p.name.clone()),
+                Cell::from(p.executable.clone()),
                 Cell::from(format!("{:.1}%", p.cpu)),
                 Cell::from(format_bytes(p.memory)),
             ])
@@ -171,7 +174,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         ],
     )
     .header(
-        Row::new(vec!["PID", "User", "Name", "CPU%", "RSS"])
+        Row::new(vec!["PID", "User", "Executable", "CPU%", "RSS"])
             .style(Style::default().add_modifier(Modifier::BOLD)),
     )
     .block(

@@ -30,14 +30,22 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let rows = app
         .interfaces
         .iter()
-        .skip(app.selected_index)
+        .enumerate()
+        .skip(app.scroll_offset)
         .take(items_per_page)
-        .map(|i| {
-            let style = match i.state.to_lowercase().as_str() {
+        .map(|(idx, i)| {
+            let mut style = match i.state.to_lowercase().as_str() {
                 "up" => Style::default().fg(Color::Green),
                 "down" => Style::default().fg(Color::Red),
                 _ => Style::default().fg(Color::Yellow),
             };
+
+            if idx == app.selected_index {
+                style = style
+                    .bg(Color::Yellow)
+                    .fg(Color::Black)
+                    .add_modifier(Modifier::BOLD);
+            }
 
             let type_lower = i.interface_type.to_lowercase();
             let icon = if type_lower.contains("wifi") || type_lower.contains("wlan") {

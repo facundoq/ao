@@ -1,4 +1,5 @@
 use crate::config::Config;
+pub use crate::config::ProcessSort;
 use crate::dashboard::rss::{get_process_memory, get_rss};
 use crate::os::detector::DetectedSystem;
 use crate::os::{ContainerInfo, NetInterfaceInfo, SensorInfo, ServiceInfo, UserSessionInfo};
@@ -7,15 +8,6 @@ use std::time::{Duration, Instant};
 use sysinfo::{
     CpuRefreshKind, Disks, MemoryRefreshKind, Networks, Process, RefreshKind, System, Users,
 };
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ProcessSort {
-    Pid,
-    Cpu,
-    Mem,
-    Name,
-    User,
-}
 
 pub struct App<'a> {
     pub system_info: System,
@@ -26,6 +18,7 @@ pub struct App<'a> {
     pub tab_index: usize,
     pub tabs: Vec<&'static str>,
     pub selected_index: usize,
+    pub scroll_offset: usize,
 
     pub sessions: Vec<UserSessionInfo>,
     pub users: Vec<(String, bool)>,
@@ -53,6 +46,7 @@ pub struct App<'a> {
     pub tree_expansion_depth: u32,
     pub show_only_current_user: bool,
     pub hide_kernel_processes: bool,
+    pub show_user_threads: bool,
     pub total_rss: u64,
     pub process_tree: Vec<ProcessTreeNode>,
     pub top_cpu_processes: Vec<ProcessSummary>,
@@ -64,6 +58,29 @@ pub struct App<'a> {
     pub max_temps: HashMap<String, f32>,
     pub process_filter: String,
     pub is_filtering: bool,
+    pub tick_rate: Duration,
+
+    pub selected_process: Option<sysinfo::Pid>,
+    pub process_details: Option<ProcessDetails>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProcessResource {
+    pub name: String,
+    pub resource_type: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProcessDetails {
+    pub pid: sysinfo::Pid,
+    pub name: String,
+    pub threads: Vec<(String, String)>, // (tid, name)
+    pub resources: Vec<ProcessResource>,
+    pub filtered_resources: Vec<ProcessResource>,
+    pub selected_index: usize,
+    pub scroll_offset: usize,
+    pub filter: String,
+    pub is_searching: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -75,12 +92,16 @@ pub struct ProcessTreeNode {
     pub memory: u64,
     pub virt_mem: u64,
     pub shared_mem: u64,
+    pub thread_count: usize,
+    pub fd_count: usize,
     pub depth: u32,
     pub children: Vec<ProcessTreeNode>,
     pub total_cpu: f32,
     pub total_mem: u64,
     pub total_virt: u64,
     pub total_shared: u64,
+    pub total_threads: usize,
+    pub total_fds: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -93,6 +114,9 @@ pub struct ProcessSummary {
     pub shared_mem: u64,
     pub cpu: f32,
     pub command: String,
+    pub executable: String,
+    pub thread_count: usize,
+    pub fd_count: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -103,6 +127,8 @@ pub struct FlattenedTreeNode {
     pub mem: String,
     pub virt: String,
     pub shared: String,
+    pub threads: String,
+    pub fds: String,
     pub name: String,
     pub depth: u32,
 }
@@ -146,8 +172,8 @@ impl<'a> App<'a> {
             tab_index: 0,
             tabs: vec![
                 "Overview",
-                "Storage",
                 "Process",
+                "Storage",
                 "User",
                 "Network",
                 "Service",
@@ -156,6 +182,7 @@ impl<'a> App<'a> {
                 "Charts",
             ],
             selected_index: 0,
+            scroll_offset: 0,
             sessions: Vec::new(),
             users: Vec::new(),
             interfaces: Vec::new(),
@@ -173,12 +200,13 @@ impl<'a> App<'a> {
             last_tick_time: Instant::now(),
             prev_network_data,
             network_speeds: HashMap::new(),
-            process_sort: ProcessSort::Cpu,
-            sort_descending: true,
-            use_tree_view: true,
-            tree_expansion_depth: 2,
-            show_only_current_user: false,
+            process_sort: config.ui.process_sort,
+            sort_descending: config.ui.process_sort_descending,
+            use_tree_view: config.ui.process_use_tree_view,
+            tree_expansion_depth: config.ui.process_tree_depth,
+            show_only_current_user: config.ui.process_current_user_only,
             hide_kernel_processes: !config.ui.show_kernel_processes,
+            show_user_threads: config.ui.show_user_threads,
             total_rss: 0,
             process_tree: Vec::new(),
             top_cpu_processes: Vec::new(),
@@ -188,12 +216,139 @@ impl<'a> App<'a> {
             last_process_refresh: Instant::now() - Duration::from_secs(11),
             refresh_interval: Duration::from_secs(10),
             max_temps: HashMap::new(),
-            process_filter: String::new(),
+            process_filter: config.ui.process_filter,
             is_filtering: false,
+            tick_rate: Duration::from_millis(config.ui.refresh_rate_ms),
+            selected_process: None,
+            process_details: None,
         };
         app.refresh_users_list();
         app.on_tick();
         app
+    }
+
+    pub fn fetch_process_details(&mut self) {
+        let pid = match self.tab_index {
+            1 => {
+                if self.use_tree_view && self.tree_expansion_depth > 0 {
+                    self.flattened_tree
+                        .get(self.selected_index)
+                        .and_then(|node| node.pid.parse::<usize>().ok())
+                        .map(sysinfo::Pid::from)
+                } else {
+                    self.sorted_processes
+                        .get(self.selected_index)
+                        .map(|p| p.pid)
+                }
+            }
+            _ => None,
+        };
+
+        if let Some(pid) = pid {
+            let mut threads = Vec::new();
+            let mut resources = Vec::new();
+
+            // Fetch threads
+            if let Ok(entries) = std::fs::read_dir(format!("/proc/{}/task", pid)) {
+                for entry in entries.flatten() {
+                    let tid = entry.file_name().to_string_lossy().to_string();
+                    let comm_path = entry.path().join("comm");
+                    let name = std::fs::read_to_string(comm_path)
+                        .unwrap_or_else(|_| "unknown".to_string())
+                        .trim()
+                        .to_string();
+                    threads.push((tid, name));
+                }
+            }
+
+            // Fetch FDs
+            if let Ok(entries) = std::fs::read_dir(format!("/proc/{}/fd", pid)) {
+                for entry in entries.flatten() {
+                    if let Ok(target) = std::fs::read_link(entry.path()) {
+                        let target_str = target.to_string_lossy().to_string();
+                        let resource_type = if target_str.starts_with("socket:[") {
+                            "Socket".to_string()
+                        } else if target_str.starts_with("pipe:[") {
+                            "Pipe".to_string()
+                        } else if target_str.starts_with("anon_inode:") {
+                            "Anon".to_string()
+                        } else {
+                            "File".to_string()
+                        };
+                        resources.push(ProcessResource {
+                            name: target_str,
+                            resource_type,
+                        });
+                    }
+                }
+            }
+
+            let name = self
+                .system_info
+                .process(pid)
+                .map(|p| p.name().to_string_lossy().to_string())
+                .unwrap_or_else(|| "unknown".to_string());
+
+            let mut details = ProcessDetails {
+                pid,
+                name,
+                threads,
+                resources,
+                filtered_resources: Vec::new(),
+                selected_index: 0,
+                scroll_offset: 0,
+                filter: String::new(),
+                is_searching: false,
+            };
+            details.filtered_resources = details.resources.clone();
+            self.process_details = Some(details);
+        }
+    }
+
+    pub fn update_details_filter(&mut self) {
+        if let Some(ref mut details) = self.process_details {
+            let filter = details.filter.to_lowercase();
+            details.filtered_resources = details
+                .resources
+                .iter()
+                .filter(|r| {
+                    r.name.to_lowercase().contains(&filter)
+                        || r.resource_type.to_lowercase().contains(&filter)
+                })
+                .cloned()
+                .collect();
+            details.selected_index = 0;
+            details.scroll_offset = 0;
+        }
+    }
+
+    pub fn toggle_details_filter_mode(&mut self) {
+        if let Some(ref mut details) = self.process_details {
+            details.is_searching = !details.is_searching;
+        }
+    }
+
+    pub fn details_on_up(&mut self) {
+        if let Some(ref mut details) = self.process_details
+            && details.selected_index > 0
+        {
+            details.selected_index -= 1;
+            if details.selected_index < details.scroll_offset {
+                details.scroll_offset = details.selected_index;
+            }
+        }
+    }
+
+    pub fn details_on_down(&mut self) {
+        if let Some(ref mut details) = self.process_details {
+            let len = details.filtered_resources.len();
+            if len > 0 && details.selected_index < len.saturating_sub(1) {
+                details.selected_index += 1;
+                if details.selected_index >= details.scroll_offset + 20 {
+                    details.scroll_offset += 1;
+                }
+            }
+        }
     }
 
     pub fn refresh_users_list(&mut self) {
@@ -222,7 +377,7 @@ impl<'a> App<'a> {
             sysinfo::ProcessRefreshKind::everything(),
         );
         self.system_info.refresh_memory();
-        self.system_info.refresh_cpu_usage();
+        self.system_info.refresh_cpu_all();
         self.disks.refresh(true);
         self.networks.refresh(true);
         self.refresh_process_data(false);
@@ -235,8 +390,10 @@ impl<'a> App<'a> {
         }
 
         let mem_total = self.system_info.total_memory() as f64;
+        let mem_available = self.system_info.available_memory() as f64;
+        let mem_used_actual = mem_total - mem_available;
         let mem_percent = if mem_total > 0.0 {
-            (self.system_info.used_memory() as f64 / mem_total) * 100.0
+            (mem_used_actual / mem_total) * 100.0
         } else {
             0.0
         };
@@ -323,7 +480,7 @@ impl<'a> App<'a> {
             .sum();
         self.process_tree = self.calculate_process_tree();
 
-        let all_summaries = self.get_sorted_processes(); // Already filtered
+        let all_summaries = self.get_sorted_processes(false); // Unfiltered for Overview
 
         let mut top_cpu = all_summaries.clone();
         top_cpu.sort_by(|a, b| {
@@ -337,7 +494,7 @@ impl<'a> App<'a> {
         top_mem.sort_by_key(|p| std::cmp::Reverse(p.memory));
         self.top_mem_processes = top_mem.into_iter().take(10).collect();
 
-        self.sorted_processes = self.get_sorted_processes();
+        self.sorted_processes = self.get_sorted_processes(true); // Filtered for Tab
         self.flattened_tree = self.calculate_flattened_tree();
     }
 
@@ -348,11 +505,14 @@ impl<'a> App<'a> {
                 pid: node.pid,
                 name: node.name.clone(),
                 user: node.user.clone(),
-                memory: node.total_mem,
-                virt_mem: node.total_virt,
-                shared_mem: node.total_shared,
-                cpu: node.total_cpu,
+                memory: node.memory, // Changed from total_mem to be consistent with individual sort
+                virt_mem: node.virt_mem,
+                shared_mem: node.shared_mem,
+                cpu: node.cpu_usage, // Changed from total_cpu to be consistent with individual sort
                 command: "".to_string(),
+                executable: "".to_string(),
+                thread_count: 0,
+                fd_count: 0,
             });
             for child in &node.children {
                 flatten(child, out);
@@ -376,11 +536,14 @@ impl<'a> App<'a> {
                 pid: node.pid,
                 name: node.name.clone(),
                 user: node.user.clone(),
-                memory: node.total_mem,
-                virt_mem: node.total_virt,
-                shared_mem: node.total_shared,
-                cpu: node.total_cpu,
+                memory: node.memory,
+                virt_mem: node.virt_mem,
+                shared_mem: node.shared_mem,
+                cpu: node.cpu_usage,
                 command: "".to_string(),
+                executable: "".to_string(),
+                thread_count: 0,
+                fd_count: 0,
             });
             for child in &node.children {
                 flatten(child, out);
@@ -393,13 +556,16 @@ impl<'a> App<'a> {
         all.into_iter().take(count).collect()
     }
 
-    pub fn get_sorted_processes(&self) -> Vec<ProcessSummary> {
+    pub fn get_sorted_processes(&self, apply_filter: bool) -> Vec<ProcessSummary> {
         let current_uid = unsafe { libc::getuid() };
         let mut processes: Vec<&Process> = self
             .system_info
             .processes()
             .values()
             .filter(|p| {
+                if !self.show_user_threads && p.thread_kind().is_some() {
+                    return false;
+                }
                 if self.show_only_current_user {
                     if let Some(uid) = p.user_id() {
                         let uid_u32: u32 = uid.to_string().parse().unwrap_or(u32::MAX);
@@ -421,7 +587,7 @@ impl<'a> App<'a> {
                         return false;
                     }
                 }
-                if !self.process_filter.is_empty() {
+                if apply_filter && !self.process_filter.is_empty() {
                     let filter = self.process_filter.to_lowercase();
                     let name = p.name().to_string_lossy().to_lowercase();
                     let cmd = p
@@ -482,9 +648,17 @@ impl<'a> App<'a> {
                     shared_mem: mem.shared,
                     cpu: p.cpu_usage() / self.system_info.cpus().len() as f32,
                     command: p
+                        .cmd()
+                        .iter()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                    executable: p
                         .exe()
                         .map(|e| e.to_string_lossy().to_string())
                         .unwrap_or_else(|| "".to_string()),
+                    thread_count: 0,
+                    fd_count: 0,
                 }
             })
             .collect()
@@ -496,6 +670,9 @@ impl<'a> App<'a> {
         let mut filtered = HashMap::new();
         let current_uid = unsafe { libc::getuid() };
         for (pid, process) in processes {
+            if !self.show_user_threads && process.thread_kind().is_some() {
+                continue;
+            }
             if self.show_only_current_user {
                 if let Some(uid) = process.user_id() {
                     let uid_u32: u32 = uid.to_string().parse().unwrap_or(u32::MAX);
@@ -543,6 +720,12 @@ impl<'a> App<'a> {
                 root_pids.push(*pid);
             }
         }
+
+        struct SortConfig {
+            by: ProcessSort,
+            descending: bool,
+        }
+
         fn build_node(
             pid: sysinfo::Pid,
             depth: u32,
@@ -550,19 +733,27 @@ impl<'a> App<'a> {
             tree: &HashMap<sysinfo::Pid, Vec<sysinfo::Pid>>,
             users: &Users,
             cpu_count: f32,
+            sort: &SortConfig,
         ) -> ProcessTreeNode {
             let process = processes[&pid];
             let mut children = Vec::new();
-            let mut total_cpu = process.cpu_usage() / cpu_count;
             let mem = get_process_memory(pid);
+            let mut total_cpu = process.cpu_usage() / cpu_count;
             let mut total_mem = mem.rss;
             let mut total_virt = mem.virt;
             let mut total_shared = mem.shared;
 
             if let Some(child_pids) = tree.get(&pid) {
                 for &child_pid in child_pids {
-                    let child_node =
-                        build_node(child_pid, depth + 1, processes, tree, users, cpu_count);
+                    let child_node = build_node(
+                        child_pid,
+                        depth + 1,
+                        processes,
+                        tree,
+                        users,
+                        cpu_count,
+                        sort,
+                    );
                     total_cpu += child_node.total_cpu;
                     total_mem += child_node.total_mem;
                     total_virt += child_node.total_virt;
@@ -570,11 +761,28 @@ impl<'a> App<'a> {
                     children.push(child_node);
                 }
             }
+
+            // Sort children
+            children.sort_by(|a, b| {
+                let res = match sort.by {
+                    ProcessSort::Pid => a.pid.cmp(&b.pid),
+                    ProcessSort::Cpu => a
+                        .total_cpu
+                        .partial_cmp(&b.total_cpu)
+                        .unwrap_or(std::cmp::Ordering::Equal),
+                    ProcessSort::Mem => a.total_mem.cmp(&b.total_mem),
+                    ProcessSort::Name => a.name.cmp(&b.name),
+                    ProcessSort::User => a.user.cmp(&b.user),
+                };
+                if sort.descending { res.reverse() } else { res }
+            });
+
             let user_name = process
                 .user_id()
                 .and_then(|uid| users.get_user_by_id(uid))
                 .map(|u| u.name().to_string())
                 .unwrap_or_else(|| "unknown".to_string());
+
             ProcessTreeNode {
                 pid,
                 name: process.name().to_string_lossy().to_string(),
@@ -583,14 +791,24 @@ impl<'a> App<'a> {
                 memory: mem.rss,
                 virt_mem: mem.virt,
                 shared_mem: mem.shared,
+                thread_count: 0,
+                fd_count: 0,
                 depth,
                 children,
                 total_cpu,
                 total_mem,
                 total_virt,
                 total_shared,
+                total_threads: 0,
+                total_fds: 0,
             }
         }
+
+        let sort_config = SortConfig {
+            by: self.process_sort,
+            descending: self.sort_descending,
+        };
+
         let mut root_nodes = Vec::new();
         for pid in root_pids {
             root_nodes.push(build_node(
@@ -600,12 +818,25 @@ impl<'a> App<'a> {
                 &tree,
                 &self.users_list,
                 cpu_count,
+                &sort_config,
             ));
         }
         root_nodes.sort_by(|a, b| {
-            b.total_cpu
-                .partial_cmp(&a.total_cpu)
-                .unwrap_or(std::cmp::Ordering::Equal)
+            let res = match self.process_sort {
+                ProcessSort::Pid => a.pid.cmp(&b.pid),
+                ProcessSort::Cpu => a
+                    .total_cpu
+                    .partial_cmp(&b.total_cpu)
+                    .unwrap_or(std::cmp::Ordering::Equal),
+                ProcessSort::Mem => a.total_mem.cmp(&b.total_mem),
+                ProcessSort::Name => a.name.cmp(&b.name),
+                ProcessSort::User => a.user.cmp(&b.user),
+            };
+            if self.sort_descending {
+                res.reverse()
+            } else {
+                res
+            }
         });
         root_nodes
     }
@@ -616,35 +847,28 @@ impl<'a> App<'a> {
         fn flatten_tree(node: &ProcessTreeNode, max_depth: u32, rows: &mut Vec<FlattenedTreeNode>) {
             let indent = "  ".repeat(node.depth as usize);
             let prefix = if node.depth > 0 { "└─ " } else { "" };
-            let cpu_str = if node.depth < max_depth && !node.children.is_empty() {
-                format!("({:.1}%)", node.total_cpu * 100.0)
+
+            let is_expanded = node.depth + 1 < max_depth;
+            let has_children = !node.children.is_empty();
+            let show_total = !is_expanded && has_children;
+
+            let cpu_str = if show_total {
+                format!("{:.1}%", node.total_cpu)
             } else {
-                format!("{:.1}%", node.cpu_usage * 100.0)
+                format!("{:.1}%", node.cpu_usage)
             };
-            let mem_str = if node.depth < max_depth && !node.children.is_empty() {
-                format!(
-                    "{} ({})",
-                    format_bytes(node.memory),
-                    format_bytes(node.total_mem)
-                )
+            let mem_str = if show_total {
+                format_bytes(node.total_mem)
             } else {
                 format_bytes(node.memory)
             };
-            let virt_str = if node.depth < max_depth && !node.children.is_empty() {
-                format!(
-                    "{} ({})",
-                    format_bytes(node.virt_mem),
-                    format_bytes(node.total_virt)
-                )
+            let virt_str = if show_total {
+                format_bytes(node.total_virt)
             } else {
                 format_bytes(node.virt_mem)
             };
-            let shared_str = if node.depth < max_depth && !node.children.is_empty() {
-                format!(
-                    "{} ({})",
-                    format_bytes(node.shared_mem),
-                    format_bytes(node.total_shared)
-                )
+            let shared_str = if show_total {
+                format_bytes(node.total_shared)
             } else {
                 format_bytes(node.shared_mem)
             };
@@ -656,6 +880,8 @@ impl<'a> App<'a> {
                 mem: mem_str,
                 virt: virt_str,
                 shared: shared_str,
+                threads: "".to_string(),
+                fds: "".to_string(),
                 name: format!("{}{}{}", indent, prefix, node.name),
                 depth: node.depth,
             });
@@ -673,14 +899,14 @@ impl<'a> App<'a> {
 
     pub fn get_current_list_len(&self) -> usize {
         match self.tab_index {
-            1 => self.disks.len(),
-            2 => {
-                if self.use_tree_view {
+            1 => {
+                if self.use_tree_view && self.tree_expansion_depth > 0 {
                     self.flattened_tree.len()
                 } else {
                     self.sorted_processes.len()
                 }
             }
+            2 => self.disks.len(),
             3 => self.sessions.len(),
             4 => self.interfaces.len(),
             5 => self.services.len(),
@@ -694,6 +920,7 @@ impl<'a> App<'a> {
     pub fn next_tab(&mut self) {
         self.tab_index = (self.tab_index + 1) % self.tabs.len();
         self.selected_index = 0;
+        self.scroll_offset = 0;
     }
     pub fn prev_tab(&mut self) {
         if self.tab_index > 0 {
@@ -702,16 +929,24 @@ impl<'a> App<'a> {
             self.tab_index = self.tabs.len() - 1;
         }
         self.selected_index = 0;
+        self.scroll_offset = 0;
     }
     pub fn on_up(&mut self) {
         if self.selected_index > 0 {
             self.selected_index -= 1;
+            if self.selected_index < self.scroll_offset {
+                self.scroll_offset = self.selected_index;
+            }
         }
     }
     pub fn on_down(&mut self) {
         let len = self.get_current_list_len();
         if len > 0 && self.selected_index < len.saturating_sub(1) {
             self.selected_index += 1;
+            // Simple heuristic: if we are at the bottom of what we think is a page, scroll
+            if self.selected_index >= self.scroll_offset + 20 {
+                self.scroll_offset += 1;
+            }
         }
     }
     pub fn on_page_up(&mut self) {
@@ -721,6 +956,7 @@ impl<'a> App<'a> {
         } else {
             self.selected_index = 0;
         }
+        self.scroll_offset = self.selected_index;
     }
     pub fn on_page_down(&mut self) {
         let len = self.get_current_list_len();
@@ -728,6 +964,76 @@ impl<'a> App<'a> {
             let items_per_page = 20;
             let max_idx = len.saturating_sub(1);
             self.selected_index = (self.selected_index + items_per_page).min(max_idx);
+            self.scroll_offset = self.selected_index;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::os::detector::detect_system;
+
+    fn setup_test_app() -> App<'static> {
+        // We need a DetectedSystem, but we don't want to actually detect it if possible.
+        // For now, let's just use the real one if we are on Linux, or bail.
+        let system = Box::leak(Box::new(detect_system().unwrap()));
+        App::new(system)
+    }
+
+    #[test]
+    fn test_tab_navigation() {
+        let mut app = setup_test_app();
+        assert_eq!(app.tab_index, 0);
+        app.next_tab();
+        assert_eq!(app.tab_index, 1);
+        app.selected_index = 10; // Mock some selection
+        app.scroll_offset = 5;
+        app.next_tab();
+        assert_eq!(app.tab_index, 2);
+        assert_eq!(app.selected_index, 0); // Should reset
+        assert_eq!(app.scroll_offset, 0); // Should reset
+        app.prev_tab();
+        assert_eq!(app.tab_index, 1);
+    }
+
+    #[test]
+    fn test_selection_logic() {
+        let mut app = setup_test_app();
+        app.tab_index = 1; // Processes
+        // Mock some processes
+        app.sorted_processes = vec![
+            ProcessSummary {
+                pid: sysinfo::Pid::from(1),
+                name: "test".into(),
+                user: "user".into(),
+                memory: 0,
+                virt_mem: 0,
+                shared_mem: 0,
+                cpu: 0.0,
+                command: "".into(),
+                executable: "".into(),
+                thread_count: 0,
+                fd_count: 0,
+            };
+            50
+        ];
+
+        assert_eq!(app.selected_index, 0);
+        app.on_down();
+        assert_eq!(app.selected_index, 1);
+        app.on_up();
+        assert_eq!(app.selected_index, 0);
+
+        // Test scrolling heuristic
+        for _ in 0..25 {
+            app.on_down();
+        }
+        assert_eq!(app.selected_index, 25);
+        assert!(app.scroll_offset > 0);
+
+        app.on_page_up();
+        assert_eq!(app.selected_index, 5);
+        assert_eq!(app.scroll_offset, 5);
     }
 }

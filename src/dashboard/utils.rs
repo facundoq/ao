@@ -29,11 +29,12 @@ pub fn format_bytes(bytes: u64) -> String {
 }
 
 pub fn make_bar(percent: u16, width: u16) -> String {
-    let filled = (percent as f32 / 100.0 * width as f32).round() as u16;
+    let p = (percent as f32 / 100.0).clamp(0.0, 1.0);
+    let filled = (p * width as f32).round() as u16;
     let mut bar = String::from("[");
     for i in 0..width {
         if i < filled {
-            bar.push('■');
+            bar.push('█');
         } else {
             bar.push(' ');
         }

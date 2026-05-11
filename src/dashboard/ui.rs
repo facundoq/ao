@@ -26,7 +26,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     draw_footer(f, app, chunks[3]);
 }
 
-fn draw_header(f: &mut Frame, _app: &App, area: Rect) {
+fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     let hostname = System::host_name().unwrap_or_else(|| "Unknown".to_string());
     let uptime = format_uptime(System::uptime());
     let distro_name = if let Ok(distro) = crate::os::detector::Distro::detect() {
@@ -58,6 +58,11 @@ fn draw_header(f: &mut Frame, _app: &App, area: Rect) {
             format!(" Uptime: {} ", uptime),
             Style::default().fg(Color::Yellow),
         ),
+        Span::raw(" | "),
+        Span::styled(
+            format!(" Freq: {}ms ", app.tick_rate.as_millis()),
+            Style::default().fg(Color::Cyan),
+        ),
     ])];
 
     f.render_widget(
@@ -67,7 +72,7 @@ fn draw_header(f: &mut Frame, _app: &App, area: Rect) {
 }
 
 fn draw_tabs(f: &mut Frame, app: &App, area: Rect) {
-    let icons = ["🏠", "💽", "⚙", "👤", "🌐", "🛠", "🐳", "🌡", "📈"];
+    let icons = ["🏠", "⚙", "💽", "👤", "🌐", "🛠", "🐳", "🌡", "📈"];
     let titles: Vec<Line> = app
         .tabs
         .iter()
@@ -93,6 +98,11 @@ fn draw_tabs(f: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
+    if let Some(details) = &app.process_details {
+        super::processes::draw_full_details(f, app, details, area);
+        return;
+    }
+
     if app.get_current_list_len() == 0 && app.tab_index != 0 && app.tab_index != 8 {
         f.render_widget(
             Paragraph::new("Loading...")
@@ -104,8 +114,8 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
 
     match app.tab_index {
         0 => super::overview::draw(f, app, area),
-        1 => super::storage::draw(f, app, area),
-        2 => super::processes::draw(f, app, area),
+        1 => super::processes::draw(f, app, area),
+        2 => super::storage::draw(f, app, area),
         3 => super::users::draw(f, app, area),
         4 => super::network::draw(f, app, area),
         5 => super::services::draw(f, app, area),
@@ -123,49 +133,73 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
     let mut spans = vec![
         Span::styled("[q]", Style::default().add_modifier(Modifier::BOLD)),
         Span::raw(" Quit | "),
-        Span::styled(
-            "[Tab/Arrows]",
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(" Tabs"),
     ];
 
-    if app.tab_index != 0 {
-        spans.push(Span::raw(" | "));
+    if app.process_details.is_some() {
         spans.push(Span::styled(
-            "[PgUp/PgDn]",
+            "[Esc]",
             Style::default().add_modifier(Modifier::BOLD),
         ));
-        spans.push(Span::raw(" Scroll"));
-    }
-
-    if app.tab_index == 2 {
-        spans.push(Span::raw(" | "));
-        spans.push(Span::styled(
-            "[i/c/m/n/u]",
-            Style::default().add_modifier(Modifier::BOLD),
-        ));
-        spans.push(Span::raw(" Sort | "));
-        spans.push(Span::styled(
-            "[o]",
-            Style::default().add_modifier(Modifier::BOLD),
-        ));
-        spans.push(Span::raw(" Own | "));
-        spans.push(Span::styled(
-            "[k]",
-            Style::default().add_modifier(Modifier::BOLD),
-        ));
-        spans.push(Span::raw(" Kernel | "));
+        spans.push(Span::raw(" Close | "));
         spans.push(Span::styled(
             "[/]",
             Style::default().add_modifier(Modifier::BOLD),
         ));
-        spans.push(Span::raw(" Filter | "));
+        spans.push(Span::raw(" Search | "));
         spans.push(Span::styled(
-            "[0-9]",
+            "[Arrows]",
             Style::default().add_modifier(Modifier::BOLD),
         ));
-        spans.push(Span::raw(" Depth"));
+        spans.push(Span::raw(" Scroll"));
+    } else {
+        spans.push(Span::styled(
+            "[Tab/Arrows]",
+            Style::default().add_modifier(Modifier::BOLD),
+        ));
+        spans.push(Span::raw(" Tabs"));
+
+        if app.tab_index != 0 {
+            spans.push(Span::raw(" | "));
+            spans.push(Span::styled(
+                "[PgUp/PgDn]",
+                Style::default().add_modifier(Modifier::BOLD),
+            ));
+            spans.push(Span::raw(" Scroll"));
+        }
+
+        if app.tab_index == 1 {
+            spans.push(Span::raw(" | "));
+            spans.push(Span::styled(
+                "[i/c/m/n/u]",
+                Style::default().add_modifier(Modifier::BOLD),
+            ));
+            spans.push(Span::raw(" Sort | "));
+            spans.push(Span::styled(
+                "[o]",
+                Style::default().add_modifier(Modifier::BOLD),
+            ));
+            spans.push(Span::raw(" Own | "));
+            spans.push(Span::styled(
+                "[H]",
+                Style::default().add_modifier(Modifier::BOLD),
+            ));
+            spans.push(Span::raw(" Threads | "));
+            spans.push(Span::styled(
+                "[k]",
+                Style::default().add_modifier(Modifier::BOLD),
+            ));
+            spans.push(Span::raw(" Kernel | "));
+            spans.push(Span::styled(
+                "[/]",
+                Style::default().add_modifier(Modifier::BOLD),
+            ));
+            spans.push(Span::raw(" Filter | "));
+            spans.push(Span::styled(
+                "[0-9]",
+                Style::default().add_modifier(Modifier::BOLD),
+            ));
+            spans.push(Span::raw(" Depth"));
+        }
     }
 
     f.render_widget(

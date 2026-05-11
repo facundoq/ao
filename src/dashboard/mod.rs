@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::os::detector::DetectedSystem;
 use anyhow::Result;
 use crossterm::{
@@ -18,7 +19,7 @@ pub mod rss;
 mod sensors;
 mod services;
 mod storage;
-mod ui;
+pub mod ui;
 mod users;
 pub mod utils;
 mod virtualization;
@@ -50,7 +51,6 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut A
 where
     <B as ratatui::backend::Backend>::Error: std::error::Error + Send + Sync + 'static,
 {
-    let tick_rate = Duration::from_millis(250);
     let mut last_tick = Instant::now();
     loop {
         terminal
@@ -60,11 +60,44 @@ where
         if event::poll(Duration::from_millis(100))?
             && let Event::Key(key) = event::read()?
         {
-            if app.is_filtering {
+            if let Some(ref mut details) = app.process_details {
+                if details.is_searching {
+                    match key.code {
+                        KeyCode::Enter | KeyCode::Esc => {
+                            details.is_searching = false;
+                        }
+                        KeyCode::Backspace => {
+                            details.filter.pop();
+                            app.update_details_filter();
+                        }
+                        KeyCode::Char(c) => {
+                            details.filter.push(c);
+                            app.update_details_filter();
+                        }
+                        _ => {}
+                    }
+                } else {
+                    match key.code {
+                        KeyCode::Esc => {
+                            app.process_details = None;
+                        }
+                        KeyCode::Char('/') => {
+                            details.is_searching = true;
+                        }
+                        KeyCode::Up | KeyCode::Char('k') => app.details_on_up(),
+                        KeyCode::Down | KeyCode::Char('j') => app.details_on_down(),
+                        _ => {}
+                    }
+                }
+            } else if app.is_filtering {
                 match key.code {
                     KeyCode::Enter | KeyCode::Esc => {
                         app.is_filtering = false;
                         app.refresh_process_data(true);
+                        // Save config on filter exit
+                        let mut config = Config::load().unwrap_or_default();
+                        config.ui.process_filter = app.process_filter.clone();
+                        let _ = config.save();
                     }
                     KeyCode::Backspace => {
                         app.process_filter.pop();
@@ -79,7 +112,13 @@ where
             } else {
                 match key.code {
                     KeyCode::Char('q') => return Ok(()),
-                    KeyCode::Char('/') if app.tab_index == 2 => {
+                    KeyCode::Esc => {
+                        app.process_details = None;
+                    }
+                    KeyCode::Enter if app.tab_index == 1 => {
+                        app.fetch_process_details();
+                    }
+                    KeyCode::Char('/') if app.tab_index == 1 => {
                         app.is_filtering = true;
                     }
                     KeyCode::Tab | KeyCode::Right => app.next_tab(),
@@ -89,11 +128,6 @@ where
                         app.use_tree_view = !app.use_tree_view;
                         app.refresh_process_data(true);
                     }
-                    KeyCode::Char('0') => {
-                        app.tree_expansion_depth = 100;
-                        app.use_tree_view = true;
-                        app.refresh_process_data(true);
-                    }
                     KeyCode::Char(c) if c.is_ascii_digit() => {
                         app.tree_expansion_depth = c.to_digit(10).unwrap();
                         app.use_tree_view = true;
@@ -101,6 +135,10 @@ where
                     }
                     KeyCode::Char('o') => {
                         app.show_only_current_user = !app.show_only_current_user;
+                        app.refresh_process_data(true);
+                    }
+                    KeyCode::Char('H') | KeyCode::Char('h') => {
+                        app.show_user_threads = !app.show_user_threads;
                         app.refresh_process_data(true);
                     }
                     KeyCode::Char('k') => {
@@ -142,11 +180,22 @@ where
                         app.sort_descending = !app.sort_descending;
                         app.refresh_process_data(true);
                     }
+                    KeyCode::Char('+') | KeyCode::Char('=') => {
+                        app.tick_rate = app.tick_rate.saturating_add(Duration::from_millis(200));
+                    }
+                    KeyCode::Char('-') | KeyCode::Char('_') => {
+                        let new_rate = app.tick_rate.saturating_sub(Duration::from_millis(200));
+                        if new_rate >= Duration::from_millis(200) {
+                            app.tick_rate = new_rate;
+                        } else {
+                            app.tick_rate = Duration::from_millis(200);
+                        }
+                    }
                     _ => {}
                 }
             }
         }
-        if last_tick.elapsed() >= tick_rate {
+        if last_tick.elapsed() >= app.tick_rate {
             app.on_tick();
             last_tick = Instant::now();
         }
