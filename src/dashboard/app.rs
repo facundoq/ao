@@ -62,6 +62,8 @@ pub struct App<'a> {
     pub last_process_refresh: Instant,
     pub refresh_interval: Duration,
     pub max_temps: HashMap<String, f32>,
+    pub process_filter: String,
+    pub is_filtering: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -186,6 +188,8 @@ impl<'a> App<'a> {
             last_process_refresh: Instant::now() - Duration::from_secs(11),
             refresh_interval: Duration::from_secs(10),
             max_temps: HashMap::new(),
+            process_filter: String::new(),
+            is_filtering: false,
         };
         app.refresh_users_list();
         app.on_tick();
@@ -417,6 +421,17 @@ impl<'a> App<'a> {
                         return false;
                     }
                 }
+                if !self.process_filter.is_empty() {
+                    let filter = self.process_filter.to_lowercase();
+                    let name = p.name().to_string_lossy().to_lowercase();
+                    let cmd = p
+                        .exe()
+                        .map(|e| e.to_string_lossy().to_lowercase())
+                        .unwrap_or_default();
+                    if !name.contains(&filter) && !cmd.contains(&filter) {
+                        return false;
+                    }
+                }
                 true
             })
             .collect();
@@ -499,6 +514,17 @@ impl<'a> App<'a> {
                 if let Some(ppid) = process.parent()
                     && ppid.as_u32() == 2
                 {
+                    continue;
+                }
+            }
+            if !self.process_filter.is_empty() {
+                let filter = self.process_filter.to_lowercase();
+                let name = process.name().to_string_lossy().to_lowercase();
+                let cmd = process
+                    .exe()
+                    .map(|e| e.to_string_lossy().to_lowercase())
+                    .unwrap_or_default();
+                if !name.contains(&filter) && !cmd.contains(&filter) {
                     continue;
                 }
             }
@@ -655,7 +681,7 @@ impl<'a> App<'a> {
                     self.sorted_processes.len()
                 }
             }
-            3 => self.sessions.len().max(self.users.len()),
+            3 => self.sessions.len(),
             4 => self.interfaces.len(),
             5 => self.services.len(),
             6 => self.containers.len(),

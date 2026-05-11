@@ -15,10 +15,15 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let mut sensors = app.sensors.clone();
     sensors.sort_by(|a, b| a.label.cmp(&b.label));
 
+    let items_per_page = area.height.saturating_sub(4) as usize;
+    let total_items = sensors.len();
+    let total_pages = (total_items + items_per_page - 1).max(1) / items_per_page;
+    let current_page = (app.selected_index / items_per_page + 1).min(total_pages);
+
     let rows = sensors
         .iter()
         .skip(app.selected_index)
-        .take(area.height.saturating_sub(4) as usize)
+        .take(items_per_page)
         .map(|s| {
             let label_lower = s.label.to_lowercase();
             let icon = if label_lower.contains("nvme") || label_lower.contains("disk") {
@@ -68,6 +73,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             ])
         });
 
+    let title = format!(" Hardware Sensors [Page {}/{}] ", current_page, total_pages);
     let table = Table::new(
         rows,
         [
@@ -78,10 +84,6 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         ],
     )
     .header(header)
-    .block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title(" Hardware Sensors "),
-    );
+    .block(Block::default().borders(Borders::ALL).title(title));
     f.render_widget(table, area);
 }

@@ -395,42 +395,55 @@ The `ao dashboard` command provides a real-time, terminal-based monitoring and a
 
 ### 7.1 Architecture & Performance
 
-To maintain the "Zero Overhead" tenet while providing a rich interactive experience, the dashboard utilizes a decoupled architecture:
+The dashboard utilizes a decoupled architecture to ensure a responsive UI even during heavy system data processing:
 
-* **Separated Logic & Rendering**: The main event loop (in `mod.rs`) handles terminal events and tick intervals. All heavy system data processing, sorting, and tree construction are offloaded to an `on_tick` cycle, while the UI `draw` calls strictly render pre-calculated data from the `App` state.
-* **Smart Throttling**: System-wide data polling is stratified. High-frequency data (like global CPU and network speeds) refreshes every **250ms**, while computationally expensive process-tree construction and sorting are throttled to a **10-second** interval by default.
-* **RSS Memory Reporting**: To avoid the massive I/O overhead of virtual memory calculations, the dashboard implements a custom Resident Set Size (RSS) retrieval mechanism. By reading `/proc/[pid]/statm` directly, it provides accurate physical memory footprints with O(1) file access.
-* **CPU Normalization**: Individual process CPU usage is normalized across the total number of system cores. A process using 100% of a single core on a 4-core system is reported as 25% total system usage, ensuring that the sum of all processes accurately correlates with global system load.
+* **Separated Logic & Rendering**: The main event loop handles terminal events and tick intervals. All heavy system data processing (sorting, tree construction, memory aggregation) is offloaded to a background tick cycle. The UI `draw` calls strictly render pre-calculated data from the `App` state.
+* **Stratified Data Polling**: To minimize overhead, different metrics are polled at different frequencies:
+    * **Global System Data** (CPU usage, global RAM, Network speeds): Refreshed every **250ms**.
+    * **Tab-Specific Static Data** (Services list, Containers, Sessions): Refreshed every **250ms**.
+    * **Process-Heavy Data** (Sorting all processes, building parent-child tree, RSS calculation): Throttled to a **10-second** interval by default.
+* **Instant Feedback Mechanism**: While process data is normally throttled, any user input that changes filtering or sorting criteria triggers an **immediate** out-of-band data refresh to ensure the UI responds instantly to user commands.
+* **Memory Metric (RSS)**: To provide accurate physical memory usage without the performance penalty of calculating virtual memory sets, the dashboard implements a custom Resident Set Size (RSS) retrieval mechanism. It parses `/proc/[pid]/statm` directly to get actual resident pages, providing a true physical memory footprint for all processes.
 
-### 7.2 Interface Layout
+### 7.2 UI Layout and Components
 
-The dashboard is divided into four main functional areas:
-1. **Header**: Displays global system context, including hostname, distribution info, version, and system uptime.
-2. **Tab Bar**: A navigable row of domains (Overview, Storage, Process, etc.), each indicated by a unique icon (🏠, 💽, ⚙, etc.).
-3. **Content Area**: The primary data display, which changes based on the active tab.
-4. **Footer**: Provides a context-sensitive hotkey guide and scroll status.
+The dashboard layout is divided into four primary areas:
 
-### 7.3 Domain Tabs Behavior
+1. **Header**: Provides global system identity, including hostname, detected distribution, AO version, and current system uptime.
+2. **Tabs Bar**: A navigable row of domain-specific tabs, each visually identified by a unique icon (🏠, 💽, ⚙, 👤, 🌐, 🛠, 🐳, 🌡, 📈).
+3. **Content Area**: The main interactive workspace. For tabs containing long datasets (Processes, Storage, Users, etc.), the content area provides **Page Indicators** (e.g., `[Page 2/15]`) in the block titles to assist in navigation.
+4. **Footer**: Displays a dynamic, context-aware hotkey guide.
 
-* **Overview (🏠)**: A split-view dashboard. The left panel (20% width) shows global RAM, Swap, and CPU gauges, followed by individual core usage bars. The right panel displays the Top 10 CPU-consuming and Top 10 Memory-consuming processes, providing instant visibility into system bottlenecks.
-* **Storage (💽)**: Lists physical and virtual block devices. It distinguishes between them visually using icons (💽 for physical disks like `/dev/nvme*` or `/dev/sdX`, 💾 for others). Shows mount points, total/used space, and a visual usage bar.
-* **Process (⚙)**: The most interactive tab, offering two views toggled with `t`:
-    * **List View**: A flat, sortable table of all processes.
-    * **Tree View**: A hierarchical representation of process parent-child relationships. 
-    * **Sorting**: Supports instant sorting by PID (`i`), CPU (`c`), Memory (`m`), Name (`n`), or User (`u`).
-    * **Filtering**: Supports toggling visibility of kernel processes (`k`) and filtering to only show the current user's processes (`o`).
-    * **Depth Control**: Number keys `0-9` dynamically control the expansion depth of the tree view.
-* **User (👤)**: Displays a dual-panel view of recent login sessions (TTY, Host, Time) and a list of system users. Active users are highlighted in **bold green**.
-* **Network (🌐)**: Real-time interface monitoring. Categorizes interfaces with icons (📡 for Wifi, 🔗 for Ethernet, 🔄 for Loopback) and displays link state, IP addresses, and instantaneous Rx/Tx speeds.
-* **Service (🛠)**: Lists all systemd services with their load and active states.
-* **Sensors (🌡)**: Tracks hardware temperatures, sorted alphabetically by device label. It maintains an in-memory maximum tracker to show peak temperatures observed during the dashboard session.
-* **Charts (📈)**: Provides unified historical visualizations:
-    * **System Resources**: Overlays CPU, Memory, and Swap usage on a single 60-second rolling chart.
-    * **Network Throughput**: Shows RX and TX speeds with a **dynamically scaling Y-axis** that adjusts based on peak traffic.
+### 7.3 Domain Tab Behaviors
 
-### 7.4 Input & Navigation
+* **Overview (🏠)**: A dual-column summary view.
+    * **Left Panel (20% width)**: Real-time gauges for RAM and Swap usage, global CPU usage, and individual core bars. Core bars align labels to the left and center the percentage value within the gauge.
+    * **Right Panel (80% width)**: Top 10 CPU-consuming and Top 10 Memory-consuming processes (using individual RSS values).
+* **Storage (💽)**: Lists all block devices and mount points. Differentiates between physical disks (using 💽 icon) and virtual/other devices (using 💾 icon).
+* **Process (⚙)**: The primary resource management interface.
+    * **Tree View**: Toggled with `t`, shows hierarchical process relationships with aggregated (Total) CPU and Memory usage for subtrees.
+    * **Filtering**: Supports substring-based filtering (activated with `/`). Users can type a string, and only processes matching that name or command path will be displayed. It also supports toggling kernel process visibility (`k`) and own-user process filtering (`o`).
+    * **Depth Control**: Number keys `0-9` control the expansion depth of the tree view.
+* **User (👤)**: Lists current login sessions and system users. Active users with current sessions are highlighted in **bold green**.
+* **Network (🌐)**: Monitors all network interfaces with real-time RX/TX speeds. Interfaces are categorized by type (📡 for Wifi, 🔗 for Ethernet, 🔄 for Loopback).
+* **Sensors (🌡)**: Real-time hardware temperature monitoring with an in-memory session maximum tracker.
+* **Charts (📈)**: Historical data visualizations. 
+    * **System Resources**: Overlays CPU, Memory, and Swap usage on a single chart using matching colors from the Overview gauges.
+    * **Network Throughput**: A unified RX/TX throughput chart with a **dynamically scaling Y-axis** that adjusts based on peak traffic observed in the rolling window.
 
-The dashboard prioritizes keyboard-driven speed:
-* **Navigation**: `Tab` / `Right Arrow` for next tab, `BackTab` / `Left Arrow` for previous tab. `Up`/`Down` and `PgUp`/`PgDn` for list scrolling.
-* **Global**: `q` to quit the dashboard instantly.
-* **Contextual**: Process management hotkeys (`i`, `c`, `m`, `n`, `u`, `o`, `k`, `t`, `0-9`) are active only when the Process tab is focused.
+### 7.4 Controls and Navigation
+
+* **Global**: `q` to quit, `Tab`/`Arrows` to switch tabs.
+* **Navigation**: `Up`/`Down` for selection, `PgUp`/`PgDn` for faster scrolling.
+* **Process Contextual**: 
+    * `i`: Sort by PID
+    * `c`: Sort by CPU Usage
+    * `m`: Sort by Memory (RSS)
+    * `n`: Sort by Name
+    * `u`: Sort by User
+    * `/`: Enter/Edit Substring Filter
+    * `Esc`/`Enter`: Finish Filter Edit
+    * `t`: Toggle Tree View
+    * `k`: Toggle Kernel Processes
+    * `o`: Toggle Current User Only
+    * `0-9`: Set Tree Expansion Depth

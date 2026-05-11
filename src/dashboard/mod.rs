@@ -60,69 +60,90 @@ where
         if event::poll(Duration::from_millis(100))?
             && let Event::Key(key) = event::read()?
         {
-            match key.code {
-                KeyCode::Char('q') => return Ok(()),
-                KeyCode::Tab | KeyCode::Right => app.next_tab(),
-                KeyCode::BackTab | KeyCode::Left => app.prev_tab(),
-
-                KeyCode::Char('t') => {
-                    app.use_tree_view = !app.use_tree_view;
-                    app.refresh_process_data(true);
-                }
-                KeyCode::Char('0') => {
-                    app.tree_expansion_depth = 100;
-                    app.use_tree_view = true;
-                    app.refresh_process_data(true);
-                }
-                KeyCode::Char(c) if c.is_ascii_digit() => {
-                    app.tree_expansion_depth = c.to_digit(10).unwrap();
-                    app.use_tree_view = true;
-                    app.refresh_process_data(true);
-                }
-                KeyCode::Char('o') => {
-                    app.show_only_current_user = !app.show_only_current_user;
-                    app.refresh_process_data(true);
-                }
-                KeyCode::Char('k') => {
-                    if app.tab_index == 2 {
-                        app.hide_kernel_processes = !app.hide_kernel_processes;
+            if app.is_filtering {
+                match key.code {
+                    KeyCode::Enter | KeyCode::Esc => {
+                        app.is_filtering = false;
                         app.refresh_process_data(true);
-                    } else {
-                        app.on_up();
                     }
+                    KeyCode::Backspace => {
+                        app.process_filter.pop();
+                        app.refresh_process_data(true);
+                    }
+                    KeyCode::Char(c) => {
+                        app.process_filter.push(c);
+                        app.refresh_process_data(true);
+                    }
+                    _ => {}
                 }
+            } else {
+                match key.code {
+                    KeyCode::Char('q') => return Ok(()),
+                    KeyCode::Char('/') if app.tab_index == 2 => {
+                        app.is_filtering = true;
+                    }
+                    KeyCode::Tab | KeyCode::Right => app.next_tab(),
+                    KeyCode::BackTab | KeyCode::Left => app.prev_tab(),
 
-                KeyCode::Up => app.on_up(),
-                KeyCode::Down | KeyCode::Char('j') => app.on_down(),
-                KeyCode::PageUp => app.on_page_up(),
-                KeyCode::PageDown => app.on_page_down(),
+                    KeyCode::Char('t') => {
+                        app.use_tree_view = !app.use_tree_view;
+                        app.refresh_process_data(true);
+                    }
+                    KeyCode::Char('0') => {
+                        app.tree_expansion_depth = 100;
+                        app.use_tree_view = true;
+                        app.refresh_process_data(true);
+                    }
+                    KeyCode::Char(c) if c.is_ascii_digit() => {
+                        app.tree_expansion_depth = c.to_digit(10).unwrap();
+                        app.use_tree_view = true;
+                        app.refresh_process_data(true);
+                    }
+                    KeyCode::Char('o') => {
+                        app.show_only_current_user = !app.show_only_current_user;
+                        app.refresh_process_data(true);
+                    }
+                    KeyCode::Char('k') => {
+                        if app.tab_index == 2 {
+                            app.hide_kernel_processes = !app.hide_kernel_processes;
+                            app.refresh_process_data(true);
+                        } else {
+                            app.on_up();
+                        }
+                    }
 
-                KeyCode::Char('i') => {
-                    app.process_sort = app::ProcessSort::Pid;
-                    app.sort_descending = !app.sort_descending;
-                    app.refresh_process_data(true);
+                    KeyCode::Up => app.on_up(),
+                    KeyCode::Down | KeyCode::Char('j') => app.on_down(),
+                    KeyCode::PageUp => app.on_page_up(),
+                    KeyCode::PageDown => app.on_page_down(),
+
+                    KeyCode::Char('i') => {
+                        app.process_sort = app::ProcessSort::Pid;
+                        app.sort_descending = !app.sort_descending;
+                        app.refresh_process_data(true);
+                    }
+                    KeyCode::Char('c') => {
+                        app.process_sort = app::ProcessSort::Cpu;
+                        app.sort_descending = !app.sort_descending;
+                        app.refresh_process_data(true);
+                    }
+                    KeyCode::Char('m') => {
+                        app.process_sort = app::ProcessSort::Mem;
+                        app.sort_descending = !app.sort_descending;
+                        app.refresh_process_data(true);
+                    }
+                    KeyCode::Char('n') => {
+                        app.process_sort = app::ProcessSort::Name;
+                        app.sort_descending = !app.sort_descending;
+                        app.refresh_process_data(true);
+                    }
+                    KeyCode::Char('u') => {
+                        app.process_sort = app::ProcessSort::User;
+                        app.sort_descending = !app.sort_descending;
+                        app.refresh_process_data(true);
+                    }
+                    _ => {}
                 }
-                KeyCode::Char('c') => {
-                    app.process_sort = app::ProcessSort::Cpu;
-                    app.sort_descending = !app.sort_descending;
-                    app.refresh_process_data(true);
-                }
-                KeyCode::Char('m') => {
-                    app.process_sort = app::ProcessSort::Mem;
-                    app.sort_descending = !app.sort_descending;
-                    app.refresh_process_data(true);
-                }
-                KeyCode::Char('n') => {
-                    app.process_sort = app::ProcessSort::Name;
-                    app.sort_descending = !app.sort_descending;
-                    app.refresh_process_data(true);
-                }
-                KeyCode::Char('u') => {
-                    app.process_sort = app::ProcessSort::User;
-                    app.sort_descending = !app.sort_descending;
-                    app.refresh_process_data(true);
-                }
-                _ => {}
             }
         }
         if last_tick.elapsed() >= tick_rate {

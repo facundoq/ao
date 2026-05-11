@@ -6,13 +6,14 @@ pub struct MemoryStats {
 }
 
 pub fn get_process_memory(pid: sysinfo::Pid) -> MemoryStats {
+    let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as u64;
     let path = format!("/proc/{}/statm", pid);
     if let Ok(content) = std::fs::read_to_string(path) {
         let fields: Vec<&str> = content.split_whitespace().collect();
         if fields.len() >= 3 {
-            let virt = fields[0].parse::<u64>().unwrap_or(0) * 4096;
-            let rss = fields[1].parse::<u64>().unwrap_or(0) * 4096;
-            let shared = fields[2].parse::<u64>().unwrap_or(0) * 4096;
+            let virt = fields[0].parse::<u64>().unwrap_or(0) * page_size;
+            let rss = fields[1].parse::<u64>().unwrap_or(0) * page_size;
+            let shared = fields[2].parse::<u64>().unwrap_or(0) * page_size;
             return MemoryStats { rss, virt, shared };
         }
     }

@@ -157,6 +157,11 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
         ));
         spans.push(Span::raw(" Kernel | "));
         spans.push(Span::styled(
+            "[/]",
+            Style::default().add_modifier(Modifier::BOLD),
+        ));
+        spans.push(Span::raw(" Filter | "));
+        spans.push(Span::styled(
             "[0-9]",
             Style::default().add_modifier(Modifier::BOLD),
         ));

@@ -22,11 +22,16 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     .map(|h| Cell::from(*h).style(Style::default().add_modifier(Modifier::BOLD)));
     let header = Row::new(header_cells).height(1).bottom_margin(1);
 
+    let items_per_page = area.height.saturating_sub(4) as usize;
+    let total_items = app.interfaces.len();
+    let total_pages = (total_items + items_per_page - 1).max(1) / items_per_page;
+    let current_page = (app.selected_index / items_per_page + 1).min(total_pages);
+
     let rows = app
         .interfaces
         .iter()
         .skip(app.selected_index)
-        .take(area.height.saturating_sub(4) as usize)
+        .take(items_per_page)
         .map(|i| {
             let style = match i.state.to_lowercase().as_str() {
                 "up" => Style::default().fg(Color::Green),
@@ -75,6 +80,10 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             .style(style)
         });
 
+    let title = format!(
+        " Network Monitoring [Page {}/{}] ",
+        current_page, total_pages
+    );
     let table = Table::new(
         rows,
         [
@@ -89,10 +98,6 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         ],
     )
     .header(header)
-    .block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title(" Network Monitoring "),
-    );
+    .block(Block::default().borders(Borders::ALL).title(title));
     f.render_widget(table, area);
 }
