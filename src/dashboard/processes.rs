@@ -53,6 +53,28 @@ fn draw_process_list(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(table, area);
 }
 
-fn draw_process_tree(_f: &mut Frame, _app: &App, _area: Rect) {
-    // Tree drawing simplified...
+fn draw_process_tree(f: &mut Frame, app: &App, area: Rect) {
+    let header = Row::new(vec![
+        Cell::from("PID").style(Style::default().add_modifier(Modifier::BOLD)),
+        Cell::from("User").style(Style::default().add_modifier(Modifier::BOLD)),
+        Cell::from("CPU% (Total)").style(Style::default().add_modifier(Modifier::BOLD)),
+        Cell::from("RSS (Total)").style(Style::default().add_modifier(Modifier::BOLD)),
+        Cell::from("Process Tree").style(Style::default().add_modifier(Modifier::BOLD)),
+    ]).height(1).bottom_margin(1);
+
+    let rows = app.flattened_tree.iter().skip(app.selected_index).take(area.height.saturating_sub(4) as usize).map(|node| {
+        let style = if node.depth == 0 { Style::default().add_modifier(Modifier::BOLD) } else { Style::default() };
+        Row::new(vec![
+            Cell::from(node.pid.clone()),
+            Cell::from(node.user.clone()).style(Style::default().fg(get_user_color(&node.user))),
+            Cell::from(node.cpu.clone()),
+            Cell::from(node.mem.clone()),
+            Cell::from(node.name.clone()),
+        ]).style(style)
+    });
+
+    let table = Table::new(rows, [Constraint::Length(8), Constraint::Length(12), Constraint::Length(15), Constraint::Length(20), Constraint::Min(0)])
+        .header(header)
+        .block(Block::default().borders(Borders::ALL).title(format!(" Process Tree (Depth {}) ", app.tree_expansion_depth)));
+    f.render_widget(table, area);
 }

@@ -179,6 +179,7 @@ impl<'a> App<'a> {
         
         self.system_info.refresh_processes_specifics(sysinfo::ProcessesToUpdate::All, true, sysinfo::ProcessRefreshKind::everything());
         self.system_info.refresh_memory();
+        self.system_info.refresh_cpu_usage();
         self.disks.refresh(true);
         self.networks.refresh(true);
         self.refresh_process_data();

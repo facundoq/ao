@@ -50,7 +50,7 @@ fn draw_header(f: &mut Frame, _app: &App, area: Rect) {
 }
 
 fn draw_tabs(f: &mut Frame, app: &App, area: Rect) {
-    let icons = ["🏠", "💾", "⚙", "👤", "🌐", "🛠", "🐳", "🌡", "📈"];
+    let icons = ["🏠", "💽", "⚙", "👤", "🌐", "🛠", "🐳", "🌡", "📈"];
     let titles: Vec<Line> = app.tabs.iter().enumerate().map(|(i, t)| {
         Line::from(vec![
             Span::raw(format!("{} ", icons.get(i).unwrap_or(&""))),

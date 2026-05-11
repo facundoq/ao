@@ -42,7 +42,14 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
     // Users List
     let user_list: Vec<Line> = app.users.iter().take(chunks[1].height.saturating_sub(2) as usize).map(|(u, is_system)| {
-        let style = if *is_system { Style::default().fg(Color::DarkGray) } else { Style::default().fg(Color::White) };
+        let is_logged_in = app.sessions.iter().any(|s| s.username == *u && s.end == "still logged in");
+        let style = if is_logged_in { 
+            Style::default().fg(Color::Green).add_modifier(Modifier::BOLD) 
+        } else if *is_system { 
+            Style::default().fg(Color::DarkGray) 
+        } else { 
+            Style::default().fg(Color::White) 
+        };
         Line::from(vec![Span::styled(u.clone(), style)])
     }).collect();
     f.render_widget(Paragraph::new(user_list).block(Block::default().borders(Borders::ALL).title(" System Users ")), chunks[1]);

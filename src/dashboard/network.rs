@@ -20,12 +20,18 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             _ => Style::default().fg(Color::Yellow),
         };
 
+        let type_lower = i.interface_type.to_lowercase();
+        let icon = if type_lower.contains("wifi") || type_lower.contains("wlan") { "📡" }
+        else if type_lower.contains("ethernet") || type_lower.contains("eth") || type_lower.contains("enp") { "🔗" }
+        else if type_lower.contains("loopback") || type_lower.contains("lo") { "🔄" }
+        else { "🌐" }; // Virtual or other
+
         let (rx_speed, tx_speed) = app.network_speeds.get(&i.name).cloned().unwrap_or((0, 0));
         let total_rx = app.networks.iter().find(|(name, _)| name == &&i.name).map(|(_, n)| n.total_received()).unwrap_or(0);
         let total_tx = app.networks.iter().find(|(name, _)| name == &&i.name).map(|(_, n)| n.total_transmitted()).unwrap_or(0);
 
         Row::new(vec![
-            Cell::from(i.name.clone()),
+            Cell::from(format!("{} {}", icon, i.name)),
             Cell::from(i.interface_type.clone()),
             Cell::from(i.state.clone()),
             Cell::from(i.ips.join(", ")),
@@ -36,7 +42,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         ]).style(style)
     });
 
-    let table = Table::new(rows, [Constraint::Length(12), Constraint::Length(10), Constraint::Length(8), Constraint::Min(20), Constraint::Length(12), Constraint::Length(12), Constraint::Length(12), Constraint::Length(12)])
+    let table = Table::new(rows, [Constraint::Length(15), Constraint::Length(10), Constraint::Length(8), Constraint::Min(20), Constraint::Length(12), Constraint::Length(12), Constraint::Length(12), Constraint::Length(12)])
         .header(header)
         .block(Block::default().borders(Borders::ALL).title(" Network Monitoring "));
     f.render_widget(table, area);
