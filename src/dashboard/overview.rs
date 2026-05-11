@@ -83,14 +83,14 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
                 let row_chunks = Layout::default().direction(Direction::Horizontal).constraints([Constraint::Length(4), Constraint::Min(0)]).split(chunk);
                 let core_label = Paragraph::new(format!("C{:02}", i)).style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
                 f.render_widget(core_label, Layout::default().direction(Direction::Vertical).constraints([Constraint::Length(1), Constraint::Length(1), Constraint::Length(1)]).split(row_chunks[0])[1]);
-                let core_gauge = Gauge::default().block(Block::default().borders(Borders::ALL)).gauge_style(Style::default().fg(Color::Rgb(150, 255, 255))).percent(usage as u16).label(format!("{:.1}%", usage));
+                let core_gauge = Gauge::default().block(Block::default().borders(Borders::ALL)).gauge_style(Style::default().fg(Color::Rgb(255, 200, 150))).percent(usage as u16).label(format!("{:.1}%", usage));
                 f.render_widget(core_gauge, row_chunks[1]);
             } else if chunk.height > 0 {
                 let label = format!("C{:02} ", i);
                 let bar_width = chunk.width.saturating_sub(12);
                 let bar = make_bar(usage as u16, bar_width);
                 let content = format!("{}{:>5.1}% {}", label, usage, bar);
-                f.render_widget(Paragraph::new(content).style(Style::default().fg(Color::Rgb(150, 255, 255))), chunk);
+                f.render_widget(Paragraph::new(content).style(Style::default().fg(Color::Rgb(255, 200, 150))), chunk);
             }
         }
     }
