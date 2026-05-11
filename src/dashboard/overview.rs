@@ -3,7 +3,7 @@ use crate::dashboard::utils::format_bytes;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Cell, Gauge, Row, Table},
+    widgets::{Block, Borders, Cell, Gauge, Paragraph, Row, Table},
     Frame,
 };
 
@@ -71,8 +71,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let cores_inner = cores_block.inner(left_chunks[3]);
     f.render_widget(cores_block, left_chunks[3]);
 
-    let core_height = 1; // Always use height 1 for consistency in the narrow panel
-    let mut core_constraints = vec![Constraint::Length(core_height); core_count];
+    let mut core_constraints = vec![Constraint::Length(1); core_count];
     core_constraints.push(Constraint::Min(0));
     let core_chunks = Layout::default().direction(Direction::Vertical).constraints(core_constraints).split(cores_inner);
 
@@ -80,11 +79,19 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         if i < core_chunks.len() {
             let usage = cpu.cpu_usage();
             let chunk = core_chunks[i];
+            
+            let row_chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Length(5), Constraint::Min(0)])
+                .split(chunk);
+            
+            f.render_widget(Paragraph::new(format!("C{:02}:", i)).style(Style::default().fg(Color::Cyan)), row_chunks[0]);
+
             let core_gauge = Gauge::default()
                 .gauge_style(Style::default().fg(Color::Rgb(255, 200, 150)))
                 .percent(usage as u16)
-                .label(format!("C{:02}: {:.1}%", i, usage));
-            f.render_widget(core_gauge, chunk);
+                .label(format!("{:.1}%", usage));
+            f.render_widget(core_gauge, row_chunks[1]);
         }
     }
 
@@ -106,7 +113,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         [
             Constraint::Length(8), 
             Constraint::Length(12), 
-            Constraint::Percentage(40), // More space for Name
+            Constraint::Percentage(40),
             Constraint::Length(10), 
             Constraint::Length(12)
         ]
@@ -131,7 +138,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         [
             Constraint::Length(8), 
             Constraint::Length(12), 
-            Constraint::Percentage(40), // More space for Name
+            Constraint::Percentage(40),
             Constraint::Length(10), 
             Constraint::Length(12)
         ]
