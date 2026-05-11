@@ -37,7 +37,13 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let swap_dataset = Dataset::default().name("Swap %").marker(ratatui::symbols::Marker::Braille).graph_type(GraphType::Line).style(Style::default().fg(Color::Magenta)).data(&app.swap_history);
     f.render_widget(Chart::new(vec![mem_dataset, swap_dataset]).block(Block::default().borders(Borders::ALL).title(" Memory & Swap (%) ")).x_axis(Axis::default().bounds(x_bounds)).y_axis(Axis::default().bounds([0.0, 100.0]).labels(vec![Span::raw("0"), Span::raw("50"), Span::raw("100")])), top_chunks[1]);
 
-    // 3. Network RX/TX - Simplified
-    f.render_widget(Block::default().borders(Borders::ALL).title(" Network History "), bottom_chunks[0]);
-    f.render_widget(Block::default().borders(Borders::ALL).title(" More Stats "), bottom_chunks[1]);
+    // 3. Network RX Chart
+    let max_rx = app.net_rx_history.iter().map(|(_, v)| *v).fold(0.0, f64::max).max(1024.0);
+    let rx_dataset = Dataset::default().name("RX").marker(ratatui::symbols::Marker::Braille).graph_type(GraphType::Line).style(Style::default().fg(Color::Yellow)).data(&app.net_rx_history);
+    f.render_widget(Chart::new(vec![rx_dataset]).block(Block::default().borders(Borders::ALL).title(format!(" Total Network RX (Max: {}/s) ", format_bytes(max_rx as u64)))).x_axis(Axis::default().bounds(x_bounds)).y_axis(Axis::default().bounds([0.0, max_rx])), bottom_chunks[0]);
+
+    // 4. Network TX Chart
+    let max_tx = app.net_tx_history.iter().map(|(_, v)| *v).fold(0.0, f64::max).max(1024.0);
+    let tx_dataset = Dataset::default().name("TX").marker(ratatui::symbols::Marker::Braille).graph_type(GraphType::Line).style(Style::default().fg(Color::Blue)).data(&app.net_tx_history);
+    f.render_widget(Chart::new(vec![tx_dataset]).block(Block::default().borders(Borders::ALL).title(format!(" Total Network TX (Max: {}/s) ", format_bytes(max_tx as u64)))).x_axis(Axis::default().bounds(x_bounds)).y_axis(Axis::default().bounds([0.0, max_tx])), bottom_chunks[1]);
 }

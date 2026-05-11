@@ -36,6 +36,7 @@ pub struct App<'a> {
     pub history_start: Instant,
 
     pub last_tick_time: Instant,
+    pub prev_network_data: HashMap<String, (u64, u64)>,
     pub network_speeds: HashMap<String, (u64, u64)>,
 
     pub process_sort: ProcessSort,
@@ -98,10 +99,21 @@ impl<'a> App<'a> {
                 .with_processes(sysinfo::ProcessRefreshKind::everything()),
         );
         system_info.refresh_all();
+        
+        let networks = Networks::new_with_refreshed_list();
+        let mut prev_network_data = HashMap::new();
+        for (name, network) in &networks {
+            prev_network_data.insert(name.clone(), (network.total_received(), network.total_transmitted()));
+        }
+
+        let sys_info = detected_system.sys.get_info().ok();
+        let ram_config = sys_info.as_ref().map(|s| s.ram_config.clone()).unwrap_or_else(|| "Unknown".to_string());
+        let ram_speed = sys_info.as_ref().map(|s| s.ram_speed.clone()).unwrap_or_else(|| "Unknown".to_string());
+
         let mut app = Self {
             system_info,
             disks: Disks::new_with_refreshed_list(),
-            networks: Networks::new_with_refreshed_list(),
+            networks,
             users_list: Users::new_with_refreshed_list(),
             detected_system,
             tab_index: 0,
@@ -113,8 +125,8 @@ impl<'a> App<'a> {
             services: Vec::new(),
             containers: Vec::new(),
             sensors: Vec::new(),
-            ram_config: "Unknown".to_string(),
-            ram_speed: "Unknown".to_string(),
+            ram_config,
+            ram_speed,
             cpu_history: Vec::with_capacity(61),
             mem_history: Vec::with_capacity(61),
             swap_history: Vec::with_capacity(61),
@@ -122,6 +134,7 @@ impl<'a> App<'a> {
             net_tx_history: Vec::with_capacity(61),
             history_start: Instant::now(),
             last_tick_time: Instant::now(),
+            prev_network_data,
             network_speeds: HashMap::new(),
             process_sort: ProcessSort::Cpu,
             sort_descending: true,
@@ -139,12 +152,12 @@ impl<'a> App<'a> {
             refresh_interval: Duration::from_secs(2),
             max_temps: HashMap::new(),
         };
-        app.refresh_users();
-        app.refresh_process_data();
+        app.refresh_users_list();
+        app.on_tick(); // Initial populate
         app
     }
 
-    pub fn refresh_users(&mut self) {
+    pub fn refresh_users_list(&mut self) {
         let mut users = Vec::new();
         for user in &self.users_list {
             let uid_str = user.id().to_string();
@@ -161,22 +174,52 @@ impl<'a> App<'a> {
 
     pub fn on_tick(&mut self) {
         let now = Instant::now();
+        let elapsed = now.duration_since(self.last_tick_time).as_secs_f64();
         self.last_tick_time = now;
+        
         self.system_info.refresh_processes_specifics(sysinfo::ProcessesToUpdate::All, true, sysinfo::ProcessRefreshKind::everything());
+        self.system_info.refresh_memory();
         self.disks.refresh(true);
         self.networks.refresh(true);
         self.refresh_process_data();
+
+        // Update charts history
         let now_sec = now.duration_since(self.history_start).as_secs_f64();
         self.cpu_history.push((now_sec, self.system_info.global_cpu_usage() as f64));
         if self.cpu_history.len() > 60 { self.cpu_history.remove(0); }
+
         let mem_total = self.system_info.total_memory() as f64;
         let mem_percent = if mem_total > 0.0 { (self.system_info.used_memory() as f64 / mem_total) * 100.0 } else { 0.0 };
         self.mem_history.push((now_sec, mem_percent));
         if self.mem_history.len() > 60 { self.mem_history.remove(0); }
+
         let swap_total = self.system_info.total_swap() as f64;
         let swap_percent = if swap_total > 0.0 { (self.system_info.used_swap() as f64 / swap_total) * 100.0 } else { 0.0 };
         self.swap_history.push((now_sec, swap_percent));
         if self.swap_history.len() > 60 { self.swap_history.remove(0); }
+
+        // Update network speeds and history
+        let mut total_rx_speed = 0.0;
+        let mut total_tx_speed = 0.0;
+        for (name, network) in &self.networks {
+            let rx = network.total_received();
+            let tx = network.total_transmitted();
+            if let Some((old_rx, old_tx)) = self.prev_network_data.get(name) {
+                let rx_delta = rx.saturating_sub(*old_rx);
+                let tx_delta = tx.saturating_sub(*old_tx);
+                let rx_speed = (rx_delta as f64 / elapsed) as u64;
+                let tx_speed = (tx_delta as f64 / elapsed) as u64;
+                self.network_speeds.insert(name.clone(), (rx_speed, tx_speed));
+                total_rx_speed += rx_speed as f64;
+                total_tx_speed += tx_speed as f64;
+            }
+            self.prev_network_data.insert(name.clone(), (rx, tx));
+        }
+        self.net_rx_history.push((now_sec, total_rx_speed));
+        if self.net_rx_history.len() > 60 { self.net_rx_history.remove(0); }
+        self.net_tx_history.push((now_sec, total_tx_speed));
+        if self.net_tx_history.len() > 60 { self.net_tx_history.remove(0); }
+
         if let Ok(s) = self.detected_system.overview.get_sensors() {
             for sensor in &s {
                 let entry = self.max_temps.entry(sensor.label.clone()).or_insert(sensor.temperature);
@@ -184,13 +227,15 @@ impl<'a> App<'a> {
             }
             self.sensors = s;
         }
-        match self.tab_index {
-            3 => { if let Ok(mut s) = self.detected_system.user.get_sessions(None, true, Some(50)) { s.reverse(); self.sessions = s; } }
-            4 => { if let Ok(i) = self.detected_system.net.get_interfaces() { self.interfaces = i; } }
-            5 => { if let Ok(s) = self.detected_system.svc.get_all_services_info() { self.services = s; } }
-            6 => { if let Ok(c) = self.detected_system.virt.get_containers() { self.containers = c; } }
-            _ => {}
+
+        // Always refresh tab data (no longer match self.tab_index)
+        if let Ok(mut s) = self.detected_system.user.get_sessions(None, true, Some(50)) {
+            s.reverse();
+            self.sessions = s;
         }
+        if let Ok(i) = self.detected_system.net.get_interfaces() { self.interfaces = i; }
+        if let Ok(s) = self.detected_system.svc.get_all_services_info() { self.services = s; }
+        if let Ok(c) = self.detected_system.virt.get_containers() { self.containers = c; }
     }
 
     pub fn refresh_process_data(&mut self) {
@@ -198,13 +243,35 @@ impl<'a> App<'a> {
         self.last_process_refresh = Instant::now();
         self.total_rss = self.system_info.processes().keys().map(|pid| get_rss(*pid)).sum();
         self.process_tree = self.calculate_process_tree();
-        self.top_cpu_processes = self.calculate_top_cpu_processes(10);
-        self.top_mem_processes = self.calculate_top_mem_processes(10);
-        self.sorted_processes = self.calculate_sorted_processes();
+        self.top_cpu_processes = self.get_top_cpu_processes(10);
+        self.top_mem_processes = self.get_top_mem_processes(10);
+        self.sorted_processes = self.get_sorted_processes();
         self.flattened_tree = self.calculate_flattened_tree();
     }
 
-    fn calculate_sorted_processes(&self) -> Vec<ProcessSummary> {
+    pub fn get_top_cpu_processes(&self, count: usize) -> Vec<ProcessSummary> {
+        let mut all = Vec::new();
+        fn flatten(node: &ProcessTreeNode, out: &mut Vec<ProcessSummary>) {
+            out.push(ProcessSummary { pid: node.pid, name: node.name.clone(), user: node.user.clone(), memory: node.total_mem, cpu: node.total_cpu, command: "".to_string() });
+            for child in &node.children { flatten(child, out); }
+        }
+        for root in &self.process_tree { flatten(root, &mut all); }
+        all.sort_by(|a, b| b.cpu.partial_cmp(&a.cpu).unwrap_or(std::cmp::Ordering::Equal));
+        all.into_iter().take(count).collect()
+    }
+
+    pub fn get_top_mem_processes(&self, count: usize) -> Vec<ProcessSummary> {
+        let mut all = Vec::new();
+        fn flatten(node: &ProcessTreeNode, out: &mut Vec<ProcessSummary>) {
+            out.push(ProcessSummary { pid: node.pid, name: node.name.clone(), user: node.user.clone(), memory: node.total_mem, cpu: node.total_cpu, command: "".to_string() });
+            for child in &node.children { flatten(child, out); }
+        }
+        for root in &self.process_tree { flatten(root, &mut all); }
+        all.sort_by_key(|n| std::cmp::Reverse(n.memory));
+        all.into_iter().take(count).collect()
+    }
+
+    pub fn get_sorted_processes(&self) -> Vec<ProcessSummary> {
         let current_uid = unsafe { libc::getuid() };
         let mut processes: Vec<&Process> = self.system_info.processes().values()
             .filter(|p| {
@@ -218,7 +285,7 @@ impl<'a> App<'a> {
                     let pid = p.pid().as_u32();
                     if pid == 0 || pid == 2 { return false; }
                     if let Some(ppid) = p.parent()
-                        && ppid.as_u32() == 2 { return false; }
+                         && ppid.as_u32() == 2 { return false; }
                 }
                 true
             })
@@ -227,7 +294,7 @@ impl<'a> App<'a> {
             let res = match self.process_sort {
                 ProcessSort::Pid => a.pid().cmp(&b.pid()),
                 ProcessSort::Cpu => a.cpu_usage().partial_cmp(&b.cpu_usage()).unwrap_or(std::cmp::Ordering::Equal),
-                ProcessSort::Mem => get_rss(a.pid()).cmp(&get_rss(b.pid())),
+                ProcessSort::Mem => a.memory().cmp(&b.memory()),
                 ProcessSort::Name => a.name().cmp(b.name()),
                 ProcessSort::User => {
                     let au = a.user_id().and_then(|id| self.users_list.get_user_by_id(id)).map(|u| u.name()).unwrap_or("");
@@ -247,7 +314,7 @@ impl<'a> App<'a> {
         }).collect()
     }
 
-    fn calculate_process_tree(&mut self) -> Vec<ProcessTreeNode> {
+    pub fn calculate_process_tree(&mut self) -> Vec<ProcessTreeNode> {
         let processes = self.system_info.processes();
         let cpu_count = self.system_info.cpus().len() as f32;
         let mut filtered = HashMap::new();
@@ -297,29 +364,7 @@ impl<'a> App<'a> {
         root_nodes
     }
 
-    fn calculate_top_cpu_processes(&self, count: usize) -> Vec<ProcessSummary> {
-        let mut all = Vec::new();
-        fn flatten(node: &ProcessTreeNode, out: &mut Vec<ProcessSummary>) {
-            out.push(ProcessSummary { pid: node.pid, name: node.name.clone(), user: node.user.clone(), memory: node.total_mem, cpu: node.total_cpu, command: "".to_string() });
-            for child in &node.children { flatten(child, out); }
-        }
-        for root in &self.process_tree { flatten(root, &mut all); }
-        all.sort_by(|a, b| b.cpu.partial_cmp(&a.cpu).unwrap_or(std::cmp::Ordering::Equal));
-        all.into_iter().take(count).collect()
-    }
-
-    fn calculate_top_mem_processes(&self, count: usize) -> Vec<ProcessSummary> {
-        let mut all = Vec::new();
-        fn flatten(node: &ProcessTreeNode, out: &mut Vec<ProcessSummary>) {
-            out.push(ProcessSummary { pid: node.pid, name: node.name.clone(), user: node.user.clone(), memory: node.total_mem, cpu: node.total_cpu, command: "".to_string() });
-            for child in &node.children { flatten(child, out); }
-        }
-        for root in &self.process_tree { flatten(root, &mut all); }
-        all.sort_by_key(|n| std::cmp::Reverse(n.memory));
-        all.into_iter().take(count).collect()
-    }
-
-    fn calculate_flattened_tree(&self) -> Vec<FlattenedTreeNode> {
+    pub fn calculate_flattened_tree(&self) -> Vec<FlattenedTreeNode> {
         use crate::dashboard::utils::format_bytes;
         let mut flat = Vec::new();
         fn flatten_tree(node: &ProcessTreeNode, max_depth: u32, rows: &mut Vec<FlattenedTreeNode>) {
