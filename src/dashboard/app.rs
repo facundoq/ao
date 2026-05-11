@@ -57,6 +57,8 @@ pub struct App<'a> {
     pub refresh_interval: Duration,
     pub max_temps: HashMap<String, f32>,
     pub process_filter: String,
+    pub max_rx_throughput: u64,
+    pub max_tx_throughput: u64,
     pub is_filtering: bool,
     pub tick_rate: Duration,
 
@@ -217,6 +219,8 @@ impl<'a> App<'a> {
             refresh_interval: Duration::from_secs(10),
             max_temps: HashMap::new(),
             process_filter: config.ui.process_filter,
+            max_rx_throughput: config.ui.max_rx_throughput,
+            max_tx_throughput: config.ui.max_tx_throughput,
             is_filtering: false,
             tick_rate: Duration::from_millis(config.ui.refresh_rate_ms),
             selected_process: None,
@@ -377,7 +381,7 @@ impl<'a> App<'a> {
             sysinfo::ProcessRefreshKind::everything(),
         );
         self.system_info.refresh_memory();
-        self.system_info.refresh_cpu_all();
+        self.system_info.refresh_all();
         self.disks.refresh(true);
         self.networks.refresh(true);
         self.refresh_process_data(false);
@@ -437,6 +441,26 @@ impl<'a> App<'a> {
         self.net_tx_history.push((now_sec, total_tx_speed));
         if self.net_tx_history.len() > 60 {
             self.net_tx_history.remove(0);
+        }
+
+        let rx_val = total_rx_speed as u64;
+        let tx_val = total_tx_speed as u64;
+        let mut updated = false;
+
+        if rx_val > self.max_rx_throughput {
+            self.max_rx_throughput = rx_val;
+            updated = true;
+        }
+        if tx_val > self.max_tx_throughput {
+            self.max_tx_throughput = tx_val;
+            updated = true;
+        }
+
+        if updated {
+            let mut config = Config::load().unwrap_or_default();
+            config.ui.max_rx_throughput = self.max_rx_throughput;
+            config.ui.max_tx_throughput = self.max_tx_throughput;
+            let _ = config.save();
         }
 
         if let Ok(s) = self.detected_system.overview.get_sensors() {

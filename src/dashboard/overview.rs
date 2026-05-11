@@ -92,6 +92,9 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     for (i, cpu) in app.system_info.cpus().iter().enumerate() {
         if i < core_chunks.len() {
             let usage = cpu.cpu_usage();
+            // Just for debugging, we can log to a file or standard error.
+            // Using stderr is usually safe if we are in TUI mode.
+            // eprintln!("CPU {} usage: {}", i, usage);
             let chunk = core_chunks[i];
 
             let row_chunks = Layout::default()
