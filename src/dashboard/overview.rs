@@ -42,7 +42,13 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         .block(Block::default().borders(Borders::ALL).title(ram_title))
         .gauge_style(Style::default().fg(Color::Green))
         .percent(mem_percent)
-        .label(format!("{} / {} ({}%)", format_bytes(mem_used), format_bytes(mem_total), mem_percent));
+        .label(format!(
+            "{} / {} ({}%) | RSS (TOTAL): {}",
+            format_bytes(mem_used),
+            format_bytes(mem_total),
+            mem_percent,
+            format_bytes(app.total_rss)
+        ));
     f.render_widget(mem_gauge, left_chunks[0]);
 
     // 2. Swap
