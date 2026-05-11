@@ -2,7 +2,7 @@ use crate::dashboard::app::App;
 use crate::dashboard::utils::{format_bytes, make_bar};
 use ratatui::{
     layout::{Constraint, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     widgets::{Block, Borders, Cell, Row, Table},
     Frame,
 };
