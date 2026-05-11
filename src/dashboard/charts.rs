@@ -29,21 +29,21 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
     // 1. Unified System Resources Chart (CPU, MEM, SWAP)
     let cpu_dataset = Dataset::default()
-        .name("CPU %")
+        .name("CPU")
         .marker(ratatui::symbols::Marker::Braille)
         .graph_type(GraphType::Line)
-        .style(Style::default().fg(Color::Cyan))
+        .style(Style::default().fg(Color::Rgb(255, 200, 150)))
         .data(&app.cpu_history);
 
     let mem_dataset = Dataset::default()
-        .name("Mem %")
+        .name("Memory")
         .marker(ratatui::symbols::Marker::Braille)
         .graph_type(GraphType::Line)
         .style(Style::default().fg(Color::Green))
         .data(&app.mem_history);
 
     let swap_dataset = Dataset::default()
-        .name("Swap %")
+        .name("Swap")
         .marker(ratatui::symbols::Marker::Braille)
         .graph_type(GraphType::Line)
         .style(Style::default().fg(Color::Magenta))

@@ -182,7 +182,7 @@ impl<'a> App<'a> {
         self.system_info.refresh_cpu_usage();
         self.disks.refresh(true);
         self.networks.refresh(true);
-        self.refresh_process_data();
+        self.refresh_process_data(false);
 
         let now_sec = now.duration_since(self.history_start).as_secs_f64();
         self.cpu_history.push((now_sec, self.system_info.global_cpu_usage() as f64));
@@ -236,8 +236,8 @@ impl<'a> App<'a> {
         if let Ok(c) = self.detected_system.virt.get_containers() { self.containers = c; }
     }
 
-    pub fn refresh_process_data(&mut self) {
-        if self.last_process_refresh.elapsed() < self.refresh_interval { return; }
+    pub fn refresh_process_data(&mut self, force: bool) {
+        if !force && self.last_process_refresh.elapsed() < self.refresh_interval { return; }
         self.last_process_refresh = Instant::now();
         self.total_rss = self.system_info.processes().keys().map(|pid| get_rss(*pid)).sum();
         self.process_tree = self.calculate_process_tree();
