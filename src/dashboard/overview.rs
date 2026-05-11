@@ -1,9 +1,9 @@
 use crate::dashboard::app::App;
-use crate::dashboard::utils::format_bytes;
+use crate::dashboard::utils::{format_bytes, make_bar};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Cell, Gauge, Row, Table},
+    widgets::{Block, Borders, Cell, Gauge, Paragraph, Row, Table},
     Frame,
 };
 
@@ -30,6 +30,8 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             Constraint::Percentage(50), // Top Mem Processes
         ])
         .split(main_chunks[1]);
+
+    // --- LEFT COLUMN ---
 
     // 1. RAM
     let mem_used = app.system_info.used_memory();
@@ -58,13 +60,42 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let cpu_usage = app.system_info.global_cpu_usage();
     let cpu_gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL).title(" CPU "))
-        .gauge_style(Style::default().fg(Color::Yellow))
+        .gauge_style(Style::default().fg(Color::Rgb(255, 200, 150)))
         .percent(cpu_usage as u16);
     f.render_widget(cpu_gauge, left_chunks[2]);
 
-    // 4. CPU Cores - Placeholder for brevity
-    let cores_block = Block::default().borders(Borders::ALL).title(" CPU Cores ");
+    // 4. CPU Cores
+    let core_count = app.system_info.cpus().len();
+    let cores_block = Block::default().borders(Borders::ALL).title(format!(" CPU Cores ({}) ", core_count));
+    let cores_inner = cores_block.inner(left_chunks[3]);
     f.render_widget(cores_block, left_chunks[3]);
+
+    let core_height = if cores_inner.height >= (core_count as u16 * 3) { 3 } else { 1 };
+    let mut core_constraints = vec![Constraint::Length(core_height); core_count];
+    core_constraints.push(Constraint::Min(0));
+    let core_chunks = Layout::default().direction(Direction::Vertical).constraints(core_constraints).split(cores_inner);
+
+    for (i, cpu) in app.system_info.cpus().iter().enumerate() {
+        if i < core_chunks.len() {
+            let usage = cpu.cpu_usage();
+            let chunk = core_chunks[i];
+            if core_height >= 3 {
+                let row_chunks = Layout::default().direction(Direction::Horizontal).constraints([Constraint::Length(4), Constraint::Min(0)]).split(chunk);
+                let core_label = Paragraph::new(format!("C{:02}", i)).style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
+                f.render_widget(core_label, Layout::default().direction(Direction::Vertical).constraints([Constraint::Length(1), Constraint::Length(1), Constraint::Length(1)]).split(row_chunks[0])[1]);
+                let core_gauge = Gauge::default().block(Block::default().borders(Borders::ALL)).gauge_style(Style::default().fg(Color::Rgb(150, 255, 255))).percent(usage as u16).label(format!("{:.1}%", usage));
+                f.render_widget(core_gauge, row_chunks[1]);
+            } else if chunk.height > 0 {
+                let label = format!("C{:02} ", i);
+                let bar_width = chunk.width.saturating_sub(12);
+                let bar = make_bar(usage as u16, bar_width);
+                let content = format!("{}{:>5.1}% {}", label, usage, bar);
+                f.render_widget(Paragraph::new(content).style(Style::default().fg(Color::Rgb(150, 255, 255))), chunk);
+            }
+        }
+    }
+
+    // --- RIGHT COLUMN ---
 
     // 1. Top CPU Processes
     let top_cpu = &app.top_cpu_processes;

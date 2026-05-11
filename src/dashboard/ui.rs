@@ -76,6 +76,12 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         0 => super::overview::draw(f, app, area),
         1 => super::storage::draw(f, app, area),
         2 => super::processes::draw(f, app, area),
+        3 => super::users::draw(f, app, area),
+        4 => super::network::draw(f, app, area),
+        5 => super::services::draw(f, app, area),
+        6 => super::virtualization::draw(f, app, area),
+        7 => super::sensors::draw(f, app, area),
+        8 => super::charts::draw(f, app, area),
         _ => f.render_widget(Paragraph::new("Coming Soon...").block(Block::default().borders(Borders::ALL)), area),
     }
 }
@@ -92,6 +98,16 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
         spans.push(Span::raw(" | "));
         spans.push(Span::styled("[PgUp/PgDn]", Style::default().add_modifier(Modifier::BOLD)));
         spans.push(Span::raw(" Scroll"));
+    }
+
+    if app.tab_index == 2 {
+        spans.push(Span::raw(" | "));
+        spans.push(Span::styled("[i/c/m/n/u]", Style::default().add_modifier(Modifier::BOLD)));
+        spans.push(Span::raw(" Sort | "));
+        spans.push(Span::styled("[o]", Style::default().add_modifier(Modifier::BOLD)));
+        spans.push(Span::raw(" Own | "));
+        spans.push(Span::styled("[k]", Style::default().add_modifier(Modifier::BOLD)));
+        spans.push(Span::raw(" Kernel"));
     }
 
     f.render_widget(Paragraph::new(vec![Line::from(spans)]).block(Block::default().borders(Borders::ALL)), area);
