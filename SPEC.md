@@ -388,3 +388,49 @@ While `ao` strives to provide a Grand Unified Wrapper, true abstraction across f
 
 Attempting to force macOS and FreeBSD into the Linux `ao` syntax tree risks breaking the "Zero Overhead" and "Safe Execution" tenets.
 **Resolution:** `ao` should strictly target Linux systems (Debian, Fedora, Arch) where paradigms (systemd, iproute2, `/sys`) are roughly homologous. If macOS or FreeBSD support is mandated, `ao` must be split into fundamentally different backends (`src/os/macos.rs`, `src/os/freebsd.rs`) with command subsets gracefully disabled when concepts (like SELinux or `lsblk`) do not map.
+
+## 7. Interactive Dashboard (`ao dashboard`)
+
+The `ao dashboard` command provides a real-time, terminal-based monitoring and administration interface. Built with `ratatui`, it offers a modular, multi-tab experience for high-level system observation and granular resource management.
+
+### 7.1 Architecture & Performance
+
+To maintain the "Zero Overhead" tenet while providing a rich interactive experience, the dashboard utilizes a decoupled architecture:
+
+* **Separated Logic & Rendering**: The main event loop (in `mod.rs`) handles terminal events and tick intervals. All heavy system data processing, sorting, and tree construction are offloaded to an `on_tick` cycle, while the UI `draw` calls strictly render pre-calculated data from the `App` state.
+* **Smart Throttling**: System-wide data polling is stratified. High-frequency data (like global CPU and network speeds) refreshes every **250ms**, while computationally expensive process-tree construction and sorting are throttled to a **10-second** interval by default.
+* **RSS Memory Reporting**: To avoid the massive I/O overhead of virtual memory calculations, the dashboard implements a custom Resident Set Size (RSS) retrieval mechanism. By reading `/proc/[pid]/statm` directly, it provides accurate physical memory footprints with O(1) file access.
+* **CPU Normalization**: Individual process CPU usage is normalized across the total number of system cores. A process using 100% of a single core on a 4-core system is reported as 25% total system usage, ensuring that the sum of all processes accurately correlates with global system load.
+
+### 7.2 Interface Layout
+
+The dashboard is divided into four main functional areas:
+1. **Header**: Displays global system context, including hostname, distribution info, version, and system uptime.
+2. **Tab Bar**: A navigable row of domains (Overview, Storage, Process, etc.), each indicated by a unique icon (🏠, 💽, ⚙, etc.).
+3. **Content Area**: The primary data display, which changes based on the active tab.
+4. **Footer**: Provides a context-sensitive hotkey guide and scroll status.
+
+### 7.3 Domain Tabs Behavior
+
+* **Overview (🏠)**: A split-view dashboard. The left panel (20% width) shows global RAM, Swap, and CPU gauges, followed by individual core usage bars. The right panel displays the Top 10 CPU-consuming and Top 10 Memory-consuming processes, providing instant visibility into system bottlenecks.
+* **Storage (💽)**: Lists physical and virtual block devices. It distinguishes between them visually using icons (💽 for physical disks like `/dev/nvme*` or `/dev/sdX`, 💾 for others). Shows mount points, total/used space, and a visual usage bar.
+* **Process (⚙)**: The most interactive tab, offering two views toggled with `t`:
+    * **List View**: A flat, sortable table of all processes.
+    * **Tree View**: A hierarchical representation of process parent-child relationships. 
+    * **Sorting**: Supports instant sorting by PID (`i`), CPU (`c`), Memory (`m`), Name (`n`), or User (`u`).
+    * **Filtering**: Supports toggling visibility of kernel processes (`k`) and filtering to only show the current user's processes (`o`).
+    * **Depth Control**: Number keys `0-9` dynamically control the expansion depth of the tree view.
+* **User (👤)**: Displays a dual-panel view of recent login sessions (TTY, Host, Time) and a list of system users. Active users are highlighted in **bold green**.
+* **Network (🌐)**: Real-time interface monitoring. Categorizes interfaces with icons (📡 for Wifi, 🔗 for Ethernet, 🔄 for Loopback) and displays link state, IP addresses, and instantaneous Rx/Tx speeds.
+* **Service (🛠)**: Lists all systemd services with their load and active states.
+* **Sensors (🌡)**: Tracks hardware temperatures, sorted alphabetically by device label. It maintains an in-memory maximum tracker to show peak temperatures observed during the dashboard session.
+* **Charts (📈)**: Provides unified historical visualizations:
+    * **System Resources**: Overlays CPU, Memory, and Swap usage on a single 60-second rolling chart.
+    * **Network Throughput**: Shows RX and TX speeds with a **dynamically scaling Y-axis** that adjusts based on peak traffic.
+
+### 7.4 Input & Navigation
+
+The dashboard prioritizes keyboard-driven speed:
+* **Navigation**: `Tab` / `Right Arrow` for next tab, `BackTab` / `Left Arrow` for previous tab. `Up`/`Down` and `PgUp`/`PgDn` for list scrolling.
+* **Global**: `q` to quit the dashboard instantly.
+* **Contextual**: Process management hotkeys (`i`, `c`, `m`, `n`, `u`, `o`, `k`, `t`, `0-9`) are active only when the Process tab is focused.

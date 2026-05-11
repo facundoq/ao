@@ -1,11 +1,11 @@
 use crate::dashboard::app::App;
 use crate::dashboard::utils::format_bytes;
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::Span,
     widgets::{Axis, Block, Borders, Chart, Dataset, GraphType},
-    Frame,
 };
 
 pub fn draw(f: &mut Frame, app: &App, area: Rect) {
@@ -56,11 +56,11 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
                 .title(" System Resources (%) "),
         )
         .x_axis(Axis::default().bounds(x_bounds))
-        .y_axis(
-            Axis::default()
-                .bounds([0.0, 100.0])
-                .labels(vec![Span::raw("0"), Span::raw("50"), Span::raw("100")]),
-        );
+        .y_axis(Axis::default().bounds([0.0, 100.0]).labels(vec![
+            Span::raw("0"),
+            Span::raw("50"),
+            Span::raw("100"),
+        ]));
     f.render_widget(system_chart, chunks[0]);
 
     // 2. Unified Network Chart (RX, TX)
@@ -91,20 +91,15 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         .data(&app.net_tx_history);
 
     let network_chart = Chart::new(vec![rx_dataset, tx_dataset])
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(format!(" Network Throughput (Max: {}/s) ", format_bytes(dynamic_max as u64))),
-        )
+        .block(Block::default().borders(Borders::ALL).title(format!(
+            " Network Throughput (Max: {}/s) ",
+            format_bytes(dynamic_max as u64)
+        )))
         .x_axis(Axis::default().bounds(x_bounds))
-        .y_axis(
-            Axis::default()
-                .bounds([0.0, dynamic_max])
-                .labels(vec![
-                    Span::raw("0"),
-                    Span::raw(format_bytes((dynamic_max / 2.0) as u64)),
-                    Span::raw(format_bytes(dynamic_max as u64)),
-                ]),
-        );
+        .y_axis(Axis::default().bounds([0.0, dynamic_max]).labels(vec![
+            Span::raw("0"),
+            Span::raw(format_bytes((dynamic_max / 2.0) as u64)),
+            Span::raw(format_bytes(dynamic_max as u64)),
+        ]));
     f.render_widget(network_chart, chunks[1]);
 }

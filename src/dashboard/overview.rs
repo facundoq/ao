@@ -1,10 +1,10 @@
 use crate::dashboard::app::App;
 use crate::dashboard::utils::format_bytes;
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     widgets::{Block, Borders, Cell, Gauge, Paragraph, Row, Table},
-    Frame,
 };
 
 pub fn draw(f: &mut Frame, app: &App, area: Rect) {
@@ -36,7 +36,10 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     // 1. RAM
     let mem_used = app.system_info.used_memory();
     let mem_total = app.system_info.total_memory();
-    let mem_percent = mem_used.checked_mul(100).and_then(|v| v.checked_div(mem_total)).unwrap_or(0) as u16;
+    let mem_percent = mem_used
+        .checked_mul(100)
+        .and_then(|v| v.checked_div(mem_total))
+        .unwrap_or(0) as u16;
     let ram_title = format!(" RAM ({}) ", app.ram_config);
     let mem_gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL).title(ram_title))
@@ -48,7 +51,10 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     // 2. Swap
     let swap_used = app.system_info.used_swap();
     let swap_total = app.system_info.total_swap();
-    let swap_percent = swap_used.checked_mul(100).and_then(|v| v.checked_div(swap_total)).unwrap_or(0) as u16;
+    let swap_percent = swap_used
+        .checked_mul(100)
+        .and_then(|v| v.checked_div(swap_total))
+        .unwrap_or(0) as u16;
     let swap_gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL).title(" Swap "))
         .gauge_style(Style::default().fg(Color::Magenta))
@@ -67,25 +73,33 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
     // 4. CPU Cores
     let core_count = app.system_info.cpus().len();
-    let cores_block = Block::default().borders(Borders::ALL).title(format!(" Cores ({}) ", core_count));
+    let cores_block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(" Cores ({}) ", core_count));
     let cores_inner = cores_block.inner(left_chunks[3]);
     f.render_widget(cores_block, left_chunks[3]);
 
     let mut core_constraints = vec![Constraint::Length(1); core_count];
     core_constraints.push(Constraint::Min(0));
-    let core_chunks = Layout::default().direction(Direction::Vertical).constraints(core_constraints).split(cores_inner);
+    let core_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(core_constraints)
+        .split(cores_inner);
 
     for (i, cpu) in app.system_info.cpus().iter().enumerate() {
         if i < core_chunks.len() {
             let usage = cpu.cpu_usage();
             let chunk = core_chunks[i];
-            
+
             let row_chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Length(5), Constraint::Min(0)])
                 .split(chunk);
-            
-            f.render_widget(Paragraph::new(format!("C{:02}:", i)).style(Style::default().fg(Color::Cyan)), row_chunks[0]);
+
+            f.render_widget(
+                Paragraph::new(format!("C{:02}:", i)).style(Style::default().fg(Color::Cyan)),
+                row_chunks[0],
+            );
 
             let core_gauge = Gauge::default()
                 .gauge_style(Style::default().fg(Color::Rgb(255, 200, 150)))
@@ -99,51 +113,71 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
     // 1. Top CPU Processes
     let top_cpu = &app.top_cpu_processes;
-    let cpu_proc_rows: Vec<Row> = top_cpu.iter().map(|p| {
-        Row::new(vec![
-            Cell::from(p.pid.to_string()),
-            Cell::from(p.user.clone()),
-            Cell::from(p.name.clone()),
-            Cell::from(format!("{:.1}%", p.cpu)),
-            Cell::from(format_bytes(p.memory)),
-        ])
-    }).collect();
+    let cpu_proc_rows: Vec<Row> = top_cpu
+        .iter()
+        .map(|p| {
+            Row::new(vec![
+                Cell::from(p.pid.to_string()),
+                Cell::from(p.user.clone()),
+                Cell::from(p.name.clone()),
+                Cell::from(format!("{:.1}%", p.cpu)),
+                Cell::from(format_bytes(p.memory)),
+            ])
+        })
+        .collect();
     let cpu_proc_table = Table::new(
-        cpu_proc_rows, 
+        cpu_proc_rows,
         [
-            Constraint::Length(8), 
-            Constraint::Length(12), 
+            Constraint::Length(8),
+            Constraint::Length(12),
             Constraint::Percentage(40),
-            Constraint::Length(10), 
-            Constraint::Length(12)
-        ]
+            Constraint::Length(10),
+            Constraint::Length(12),
+        ],
     )
-    .header(Row::new(vec!["PID", "User", "Name", "CPU%", "RSS"]).style(Style::default().add_modifier(Modifier::BOLD)))
-    .block(Block::default().borders(Borders::ALL).title(" Top 10 CPU Processes "));
+    .header(
+        Row::new(vec!["PID", "User", "Name", "CPU%", "RSS"])
+            .style(Style::default().add_modifier(Modifier::BOLD)),
+    )
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Top 10 CPU Processes "),
+    );
     f.render_widget(cpu_proc_table, right_chunks[0]);
 
     // 2. Top Mem Processes
     let top_mem = &app.top_mem_processes;
-    let mem_proc_rows: Vec<Row> = top_mem.iter().map(|p| {
-        Row::new(vec![
-            Cell::from(p.pid.to_string()),
-            Cell::from(p.user.clone()),
-            Cell::from(p.name.clone()),
-            Cell::from(format!("{:.1}%", p.cpu)),
-            Cell::from(format_bytes(p.memory)),
-        ])
-    }).collect();
+    let mem_proc_rows: Vec<Row> = top_mem
+        .iter()
+        .map(|p| {
+            Row::new(vec![
+                Cell::from(p.pid.to_string()),
+                Cell::from(p.user.clone()),
+                Cell::from(p.name.clone()),
+                Cell::from(format!("{:.1}%", p.cpu)),
+                Cell::from(format_bytes(p.memory)),
+            ])
+        })
+        .collect();
     let mem_proc_table = Table::new(
-        mem_proc_rows, 
+        mem_proc_rows,
         [
-            Constraint::Length(8), 
-            Constraint::Length(12), 
+            Constraint::Length(8),
+            Constraint::Length(12),
             Constraint::Percentage(40),
-            Constraint::Length(10), 
-            Constraint::Length(12)
-        ]
+            Constraint::Length(10),
+            Constraint::Length(12),
+        ],
     )
-    .header(Row::new(vec!["PID", "User", "Name", "CPU%", "RSS"]).style(Style::default().add_modifier(Modifier::BOLD)))
-    .block(Block::default().borders(Borders::ALL).title(" Top 10 Mem Processes "));
+    .header(
+        Row::new(vec!["PID", "User", "Name", "CPU%", "RSS"])
+            .style(Style::default().add_modifier(Modifier::BOLD)),
+    )
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Top 10 Mem Processes "),
+    );
     f.render_widget(mem_proc_table, right_chunks[1]);
 }
