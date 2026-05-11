@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::dashboard::rss::get_rss;
+use crate::dashboard::rss::{get_process_memory, get_rss};
 use crate::os::detector::DetectedSystem;
 use crate::os::{ContainerInfo, NetInterfaceInfo, SensorInfo, ServiceInfo, UserSessionInfo};
 use std::collections::HashMap;
@@ -71,10 +71,14 @@ pub struct ProcessTreeNode {
     pub user: String,
     pub cpu_usage: f32,
     pub memory: u64,
+    pub virt_mem: u64,
+    pub shared_mem: u64,
     pub depth: u32,
     pub children: Vec<ProcessTreeNode>,
     pub total_cpu: f32,
     pub total_mem: u64,
+    pub total_virt: u64,
+    pub total_shared: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -83,6 +87,8 @@ pub struct ProcessSummary {
     pub name: String,
     pub user: String,
     pub memory: u64,
+    pub virt_mem: u64,
+    pub shared_mem: u64,
     pub cpu: f32,
     pub command: String,
 }
@@ -93,6 +99,8 @@ pub struct FlattenedTreeNode {
     pub user: String,
     pub cpu: String,
     pub mem: String,
+    pub virt: String,
+    pub shared: String,
     pub name: String,
     pub depth: u32,
 }
@@ -329,6 +337,58 @@ impl<'a> App<'a> {
         self.flattened_tree = self.calculate_flattened_tree();
     }
 
+    pub fn get_top_cpu_processes(&self, count: usize) -> Vec<ProcessSummary> {
+        let mut all = Vec::new();
+        fn flatten(node: &ProcessTreeNode, out: &mut Vec<ProcessSummary>) {
+            out.push(ProcessSummary {
+                pid: node.pid,
+                name: node.name.clone(),
+                user: node.user.clone(),
+                memory: node.total_mem,
+                virt_mem: node.total_virt,
+                shared_mem: node.total_shared,
+                cpu: node.total_cpu,
+                command: "".to_string(),
+            });
+            for child in &node.children {
+                flatten(child, out);
+            }
+        }
+        for root in &self.process_tree {
+            flatten(root, &mut all);
+        }
+        all.sort_by(|a, b| {
+            b.cpu
+                .partial_cmp(&a.cpu)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        all.into_iter().take(count).collect()
+    }
+
+    pub fn get_top_mem_processes(&self, count: usize) -> Vec<ProcessSummary> {
+        let mut all = Vec::new();
+        fn flatten(node: &ProcessTreeNode, out: &mut Vec<ProcessSummary>) {
+            out.push(ProcessSummary {
+                pid: node.pid,
+                name: node.name.clone(),
+                user: node.user.clone(),
+                memory: node.total_mem,
+                virt_mem: node.total_virt,
+                shared_mem: node.total_shared,
+                cpu: node.total_cpu,
+                command: "".to_string(),
+            });
+            for child in &node.children {
+                flatten(child, out);
+            }
+        }
+        for root in &self.process_tree {
+            flatten(root, &mut all);
+        }
+        all.sort_by_key(|n| std::cmp::Reverse(n.memory));
+        all.into_iter().take(count).collect()
+    }
+
     pub fn get_sorted_processes(&self) -> Vec<ProcessSummary> {
         let current_uid = unsafe { libc::getuid() };
         let mut processes: Vec<&Process> = self
@@ -397,11 +457,14 @@ impl<'a> App<'a> {
                     .and_then(|uid| self.users_list.get_user_by_id(uid))
                     .map(|u| u.name().to_string())
                     .unwrap_or_else(|| "unknown".to_string());
+                let mem = get_process_memory(p.pid());
                 ProcessSummary {
                     pid: p.pid(),
                     name: p.name().to_string_lossy().to_string(),
                     user: user_name,
-                    memory: get_rss(p.pid()),
+                    memory: mem.rss,
+                    virt_mem: mem.virt,
+                    shared_mem: mem.shared,
                     cpu: p.cpu_usage() / self.system_info.cpus().len() as f32,
                     command: p
                         .exe()
@@ -465,13 +528,19 @@ impl<'a> App<'a> {
             let process = processes[&pid];
             let mut children = Vec::new();
             let mut total_cpu = process.cpu_usage() / cpu_count;
-            let mut total_mem = get_rss(pid);
+            let mem = get_process_memory(pid);
+            let mut total_mem = mem.rss;
+            let mut total_virt = mem.virt;
+            let mut total_shared = mem.shared;
+
             if let Some(child_pids) = tree.get(&pid) {
                 for &child_pid in child_pids {
                     let child_node =
                         build_node(child_pid, depth + 1, processes, tree, users, cpu_count);
                     total_cpu += child_node.total_cpu;
                     total_mem += child_node.total_mem;
+                    total_virt += child_node.total_virt;
+                    total_shared += child_node.total_shared;
                     children.push(child_node);
                 }
             }
@@ -485,11 +554,15 @@ impl<'a> App<'a> {
                 name: process.name().to_string_lossy().to_string(),
                 user: user_name,
                 cpu_usage: process.cpu_usage() / cpu_count,
-                memory: get_rss(pid),
+                memory: mem.rss,
+                virt_mem: mem.virt,
+                shared_mem: mem.shared,
                 depth,
                 children,
                 total_cpu,
                 total_mem,
+                total_virt,
+                total_shared,
             }
         }
         let mut root_nodes = Vec::new();
@@ -531,11 +604,32 @@ impl<'a> App<'a> {
             } else {
                 format_bytes(node.memory)
             };
+            let virt_str = if node.depth < max_depth && !node.children.is_empty() {
+                format!(
+                    "{} ({})",
+                    format_bytes(node.virt_mem),
+                    format_bytes(node.total_virt)
+                )
+            } else {
+                format_bytes(node.virt_mem)
+            };
+            let shared_str = if node.depth < max_depth && !node.children.is_empty() {
+                format!(
+                    "{} ({})",
+                    format_bytes(node.shared_mem),
+                    format_bytes(node.total_shared)
+                )
+            } else {
+                format_bytes(node.shared_mem)
+            };
+
             rows.push(FlattenedTreeNode {
                 pid: node.pid.to_string(),
                 user: node.user.clone(),
                 cpu: cpu_str,
                 mem: mem_str,
+                virt: virt_str,
+                shared: shared_str,
                 name: format!("{}{}{}", indent, prefix, node.name),
                 depth: node.depth,
             });

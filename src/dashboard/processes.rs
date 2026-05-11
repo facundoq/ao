@@ -34,7 +34,9 @@ fn draw_process_list(f: &mut Frame, app: &App, area: Rect) {
         ("PID", app.process_sort == ProcessSort::Pid),
         ("User", app.process_sort == ProcessSort::User),
         ("CPU%", app.process_sort == ProcessSort::Cpu),
+        ("VIRT", false),
         ("RSS", app.process_sort == ProcessSort::Mem),
+        ("SHR", false),
         ("Name", app.process_sort == ProcessSort::Name),
         ("Command", false),
     ]
@@ -59,8 +61,10 @@ fn draw_process_list(f: &mut Frame, app: &App, area: Rect) {
             Row::new(vec![
                 Cell::from(p.pid.to_string()),
                 Cell::from(p.user.clone()).style(Style::default().fg(get_user_color(&p.user))),
-                Cell::from(format!("{:.1}", p.cpu)),
+                Cell::from(format!("{:.1}%", p.cpu * 100.0)),
+                Cell::from(format_bytes(p.virt_mem)),
                 Cell::from(format_bytes(p.memory)),
+                Cell::from(format_bytes(p.shared_mem)),
                 Cell::from(p.name.clone()),
                 Cell::from(p.command.clone()),
             ])
@@ -71,6 +75,8 @@ fn draw_process_list(f: &mut Frame, app: &App, area: Rect) {
         [
             Constraint::Length(8),
             Constraint::Length(12),
+            Constraint::Length(8),
+            Constraint::Length(10),
             Constraint::Length(10),
             Constraint::Length(10),
             Constraint::Length(20),
@@ -92,7 +98,9 @@ fn draw_process_tree(f: &mut Frame, app: &App, area: Rect) {
         ("PID", app.process_sort == ProcessSort::Pid),
         ("User", app.process_sort == ProcessSort::User),
         ("CPU% (Total)", app.process_sort == ProcessSort::Cpu),
+        ("VIRT (Total)", false),
         ("RSS (Total)", app.process_sort == ProcessSort::Mem),
+        ("SHR (Total)", false),
         ("Process Tree", app.process_sort == ProcessSort::Name),
     ]
     .iter()
@@ -124,7 +132,9 @@ fn draw_process_tree(f: &mut Frame, app: &App, area: Rect) {
                 Cell::from(node.user.clone())
                     .style(Style::default().fg(get_user_color(&node.user))),
                 Cell::from(node.cpu.clone()),
+                Cell::from(node.virt.clone()),
                 Cell::from(node.mem.clone()),
+                Cell::from(node.shared.clone()),
                 Cell::from(node.name.clone()),
             ])
             .style(style)
@@ -136,7 +146,9 @@ fn draw_process_tree(f: &mut Frame, app: &App, area: Rect) {
             Constraint::Length(8),
             Constraint::Length(12),
             Constraint::Length(15),
-            Constraint::Length(20),
+            Constraint::Length(15),
+            Constraint::Length(15),
+            Constraint::Length(15),
             Constraint::Min(0),
         ],
     )
