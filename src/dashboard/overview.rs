@@ -82,7 +82,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let cores_inner = cores_block.inner(left_chunks[3]);
     f.render_widget(cores_block, left_chunks[3]);
 
-    let mut core_constraints = vec![Constraint::Length(1); core_count];
+    let mut core_constraints = vec![Constraint::Length(2); core_count];
     core_constraints.push(Constraint::Min(0));
     let core_chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -92,9 +92,6 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     for (i, cpu) in app.system_info.cpus().iter().enumerate() {
         if i < core_chunks.len() {
             let usage = cpu.cpu_usage();
-            // Just for debugging, we can log to a file or standard error.
-            // Using stderr is usually safe if we are in TUI mode.
-            // eprintln!("CPU {} usage: {}", i, usage);
             let chunk = core_chunks[i];
 
             let row_chunks = Layout::default()
