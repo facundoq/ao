@@ -7,6 +7,7 @@ use super::linux_generic::{
     StandardLog, StandardMonitor, StandardNet, StandardPartition, StandardSec, StandardSelf,
     StandardSys, StandardUser, StandardVirt, Systemd,
 };
+use super::macos::{MacOSPackage, MacOSService};
 use super::{
     BootManager, DevManager, DiskManager, DistroManager, Domain, GroupManager, GuiManager,
     LogManager, NetManager, OverviewManager, PackageDomain, PackageManager, PartitionManager,
@@ -68,10 +69,14 @@ pub enum Distro {
     Arch,
     Fedora,
     Alpine,
+    MacOS,
 }
 
 impl Distro {
     pub fn detect() -> Result<Self> {
+        #[cfg(target_os = "macos")]
+        return Ok(Distro::MacOS);
+
         let mut os_release = String::new();
         if let Ok(file) = File::open(OS_RELEASE_PATH) {
             let reader = BufReader::new(file);
@@ -101,18 +106,31 @@ impl Distro {
 pub fn detect_system() -> Result<DetectedSystem> {
     let distro = Distro::detect()?;
 
-    let pkg_manager: Box<dyn PackageManager> = match distro {
-        Distro::Debian => Box::new(Apt),
-        Distro::Arch => Box::new(Pacman),
-        Distro::Fedora => Box::new(Dnf),
-        Distro::Alpine => Box::new(Apk),
+    let (pkg_manager, svc_manager, overview_manager): (
+        Box<dyn PackageManager>,
+        Box<dyn ServiceManager>,
+        Box<dyn OverviewManager>,
+    ) = match distro {
+        Distro::Debian => (Box::new(Apt), Box::new(Systemd), Box::new(StandardMonitor)),
+        Distro::Arch => (
+            Box::new(Pacman),
+            Box::new(Systemd),
+            Box::new(StandardMonitor),
+        ),
+        Distro::Fedora => (Box::new(Dnf), Box::new(Systemd), Box::new(StandardMonitor)),
+        Distro::Alpine => (Box::new(Apk), Box::new(Systemd), Box::new(StandardMonitor)),
+        Distro::MacOS => (
+            Box::new(MacOSPackage),
+            Box::new(MacOSService),
+            Box::new(StandardMonitor),
+        ),
     };
 
     Ok(DetectedSystem {
         pkg: Box::new(PackageDomain {
             manager: pkg_manager,
         }),
-        svc: Box::new(Systemd),
+        svc: svc_manager,
         net: Box::new(StandardNet),
         dev: Box::new(StandardDev),
         virt: Box::new(StandardVirt),
@@ -126,7 +144,7 @@ pub fn detect_system() -> Result<DetectedSystem> {
         sys: Box::new(StandardSys),
         log: Box::new(StandardLog),
         distro: Box::new(StandardDistro),
-        overview: Box::new(StandardMonitor),
+        overview: overview_manager,
         self_manager: Box::new(StandardSelf),
     })
 }

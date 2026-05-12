@@ -9,6 +9,7 @@ pub mod debian;
 pub mod detector;
 pub mod fedora;
 pub mod linux_generic;
+pub mod macos;
 
 pub const EXECUTABLE_NAME: &str = "ao";
 
