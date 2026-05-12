@@ -5,14 +5,19 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::Span,
-    widgets::{Axis, Block, Borders, Chart, Dataset, GraphType},
+    widgets::{Axis, Block, Borders, Chart, Dataset, GraphType, LegendPosition},
 };
 
 pub fn draw(f: &mut Frame, app: &App, area: Rect) {
+    let main_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(100)])
+        .split(area);
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(area);
+        .split(main_chunks[0]);
 
     let x_bounds = if app.cpu_history.is_empty() {
         [0.0, 60.0]
@@ -55,6 +60,8 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
                 .borders(Borders::ALL)
                 .title(" System Resources (%) "),
         )
+        .legend_position(Some(LegendPosition::TopRight))
+        .hidden_legend_constraints((Constraint::Min(0), Constraint::Min(0)))
         .x_axis(Axis::default().bounds(x_bounds))
         .y_axis(Axis::default().bounds([0.0, 100.0]).labels(vec![
             Span::raw("0"),
@@ -74,7 +81,10 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         .iter()
         .map(|(_, v)| *v)
         .fold(0.0, f64::max);
-    let dynamic_max = max_rx.max(max_tx).max(1024.0); // At least 1KB/s
+    let dynamic_max = max_rx
+        .max(max_tx)
+        .max(app.max_rx_throughput as f64)
+        .max(app.max_tx_throughput as f64); // Remembered peaks
 
     let rx_dataset = Dataset::default()
         .name("RX")
@@ -95,6 +105,8 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             " Network Throughput (Max: {}/s) ",
             format_bytes(dynamic_max as u64)
         )))
+        .legend_position(Some(LegendPosition::TopRight))
+        .hidden_legend_constraints((Constraint::Min(0), Constraint::Min(0)))
         .x_axis(Axis::default().bounds(x_bounds))
         .y_axis(Axis::default().bounds([0.0, dynamic_max]).labels(vec![
             Span::raw("0"),

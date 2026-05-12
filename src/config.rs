@@ -37,6 +37,8 @@ pub struct UiConfig {
     pub process_tree_depth: u32,
     pub process_current_user_only: bool,
     pub process_filter: String,
+    pub max_rx_throughput: u64,
+    pub max_tx_throughput: u64,
     pub refresh_rate_ms: u64,
 }
 
@@ -55,7 +57,9 @@ impl Default for UiConfig {
             process_tree_depth: 2,
             process_current_user_only: false,
             process_filter: String::new(),
-            refresh_rate_ms: 250,
+            max_rx_throughput: 1024,
+            max_tx_throughput: 1024,
+            refresh_rate_ms: 1000,
         }
     }
 }

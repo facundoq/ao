@@ -1,0 +1,14 @@
+   Compiling ao-cli v0.1.19 (/home/facundoq/dev/ao)
+error[E0599]: no method named `refresh_cpu` found for struct `sysinfo::System` in the current scope
+   --> src/dashboard/app.rs:384:26
+    |
+384 |         self.system_info.refresh_cpu();
+    |                          ^^^^^^^^^^^
+    |
+help: there is a method `refresh_cpu_all` with a similar name
+    |
+384 |         self.system_info.refresh_cpu_all();
+    |                                     ++++
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `ao-cli` (lib) due to 1 previous error

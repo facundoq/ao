@@ -381,7 +381,7 @@ impl<'a> App<'a> {
             sysinfo::ProcessRefreshKind::everything(),
         );
         self.system_info.refresh_memory();
-        self.system_info.refresh_cpu_all();
+        self.system_info.refresh_all();
         self.disks.refresh(true);
         self.networks.refresh(true);
         self.refresh_process_data(false);

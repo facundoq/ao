@@ -144,6 +144,12 @@ impl LogManager for StandardLog {
     }
 
     fn file(&self, path: &str, lines: u32, follow: bool) -> Result<Box<dyn ExecutableCommand>> {
+        let abs_path = std::fs::canonicalize(path)?;
+        let allowed = ["/var/log"];
+        if !allowed.iter().any(|dir| abs_path.starts_with(dir)) {
+            anyhow::bail!("Access to {} is denied for security reasons.", path);
+        }
+
         let mut cmd = SystemCommand::new("tail");
         if follow {
             cmd = cmd.arg("-f");

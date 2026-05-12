@@ -92,6 +92,16 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     for (i, cpu) in app.system_info.cpus().iter().enumerate() {
         if i < core_chunks.len() {
             let usage = cpu.cpu_usage();
+            // Log to debug file
+            use std::io::Write;
+            if let Ok(mut file) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("/tmp/ao_cpu_debug.txt")
+            {
+                let _ = writeln!(file, "CPU {} usage: {}", i, usage);
+            }
+
             let chunk = core_chunks[i];
 
             let row_chunks = Layout::default()
