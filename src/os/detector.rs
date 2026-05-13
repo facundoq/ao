@@ -7,7 +7,7 @@ use super::linux_generic::{
     StandardLog, StandardMonitor, StandardNet, StandardPartition, StandardSec, StandardSelf,
     StandardSys, StandardUser, StandardVirt, Systemd,
 };
-use super::macos::{MacOSPackage, MacOSService};
+use super::macos;
 use super::{
     BootManager, DevManager, DiskManager, DistroManager, Domain, GroupManager, GuiManager,
     LogManager, NetManager, OverviewManager, PackageDomain, PackageManager, PartitionManager,
@@ -106,45 +106,66 @@ impl Distro {
 pub fn detect_system() -> Result<DetectedSystem> {
     let distro = Distro::detect()?;
 
-    let (pkg_manager, svc_manager, overview_manager): (
-        Box<dyn PackageManager>,
-        Box<dyn ServiceManager>,
-        Box<dyn OverviewManager>,
-    ) = match distro {
-        Distro::Debian => (Box::new(Apt), Box::new(Systemd), Box::new(StandardMonitor)),
-        Distro::Arch => (
-            Box::new(Pacman),
-            Box::new(Systemd),
-            Box::new(StandardMonitor),
-        ),
-        Distro::Fedora => (Box::new(Dnf), Box::new(Systemd), Box::new(StandardMonitor)),
-        Distro::Alpine => (Box::new(Apk), Box::new(Systemd), Box::new(StandardMonitor)),
-        Distro::MacOS => (
-            Box::new(MacOSPackage),
-            Box::new(MacOSService),
-            Box::new(StandardMonitor),
-        ),
-    };
-
-    Ok(DetectedSystem {
-        pkg: Box::new(PackageDomain {
-            manager: pkg_manager,
+    match distro {
+        Distro::MacOS => Ok(DetectedSystem {
+            pkg: Box::new(PackageDomain {
+                manager: Box::new(macos::MacOSPackage),
+            }),
+            svc: Box::new(macos::MacOSService),
+            net: Box::new(macos::MacOSNet),
+            dev: Box::new(StandardDev),
+            virt: Box::new(macos::MacOSVirt),
+            sec: Box::new(macos::MacOSSec),
+            boot: Box::new(macos::MacOSBoot),
+            gui: Box::new(macos::MacOSGui),
+            user: Box::new(macos::MacOSUser),
+            group: Box::new(macos::MacOSGroup),
+            disk: Box::new(macos::MacOSDisk),
+            partition: Box::new(macos::MacOSPartition),
+            sys: Box::new(macos::MacOSSys),
+            log: Box::new(macos::MacOSLog),
+            distro: Box::new(macos::MacOSDistro),
+            overview: Box::new(macos::MacOSOverview),
+            self_manager: Box::new(macos::MacOSSelf),
         }),
-        svc: svc_manager,
-        net: Box::new(StandardNet),
-        dev: Box::new(StandardDev),
-        virt: Box::new(StandardVirt),
-        sec: Box::new(StandardSec),
-        boot: Box::new(StandardBoot),
-        gui: Box::new(StandardGui),
-        user: Box::new(StandardUser),
-        group: Box::new(StandardGroup),
-        disk: Box::new(StandardDisk),
-        partition: Box::new(StandardPartition),
-        sys: Box::new(StandardSys),
-        log: Box::new(StandardLog),
-        distro: Box::new(StandardDistro),
-        overview: overview_manager,
-        self_manager: Box::new(StandardSelf),
-    })
+        _ => {
+            let (pkg_manager, svc_manager, overview_manager): (
+                Box<dyn PackageManager>,
+                Box<dyn ServiceManager>,
+                Box<dyn OverviewManager>,
+            ) = match distro {
+                Distro::Debian => (Box::new(Apt), Box::new(Systemd), Box::new(StandardMonitor)),
+                Distro::Arch => (
+                    Box::new(Pacman),
+                    Box::new(Systemd),
+                    Box::new(StandardMonitor),
+                ),
+                Distro::Fedora => (Box::new(Dnf), Box::new(Systemd), Box::new(StandardMonitor)),
+                Distro::Alpine => (Box::new(Apk), Box::new(Systemd), Box::new(StandardMonitor)),
+                Distro::MacOS => unreachable!(),
+            };
+
+            Ok(DetectedSystem {
+                pkg: Box::new(PackageDomain {
+                    manager: pkg_manager,
+                }),
+                svc: svc_manager,
+                net: Box::new(StandardNet),
+                dev: Box::new(StandardDev),
+                virt: Box::new(StandardVirt),
+                sec: Box::new(StandardSec),
+                boot: Box::new(StandardBoot),
+                gui: Box::new(StandardGui),
+                user: Box::new(StandardUser),
+                group: Box::new(StandardGroup),
+                disk: Box::new(StandardDisk),
+                partition: Box::new(StandardPartition),
+                sys: Box::new(StandardSys),
+                log: Box::new(StandardLog),
+                distro: Box::new(StandardDistro),
+                overview: overview_manager,
+                self_manager: Box::new(StandardSelf),
+            })
+        }
+    }
 }

@@ -13,20 +13,6 @@ fn get_engine() -> String {
     }
 }
 
-async fn build_musl_binary() {
-    println!("Building musl binary...");
-    let build = Command::new("cargo")
-        .args([
-            "build",
-            "--release",
-            "--target",
-            "x86_64-unknown-linux-musl",
-        ])
-        .status()
-        .expect("Failed to build musl binary");
-    assert!(build.success());
-}
-
 async fn build_test_image(engine: &str, distro: &str) -> String {
     let image_name = format!("ao-test-{}", distro);
     let dockerfile = format!("tests/containers/{}.Dockerfile", distro);
@@ -44,9 +30,23 @@ async fn build_test_image(engine: &str, distro: &str) -> String {
 async fn run_test_in_image(engine: &str, image_name: &str) {
     println!("Running tests on {}...", image_name);
 
-    // 1. Start container
+    let current_dir = std::env::current_dir().expect("Failed to get current dir");
+    let current_dir_str = current_dir.to_string_lossy();
+    let log_file_name = format!("test_{}.log", image_name);
+    let log_file_path = current_dir.join(&log_file_name);
+
+    // 1. Start container with bind mount
     let output = Command::new(engine)
-        .args(["run", "-d", "--rm", image_name, "sleep", "300"])
+        .args([
+            "run",
+            "-d",
+            "--rm",
+            "-v",
+            &format!("{}:/ao", current_dir_str),
+            image_name,
+            "sleep",
+            "600",
+        ])
         .output()
         .expect("Failed to start container");
 
@@ -64,26 +64,17 @@ async fn run_test_in_image(engine: &str, image_name: &str) {
         id: container_id.clone(),
     };
 
-    // 2. Copy binary and script
-    let binary_path = "target/x86_64-unknown-linux-musl/release/ao";
-    let test_script = "tests/read_only_tests.sh";
+    // 2. Run tests inside the container (compiling if needed)
+    println!("Building and testing inside {}...", image_name);
+    println!("Diagnostics will be saved to {}", log_file_name);
 
-    Command::new(engine)
-        .args([
-            "cp",
-            binary_path,
-            &format!("{}:/usr/local/bin/ao", container_id),
-        ])
-        .status()
-        .expect("cp binary failed");
-    Command::new(engine)
-        .args(["cp", test_script, &format!("{}:/tmp/test.sh", container_id)])
-        .status()
-        .expect("cp script failed");
+    let test_script = format!(
+        "export RUST_BACKTRACE=1 && cargo test -- --nocapture > /ao/{} 2>&1 && bash tests/read_only_tests.sh >> /ao/{} 2>&1",
+        log_file_name, log_file_name
+    );
 
-    // 3. Run tests
     let output = Command::new(engine)
-        .args(["exec", &container_id, "bash", "/tmp/test.sh"])
+        .args(["exec", &container_id, "bash", "-c", &test_script])
         .output()
         .expect("Failed to execute tests");
 
@@ -92,8 +83,18 @@ async fn run_test_in_image(engine: &str, image_name: &str) {
 
     if !output.status.success() {
         println!("Tests FAILED on {}", image_name);
-        println!("STDOUT:\n{}", stdout);
-        println!("STDERR:\n{}", stderr);
+
+        // Try to read the log file from the host since it's a bind mount
+        if let Ok(log_content) = std::fs::read_to_string(&log_file_path) {
+            println!("--- LOG FILE CONTENT ({}) ---", log_file_name);
+            println!("{}", log_content);
+            println!("--- END OF LOG FILE ---");
+        } else {
+            println!("(Could not read log file {})", log_file_name);
+            println!("STDOUT:\n{}", stdout);
+            println!("STDERR:\n{}", stderr);
+        }
+
         panic!(
             "Integration tests failed on {} (Exit code: {:?})",
             image_name,
@@ -101,6 +102,8 @@ async fn run_test_in_image(engine: &str, image_name: &str) {
         );
     } else {
         println!("Tests PASSED on {}", image_name);
+        // Optionally clean up the log file on success
+        let _ = std::fs::remove_file(&log_file_path);
     }
 }
 
@@ -120,10 +123,9 @@ impl Drop for ContainerGuard {
 #[tokio::test]
 #[ignore]
 async fn test_distros() {
-    build_musl_binary().await;
     let engine = get_engine();
 
-    let distros = ["debian", "ubuntu", "fedora", "archlinux", "alpine"];
+    let distros = ["debian", "ubuntu", "fedora", "archlinux", "alpine", "macos"];
 
     for distro in distros {
         let image = build_test_image(&engine, distro).await;

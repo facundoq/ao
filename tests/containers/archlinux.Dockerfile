@@ -4,4 +4,12 @@ RUN pacman -Syu --noconfirm && pacman -S --noconfirm \
     iproute2 \
     procps-ng \
     which \
+    base-devel \
+    rustup \
+    git \
     && pacman -Scc --noconfirm
+
+RUN rustup default stable
+
+WORKDIR /ao
+VOLUME /ao

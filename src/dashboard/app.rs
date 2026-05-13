@@ -375,13 +375,13 @@ impl<'a> App<'a> {
         let elapsed = now.duration_since(self.last_tick_time).as_secs_f64();
         self.last_tick_time = now;
 
+        self.system_info.refresh_memory();
+        self.system_info.refresh_cpu_all();
         self.system_info.refresh_processes_specifics(
             sysinfo::ProcessesToUpdate::All,
             true,
             sysinfo::ProcessRefreshKind::everything(),
         );
-        self.system_info.refresh_memory();
-        self.system_info.refresh_all();
         self.disks.refresh(true);
         self.networks.refresh(true);
         self.refresh_process_data(false);
@@ -1001,8 +1001,40 @@ mod tests {
     fn setup_test_app() -> App<'static> {
         // We need a DetectedSystem, but we don't want to actually detect it if possible.
         // For now, let's just use the real one if we are on Linux, or bail.
-        let system = Box::leak(Box::new(detect_system().unwrap()));
-        App::new(system)
+        let system_res = detect_system();
+        if let Ok(system) = system_res {
+            let system_leaked = Box::leak(Box::new(system));
+            App::new(system_leaked)
+        } else {
+            // Fallback for tests in environments where detection fails
+            use crate::os::PackageDomain;
+            use crate::os::debian::Apt;
+            use crate::os::detector::DetectedSystem;
+            use crate::os::linux_generic::*;
+
+            let system = Box::leak(Box::new(DetectedSystem {
+                pkg: Box::new(PackageDomain {
+                    manager: Box::new(Apt),
+                }),
+                svc: Box::new(Systemd),
+                net: Box::new(StandardNet),
+                dev: Box::new(StandardDev),
+                virt: Box::new(StandardVirt),
+                sec: Box::new(StandardSec),
+                boot: Box::new(StandardBoot),
+                gui: Box::new(StandardGui),
+                user: Box::new(StandardUser),
+                group: Box::new(StandardGroup),
+                disk: Box::new(StandardDisk),
+                partition: Box::new(StandardPartition),
+                sys: Box::new(StandardSys),
+                log: Box::new(StandardLog),
+                distro: Box::new(StandardDistro),
+                overview: Box::new(StandardMonitor),
+                self_manager: Box::new(StandardSelf),
+            }));
+            App::new(system)
+        }
     }
 
     #[test]
@@ -1025,6 +1057,7 @@ mod tests {
     fn test_selection_logic() {
         let mut app = setup_test_app();
         app.tab_index = 1; // Processes
+        app.use_tree_view = false;
         // Mock some processes
         app.sorted_processes = vec![
             ProcessSummary {
