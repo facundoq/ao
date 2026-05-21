@@ -64,3 +64,20 @@ jobs:
       - name: Run Integration Tests
         # Skip testcontainers tests in CI as it requires a docker daemon
         run: cargo test --test print_commands --test shell_completions
+
+  test-macos:
+    name: Test on MacOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build
+      - name: Run Tests
+        run: cargo test --bins --test macos_tests
+      - name: Run Integration Tests
+        run: cargo test --test print_commands --test shell_completions
+

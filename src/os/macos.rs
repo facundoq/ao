@@ -155,10 +155,51 @@ impl ServiceManager for MacOSService {
         ))
     }
     fn get_services(&self) -> Result<Vec<String>> {
-        Ok(vec![])
+        let output = std::process::Command::new("launchctl")
+            .arg("list")
+            .output()?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut services = Vec::new();
+        for line in stdout.lines().skip(1) {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if let Some(label) = parts.get(2) {
+                services.push(label.to_string());
+            }
+        }
+        Ok(services)
     }
     fn get_all_services_info(&self) -> Result<Vec<ServiceInfo>> {
-        Ok(vec![])
+        let output = std::process::Command::new("launchctl")
+            .arg("list")
+            .output()?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut services = Vec::new();
+        for line in stdout.lines().skip(1) {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() < 3 {
+                continue;
+            }
+            let pid = parts[0];
+            let status_code = parts[1];
+            let label = parts[2];
+
+            let status = if pid != "-" {
+                "running"
+            } else if status_code != "0" {
+                "error"
+            } else {
+                "stopped"
+            };
+
+            services.push(ServiceInfo {
+                name: label.to_string(),
+                description: String::new(),
+                status: status.to_string(),
+                loaded: (pid != "-").to_string(),
+                active: (pid != "-").to_string(),
+            });
+        }
+        Ok(services)
     }
 }
 
@@ -522,7 +563,34 @@ impl NetManager for MacOSNet {
         Ok(interfaces)
     }
     fn get_fw_rules(&self) -> Result<Vec<FwRuleInfo>> {
-        Ok(vec![])
+        let output = std::process::Command::new("/usr/libexec/ApplicationFirewall/socketfilterfw")
+            .arg("--listapps")
+            .output()?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut rules = Vec::new();
+        // Parsing socketfilterfw --listapps is complex, but we can extract app names and their status
+        // Output format is like:
+        // ALF: total number of apps = 1
+        // 1 :  /usr/libexec/sharingd ( Allow incoming connections )
+        for line in stdout.lines() {
+            if line.contains(" : ") {
+                let parts: Vec<&str> = line.split(" : ").collect();
+                if parts.len() >= 2 {
+                    let path = parts[1].split('(').next().unwrap_or("").trim().to_string();
+                    let action = if line.contains("Allow") {
+                        "ALLOW"
+                    } else {
+                        "DENY"
+                    };
+                    rules.push(FwRuleInfo {
+                        to: path,
+                        action: action.to_string(),
+                        from: "ANY".to_string(),
+                    });
+                }
+            }
+        }
+        Ok(rules)
     }
 }
 
@@ -622,6 +690,113 @@ impl SysManager for MacOSSys {
             })
             .unwrap_or(0);
 
+        let uptime = if let Ok(output) = std::process::Command::new("sysctl")
+            .arg("-n")
+            .arg("kern.boottime")
+            .output()
+        {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            // Format is { sec = 1621345678, usec = 123456 }
+            if let Some(sec_part) = stdout.split("sec = ").nth(1) {
+                if let Some(sec_str) = sec_part.split(',').next() {
+                    if let Ok(boot_time) = sec_str.parse::<u64>() {
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs();
+                        let diff = now.saturating_sub(boot_time);
+                        let days = diff / 86400;
+                        let hours = (diff % 86400) / 3600;
+                        let mins = (diff % 3600) / 60;
+                        format!("{}d {}h {}m", days, hours, mins)
+                    } else {
+                        "Unknown".to_string()
+                    }
+                } else {
+                    "Unknown".to_string()
+                }
+            } else {
+                "Unknown".to_string()
+            }
+        } else {
+            "Unknown".to_string()
+        };
+
+        let mut used_memory = 0;
+        if let Ok(output) = std::process::Command::new("vm_stat").output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let mut page_size = 4096;
+            let mut active_pages = 0;
+            let mut wired_pages = 0;
+            let mut compressed_pages = 0;
+
+            for line in stdout.lines() {
+                if line.contains("page size of") {
+                    if let Some(ps_val) = line
+                        .split("page size of ")
+                        .nth(1)
+                        .and_then(|ps| ps.split(' ').next())
+                    {
+                        page_size = ps_val.parse::<u64>().unwrap_or(4096);
+                    }
+                } else if line.contains("Pages active:") {
+                    active_pages = line
+                        .split(':')
+                        .nth(1)
+                        .unwrap_or("")
+                        .trim()
+                        .trim_end_matches('.')
+                        .parse::<u64>()
+                        .unwrap_or(0);
+                } else if line.contains("Pages wired down:") {
+                    wired_pages = line
+                        .split(':')
+                        .nth(1)
+                        .unwrap_or("")
+                        .trim()
+                        .trim_end_matches('.')
+                        .parse::<u64>()
+                        .unwrap_or(0);
+                } else if line.contains("Pages occupied by compressor:") {
+                    compressed_pages = line
+                        .split(':')
+                        .nth(1)
+                        .unwrap_or("")
+                        .trim()
+                        .trim_end_matches('.')
+                        .parse::<u64>()
+                        .unwrap_or(0);
+                }
+            }
+            used_memory = (active_pages + wired_pages + compressed_pages) * page_size;
+        }
+
+        let system_users_count = std::process::Command::new("dscl")
+            .arg(".")
+            .arg("-list")
+            .arg("/Users")
+            .output()
+            .map(|o| {
+                String::from_utf8_lossy(&o.stdout)
+                    .lines()
+                    .filter(|l| l.starts_with('_'))
+                    .count()
+            })
+            .unwrap_or(0);
+
+        let common_users_count = std::process::Command::new("dscl")
+            .arg(".")
+            .arg("-list")
+            .arg("/Users")
+            .output()
+            .map(|o| {
+                String::from_utf8_lossy(&o.stdout)
+                    .lines()
+                    .filter(|l| !l.starts_with('_'))
+                    .count()
+            })
+            .unwrap_or(0);
+
         use super::linux_generic::common::format_bytes;
 
         Ok(SysInfoData {
@@ -629,13 +804,13 @@ impl SysManager for MacOSSys {
             os: format!("{} {}", os, os_ver),
             kernel,
             architecture: arch,
-            uptime: "Unknown".to_string(), // Simplified
+            uptime,
             cpu_count,
             cpu_model,
             total_memory,
-            used_memory: 0,
+            used_memory,
             total_memory_readable: format_bytes(total_memory),
-            used_memory_readable: "0 B".to_string(),
+            used_memory_readable: format_bytes(used_memory),
             ram_type: String::new(),
             ram_model: String::new(),
             ram_config: String::new(),
@@ -645,8 +820,8 @@ impl SysManager for MacOSSys {
             wifi_adapters: vec![],
             bt_adapters: vec![],
             monitors: vec![],
-            system_users_count: 0,
-            common_users_count: 0,
+            system_users_count,
+            common_users_count,
         })
     }
     fn power(
@@ -726,6 +901,10 @@ impl VirtManager for MacOSVirt {
         Ok(Box::new(SystemCommand::new("docker").arg("logs").arg(name)))
     }
     fn get_containers(&self) -> Result<Vec<ContainerInfo>> {
+        use super::linux_generic::common::command_exists;
+        if !command_exists("docker") {
+            return Ok(vec![]);
+        }
         let output = std::process::Command::new("docker")
             .arg("ps")
             .arg("-a")
@@ -835,7 +1014,21 @@ impl DiskManager for MacOSDisk {
         Ok(Box::new(SystemCommand::new("diskutil").arg("list")))
     }
     fn get_devices(&self) -> Result<Vec<String>> {
-        Ok(vec![])
+        let output = std::process::Command::new("diskutil")
+            .arg("list")
+            .output()?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut devices = Vec::new();
+        for line in stdout.lines() {
+            if let Some(dev) = line
+                .split_whitespace()
+                .next()
+                .filter(|_| line.starts_with("/dev/disk"))
+            {
+                devices.push(dev.to_string());
+            }
+        }
+        Ok(devices)
     }
 }
 
@@ -910,7 +1103,18 @@ impl PartitionManager for MacOSPartition {
         Ok(Box::new(SystemCommand::new("du").arg("-sh").arg(path)))
     }
     fn get_mount_points(&self) -> Result<Vec<String>> {
-        Ok(vec![])
+        let output = std::process::Command::new("mount").output()?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut mounts = Vec::new();
+        for line in stdout.lines() {
+            if let Some(on_idx) = line.find(" on ") {
+                let rest = &line[on_idx + 4..];
+                if let Some(space_idx) = rest.find(" (") {
+                    mounts.push(rest[..space_idx].trim().to_string());
+                }
+            }
+        }
+        Ok(mounts)
     }
 }
 

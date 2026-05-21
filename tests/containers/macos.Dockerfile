@@ -1,4 +1,6 @@
-FROM sickcodes/docker-osx:auto
+FROM docker.io/sickcodes/docker-osx:latest
+
+USER root
 
 # This container runs a full macOS VM via QEMU.
 # It is used for integration testing ao on macOS.

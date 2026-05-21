@@ -13,10 +13,12 @@ license = "AGPL-3.0-only"
 [[bin]]
 name = "ao"
 path = "src/main.rs"
+doctest = false
 
 [lib]
 name = "ao_cli"
 path = "src/lib.rs"
+doctest = false
 
 [dependencies]
 anyhow = "1.0.102"

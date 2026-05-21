@@ -122,13 +122,48 @@ impl Drop for ContainerGuard {
 
 #[tokio::test]
 #[ignore]
-async fn test_distros() {
+async fn test_distro_debian() {
     let engine = get_engine();
+    let image = build_test_image(&engine, "debian").await;
+    run_test_in_image(&engine, &image).await;
+}
 
-    let distros = ["debian", "ubuntu", "fedora", "archlinux", "alpine", "macos"];
+#[tokio::test]
+#[ignore]
+async fn test_distro_ubuntu() {
+    let engine = get_engine();
+    let image = build_test_image(&engine, "ubuntu").await;
+    run_test_in_image(&engine, &image).await;
+}
 
-    for distro in distros {
-        let image = build_test_image(&engine, distro).await;
-        run_test_in_image(&engine, &image).await;
-    }
+#[tokio::test]
+#[ignore]
+async fn test_distro_fedora() {
+    let engine = get_engine();
+    let image = build_test_image(&engine, "fedora").await;
+    run_test_in_image(&engine, &image).await;
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_distro_archlinux() {
+    let engine = get_engine();
+    let image = build_test_image(&engine, "archlinux").await;
+    run_test_in_image(&engine, &image).await;
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_distro_alpine() {
+    let engine = get_engine();
+    let image = build_test_image(&engine, "alpine").await;
+    run_test_in_image(&engine, &image).await;
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_distro_macos() {
+    let engine = get_engine();
+    let image = build_test_image(&engine, "macos").await;
+    run_test_in_image(&engine, &image).await;
 }
