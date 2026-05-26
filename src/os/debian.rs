@@ -48,6 +48,10 @@ impl PackageManager for Apt {
     }
 
     fn get_installed_packages(&self) -> Result<Vec<String>> {
+        use super::linux_generic::common::command_exists;
+        if !command_exists("dpkg-query") {
+            return Ok(vec![]);
+        }
         let output = Command::new("dpkg-query")
             .arg("-W")
             .arg("-f=${Package}\n")
@@ -57,6 +61,10 @@ impl PackageManager for Apt {
     }
 
     fn get_available_packages(&self) -> Result<Vec<String>> {
+        use super::linux_generic::common::command_exists;
+        if !command_exists("apt-cache") {
+            return Ok(vec![]);
+        }
         let output = Command::new("apt-cache").arg("pkgnames").output()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
         Ok(stdout.lines().map(|s| s.to_string()).collect())

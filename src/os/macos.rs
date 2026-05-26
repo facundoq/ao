@@ -260,6 +260,50 @@ impl Domain for MacOSUser {
             None => self.list(false, false, OutputFormat::Table),
         }
     }
+    fn complete(
+        &self,
+        _line: &str,
+        words: &[&str],
+        _last_word_complete: bool,
+    ) -> Result<Vec<String>> {
+        use super::linux_generic::is_completing_action;
+
+        if is_completing_action(words, self.name(), "delete", 1)
+            || is_completing_action(words, self.name(), "modify", 1)
+            || is_completing_action(words, self.name(), "passwd", 1)
+        {
+            return self.get_users();
+        }
+
+        if is_completing_action(words, self.name(), "modify", 2) {
+            return Ok(vec![
+                "add-group".to_string(),
+                "del-group".to_string(),
+                "shell".to_string(),
+                "home".to_string(),
+            ]);
+        }
+
+        if is_completing_action(words, self.name(), "modify", 3) {
+            let action = words.get(words.len() - 2).copied().unwrap_or("");
+            if action == "add-group" || action == "del-group" {
+                let output = std::process::Command::new("dscl")
+                    .arg(".")
+                    .arg("-list")
+                    .arg("/Groups")
+                    .output()?;
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                return Ok(stdout
+                    .lines()
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.starts_with('_'))
+                    .collect());
+            } else if action == "shell" {
+                return self.get_shells();
+            }
+        }
+        Ok(vec![])
+    }
 }
 impl UserManager for MacOSUser {
     fn list(
@@ -407,6 +451,20 @@ impl Domain for MacOSGroup {
             Some(GroupAction::Modify { groupname, gid }) => self.mod_group(groupname, *gid),
             None => self.ls(OutputFormat::Table),
         }
+    }
+    fn complete(
+        &self,
+        _line: &str,
+        words: &[&str],
+        _last_word_complete: bool,
+    ) -> Result<Vec<String>> {
+        use super::linux_generic::is_completing_action;
+        if is_completing_action(words, self.name(), "delete", 1)
+            || is_completing_action(words, self.name(), "modify", 1)
+        {
+            return self.get_groups();
+        }
+        Ok(vec![])
     }
 }
 impl GroupManager for MacOSGroup {

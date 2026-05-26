@@ -1,4 +1,4 @@
-use super::common::{BIN_SYSTEMCTL, SystemCommand, is_completing_action};
+use super::common::{BIN_SYSTEMCTL, SystemCommand, command_exists, is_completing_action};
 
 use crate::cli::{ServiceAction, ServiceArgs};
 use crate::os::{Domain, ExecutableCommand, OutputFormat, ServiceInfo, ServiceManager};
@@ -82,6 +82,9 @@ impl ServiceManager for Systemd {
     }
 
     fn get_services(&self) -> Result<Vec<String>> {
+        if !command_exists(BIN_SYSTEMCTL) {
+            return Ok(vec![]);
+        }
         let output = Command::new(BIN_SYSTEMCTL)
             .arg("list-unit-files")
             .arg("--type=service")
@@ -96,6 +99,9 @@ impl ServiceManager for Systemd {
     }
 
     fn get_all_services_info(&self) -> Result<Vec<ServiceInfo>> {
+        if !command_exists(BIN_SYSTEMCTL) {
+            return Ok(vec![]);
+        }
         let output = Command::new(BIN_SYSTEMCTL)
             .arg("list-units")
             .arg("--type=service")

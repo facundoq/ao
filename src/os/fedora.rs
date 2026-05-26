@@ -39,6 +39,10 @@ impl PackageManager for Dnf {
     }
 
     fn get_installed_packages(&self) -> Result<Vec<String>> {
+        use super::linux_generic::common::command_exists;
+        if !command_exists("rpm") {
+            return Ok(vec![]);
+        }
         let output = Command::new("rpm")
             .arg("-qa")
             .arg("--queryformat")
@@ -49,6 +53,10 @@ impl PackageManager for Dnf {
     }
 
     fn get_available_packages(&self) -> Result<Vec<String>> {
+        use super::linux_generic::common::command_exists;
+        if !command_exists("dnf") {
+            return Ok(vec![]);
+        }
         let output = Command::new("dnf")
             .arg("repoquery")
             .arg("--qf")

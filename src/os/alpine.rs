@@ -33,12 +33,20 @@ impl PackageManager for Apk {
     }
 
     fn get_installed_packages(&self) -> Result<Vec<String>> {
+        use super::linux_generic::common::command_exists;
+        if !command_exists("apk") {
+            return Ok(vec![]);
+        }
         let output = Command::new("apk").arg("info").output()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
         Ok(stdout.lines().map(|s| s.to_string()).collect())
     }
 
     fn get_available_packages(&self) -> Result<Vec<String>> {
+        use super::linux_generic::common::command_exists;
+        if !command_exists("apk") {
+            return Ok(vec![]);
+        }
         // This can be slow and might need a better way for completions
         let output = Command::new("apk").arg("search").arg("-q").output()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
