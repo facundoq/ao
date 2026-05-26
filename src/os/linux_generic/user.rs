@@ -84,13 +84,12 @@ impl Domain for StandardUser {
         if is_completing_action(words, self.name(), "modify", 3) {
             let action = words.get(words.len() - 2).copied().unwrap_or("");
             if action == "add-group" || action == "del-group" {
-                let output = Command::new("cut")
-                    .arg("-d:")
-                    .arg("-f1")
-                    .arg("/etc/group")
-                    .output()?;
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                return Ok(stdout.lines().map(|s| s.trim().to_string()).collect());
+                let content = std::fs::read_to_string("/etc/group")?;
+                return Ok(content
+                    .lines()
+                    .filter_map(|l| l.split(':').next())
+                    .map(|s| s.to_string())
+                    .collect());
             } else if action == "shell" {
                 return self.get_shells();
             }
@@ -286,19 +285,17 @@ impl UserManager for StandardUser {
     }
 
     fn get_users(&self) -> Result<Vec<String>> {
-        let output = Command::new("cut")
-            .arg("-d:")
-            .arg("-f1")
-            .arg("/etc/passwd")
-            .output()?;
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        Ok(stdout.lines().map(|s| s.to_string()).collect())
+        let content = std::fs::read_to_string("/etc/passwd")?;
+        Ok(content
+            .lines()
+            .filter_map(|l| l.split(':').next())
+            .map(|s| s.to_string())
+            .collect())
     }
 
     fn get_shells(&self) -> Result<Vec<String>> {
-        let output = Command::new("cat").arg("/etc/shells").output()?;
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        Ok(stdout
+        let content = std::fs::read_to_string("/etc/shells")?;
+        Ok(content
             .lines()
             .filter(|l| !l.starts_with('#') && !l.is_empty())
             .map(|s| s.trim().to_string())
@@ -313,8 +310,7 @@ pub struct UserListCommand {
 }
 impl ExecutableCommand for UserListCommand {
     fn execute(&self) -> Result<()> {
-        let output = Command::new("cat").arg("/etc/passwd").output()?;
-        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stdout = std::fs::read_to_string("/etc/passwd")?;
         let mut users = Vec::new();
         for line in stdout.lines() {
             let parts: Vec<&str> = line.split(':').collect();

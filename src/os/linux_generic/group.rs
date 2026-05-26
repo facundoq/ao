@@ -68,13 +68,12 @@ impl GroupManager for StandardGroup {
     }
 
     fn get_groups(&self) -> Result<Vec<String>> {
-        let output = Command::new("cut")
-            .arg("-d:")
-            .arg("-f1")
-            .arg("/etc/group")
-            .output()?;
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        Ok(stdout.lines().map(|s| s.trim().to_string()).collect())
+        let content = std::fs::read_to_string("/etc/group")?;
+        Ok(content
+            .lines()
+            .filter_map(|l| l.split(':').next())
+            .map(|s| s.to_string())
+            .collect())
     }
 }
 
