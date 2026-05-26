@@ -3,7 +3,6 @@ use crate::cli::{LogAction, LogArgs};
 use crate::os::{Domain, ExecutableCommand, LogManager};
 use anyhow::Result;
 use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
-use std::process::Command;
 
 pub struct StandardLog;
 
@@ -53,18 +52,8 @@ impl Domain for StandardLog {
     ) -> Result<Vec<String>> {
         if is_completing_action(words, self.name(), "service", 1) {
             // Suggest services for log tail
-            let output = Command::new("systemctl")
-                .arg("list-units")
-                .arg("--type=service")
-                .arg("--no-legend")
-                .arg("--no-pager")
-                .output()?;
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            return Ok(stdout
-                .lines()
-                .filter_map(|l| l.split_whitespace().next())
-                .map(|s| s.to_string())
-                .collect());
+            let system = crate::os::detector::detect_system()?;
+            return system.svc.get_services();
         }
         Ok(vec![])
     }

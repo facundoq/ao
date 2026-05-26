@@ -3,7 +3,7 @@ use super::arch::Pacman;
 use super::debian::Apt;
 use super::fedora::Dnf;
 use super::linux_generic::{
-    StandardBoot, StandardDev, StandardDisk, StandardDistro, StandardGroup, StandardGui,
+    OpenRc, StandardBoot, StandardDev, StandardDisk, StandardDistro, StandardGroup, StandardGui,
     StandardLog, StandardMonitor, StandardNet, StandardPartition, StandardSec, StandardSelf,
     StandardSys, StandardUser, StandardVirt, Systemd,
 };
@@ -141,7 +141,7 @@ pub fn detect_system() -> Result<DetectedSystem> {
                     Box::new(StandardMonitor),
                 ),
                 Distro::Fedora => (Box::new(Dnf), Box::new(Systemd), Box::new(StandardMonitor)),
-                Distro::Alpine => (Box::new(Apk), Box::new(Systemd), Box::new(StandardMonitor)),
+                Distro::Alpine => (Box::new(Apk), Box::new(OpenRc), Box::new(StandardMonitor)),
                 Distro::MacOS => unreachable!(),
             };
 

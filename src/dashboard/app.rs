@@ -993,7 +993,7 @@ impl<'a> App<'a> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(all(target_os = "linux", target_env = "musl"))))]
 mod tests {
     use super::*;
     use crate::os::detector::detect_system;

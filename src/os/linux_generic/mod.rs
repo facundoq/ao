@@ -32,7 +32,7 @@ pub use net::StandardNet;
 pub use partition::StandardPartition;
 pub use sec::StandardSec;
 pub use self_domain::StandardSelf;
-pub use svc::Systemd;
+pub use svc::{OpenRc, Systemd};
 pub use sys::StandardSys;
 pub use user::StandardUser;
 pub use virt::StandardVirt;

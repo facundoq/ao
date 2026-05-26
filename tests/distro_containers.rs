@@ -27,22 +27,25 @@ async fn build_test_image(engine: &str, distro: &str) -> String {
     image_name
 }
 
-async fn run_test_in_image(engine: &str, image_name: &str) {
+async fn run_test_in_image(engine: &str, distro: &str, image_name: &str) {
     println!("Running tests on {}...", image_name);
 
     let current_dir = std::env::current_dir().expect("Failed to get current dir");
     let current_dir_str = current_dir.to_string_lossy();
     let log_file_name = format!("test_{}.log", image_name);
     let log_file_path = current_dir.join(&log_file_name);
+    let target_dir = format!("target_{}", distro);
 
-    // 1. Start container with bind mount
+    // 1. Start container with bind mount and custom target dir
     let output = Command::new(engine)
         .args([
             "run",
             "-d",
             "--rm",
             "-v",
-            &format!("{}:/ao", current_dir_str),
+            &format!("{}:/ao:Z", current_dir_str),
+            "-e",
+            &format!("CARGO_TARGET_DIR=/ao/{}", target_dir),
             image_name,
             "sleep",
             "600",
@@ -125,7 +128,7 @@ impl Drop for ContainerGuard {
 async fn test_distro_debian() {
     let engine = get_engine();
     let image = build_test_image(&engine, "debian").await;
-    run_test_in_image(&engine, &image).await;
+    run_test_in_image(&engine, "debian", &image).await;
 }
 
 #[tokio::test]
@@ -133,7 +136,7 @@ async fn test_distro_debian() {
 async fn test_distro_ubuntu() {
     let engine = get_engine();
     let image = build_test_image(&engine, "ubuntu").await;
-    run_test_in_image(&engine, &image).await;
+    run_test_in_image(&engine, "ubuntu", &image).await;
 }
 
 #[tokio::test]
@@ -141,7 +144,7 @@ async fn test_distro_ubuntu() {
 async fn test_distro_fedora() {
     let engine = get_engine();
     let image = build_test_image(&engine, "fedora").await;
-    run_test_in_image(&engine, &image).await;
+    run_test_in_image(&engine, "fedora", &image).await;
 }
 
 #[tokio::test]
@@ -149,7 +152,7 @@ async fn test_distro_fedora() {
 async fn test_distro_archlinux() {
     let engine = get_engine();
     let image = build_test_image(&engine, "archlinux").await;
-    run_test_in_image(&engine, &image).await;
+    run_test_in_image(&engine, "archlinux", &image).await;
 }
 
 #[tokio::test]
@@ -157,7 +160,7 @@ async fn test_distro_archlinux() {
 async fn test_distro_alpine() {
     let engine = get_engine();
     let image = build_test_image(&engine, "alpine").await;
-    run_test_in_image(&engine, &image).await;
+    run_test_in_image(&engine, "alpine", &image).await;
 }
 
 #[tokio::test]
@@ -165,5 +168,5 @@ async fn test_distro_alpine() {
 async fn test_distro_macos() {
     let engine = get_engine();
     let image = build_test_image(&engine, "macos").await;
-    run_test_in_image(&engine, &image).await;
+    run_test_in_image(&engine, "macos", &image).await;
 }

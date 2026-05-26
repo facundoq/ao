@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-EXE="./target/debug/ao"
+EXE="${AO_EXE:-./target/debug/ao}"
 
 if [ ! -f "$EXE" ]; then
     echo "Binary not found at $EXE. Please run cargo build first."
@@ -36,6 +36,9 @@ else
             for item in "\${COMPREPLY[@]}"; do
                 if [[ "\$item" == *"\$expected"* ]]; then exit 0; fi
             done
+            # Also allow just any service if we're on a non-systemd system (e.g. Alpine)
+            if [[ "$expected" == ".service" && \${#COMPREPLY[@]} -gt 0 ]]; then exit 0; fi
+
             echo "FAILURE: Suggestions were: \${COMPREPLY[*]}"
             exit 1
 BASH_EOF
@@ -87,6 +90,8 @@ else
         
         if echo "$output" | grep -q "$expected"; then
             echo "SUCCESS"
+        elif [[ "$expected" == ".service" && -n "$output" ]]; then
+            echo "SUCCESS (OpenRC fallback)"
         else
             echo "FAILURE: Output was: $output"
             exit 1

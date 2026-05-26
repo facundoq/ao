@@ -120,6 +120,139 @@ impl ServiceManager for Systemd {
     }
 }
 
+pub struct OpenRc;
+
+impl Domain for OpenRc {
+    fn name(&self) -> &'static str {
+        "service"
+    }
+    fn command(&self) -> ClapCommand {
+        ServiceArgs::augment_args(ClapCommand::new("service").about("Manage services"))
+    }
+    fn execute(
+        &self,
+        matches: &ArgMatches,
+        _app: &ClapCommand,
+    ) -> Result<Box<dyn ExecutableCommand>> {
+        let args = ServiceArgs::from_arg_matches(matches)?;
+        match &args.action {
+            Some(ServiceAction::List { format }) => self.ls(*format),
+            Some(ServiceAction::Up { name }) => self.up(name),
+            Some(ServiceAction::Down { name }) => self.down(name),
+            Some(ServiceAction::Restart { name }) => self.restart(name),
+            Some(ServiceAction::Reload { name }) => self.reload(name),
+            Some(ServiceAction::Status { name }) => self.status(name),
+            None => self.ls(OutputFormat::Table),
+        }
+    }
+    fn complete(
+        &self,
+        _line: &str,
+        words: &[&str],
+        _last_word_complete: bool,
+    ) -> Result<Vec<String>> {
+        for action in ["up", "down", "restart", "reload", "status"] {
+            if is_completing_action(words, self.name(), action, 1) {
+                return self.get_services();
+            }
+        }
+        Ok(vec![])
+    }
+}
+
+impl ServiceManager for OpenRc {
+    fn ls(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
+        Ok(Box::new(ServiceListCommand { format }))
+    }
+
+    fn up(&self, service: &str) -> Result<Box<dyn ExecutableCommand>> {
+        Ok(Box::new(
+            SystemCommand::new("rc-service").arg(service).arg("start"),
+        ))
+    }
+
+    fn down(&self, service: &str) -> Result<Box<dyn ExecutableCommand>> {
+        Ok(Box::new(
+            SystemCommand::new("rc-service").arg(service).arg("stop"),
+        ))
+    }
+
+    fn restart(&self, service: &str) -> Result<Box<dyn ExecutableCommand>> {
+        Ok(Box::new(
+            SystemCommand::new("rc-service").arg(service).arg("restart"),
+        ))
+    }
+
+    fn reload(&self, service: &str) -> Result<Box<dyn ExecutableCommand>> {
+        Ok(Box::new(
+            SystemCommand::new("rc-service").arg(service).arg("reload"),
+        ))
+    }
+
+    fn status(&self, service: &str) -> Result<Box<dyn ExecutableCommand>> {
+        Ok(Box::new(
+            SystemCommand::new("rc-service")
+                .arg(service)
+                .arg("status")
+                .ignore_exit_code(),
+        ))
+    }
+
+    fn get_services(&self) -> Result<Vec<String>> {
+        use super::common::command_exists;
+        if !command_exists("rc-status") {
+            return Ok(vec![]);
+        }
+        let output = Command::new("rc-status").arg("-a").output()?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut services = Vec::new();
+        for line in stdout.lines() {
+            if let Some(label) = line
+                .split_whitespace()
+                .next()
+                .filter(|_| line.contains('[') && line.contains(']'))
+            {
+                services.push(label.to_string());
+            }
+        }
+        Ok(services)
+    }
+
+    fn get_all_services_info(&self) -> Result<Vec<ServiceInfo>> {
+        use super::common::command_exists;
+        if !command_exists("rc-status") {
+            return Ok(vec![]);
+        }
+        let output = Command::new("rc-status").arg("-a").output()?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut services = Vec::new();
+        for line in stdout.lines() {
+            if line.contains('[') && line.contains(']') {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    let status = parts
+                        .last()
+                        .unwrap_or(&"")
+                        .trim_matches(|c| c == '[' || c == ']');
+                    services.push(ServiceInfo {
+                        name: parts[0].to_string(),
+                        loaded: "loaded".to_string(),
+                        active: if status == "started" {
+                            "active"
+                        } else {
+                            "inactive"
+                        }
+                        .to_string(),
+                        status: status.to_string(),
+                        description: String::new(),
+                    });
+                }
+            }
+        }
+        Ok(services)
+    }
+}
+
 pub struct ServiceListCommand {
     pub format: OutputFormat,
 }

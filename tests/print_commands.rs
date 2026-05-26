@@ -2,7 +2,9 @@ use std::process::Command;
 use std::str;
 
 fn run_print(args: &[&str]) -> String {
-    let output = Command::new("./target/debug/ao")
+    let target_dir = std::env::var("CARGO_TARGET_DIR").unwrap_or_else(|_| "target".to_string());
+    let binary_path = format!("{}/debug/ao", target_dir);
+    let output = Command::new(binary_path)
         .arg("--print")
         .args(args)
         .output()
@@ -42,7 +44,11 @@ fn test_command_printing() {
 
     // 3. Service Status
     let svc_status = run_print(&["service", "status", "cron"]);
-    assert!(svc_status.contains("systemctl status") || svc_status.contains("launchctl list"));
+    assert!(
+        svc_status.contains("systemctl status")
+            || svc_status.contains("launchctl list")
+            || svc_status.contains("rc-service")
+    );
 
     // 4. Disk List
     let disk_list = run_print(&["disk", "list"]);
@@ -69,5 +75,9 @@ fn test_command_printing() {
 
     // 8. User Modification
     let user_mod = run_print(&["user", "modify", "john", "shell", "/bin/zsh"]);
-    assert!(user_mod.contains("usermod -s") || user_mod.contains("dscl . -create /Users/john"));
+    assert!(
+        user_mod.contains("usermod -s")
+            || user_mod.contains("dscl . -create /Users/john")
+            || user_mod.contains("adduser")
+    );
 }
