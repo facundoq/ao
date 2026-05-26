@@ -45,7 +45,7 @@ jobs:
       - name: Install dependencies (Alpine)
         if: matrix.distro == 'alpine'
         run: |
-          apk add --no-progress --update curl gcc musl-dev openssl-dev pkgconfig rustup
+          apk add --no-progress --update curl gcc musl-dev openssl-dev pkgconfig rustup bash
 
       - uses: actions/checkout@v6
 
