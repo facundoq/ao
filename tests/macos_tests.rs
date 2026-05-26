@@ -57,6 +57,6 @@ mod tests {
             .get_mount_points()
             .expect("Failed to get mount points");
         assert!(!mounts.is_empty());
-        assert!(mounts.contains("/"));
+        assert!(mounts.iter().any(|m| m == "/"));
     }
 }
