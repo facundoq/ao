@@ -34,7 +34,7 @@ async fn run_test_in_image(engine: &str, distro: &str, image_name: &str) {
     let current_dir_str = current_dir.to_string_lossy();
     let log_file_name = format!("test_{}.log", image_name);
     let log_file_path = current_dir.join(&log_file_name);
-    let target_dir = format!("target_{}", distro);
+    let target_dir = format!("container_targets/target_{}", distro);
 
     // 1. Start container with bind mount and custom target dir
     let output = Command::new(engine)
