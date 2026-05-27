@@ -70,8 +70,16 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
     // 3. Global CPU
     let cpu_usage = app.system_info.global_cpu_usage();
+    let title = if app.global_cpu_frequency > 0 {
+        format!(
+            " CPU ({:.1} GHz) ",
+            app.global_cpu_frequency as f64 / 1000.0
+        )
+    } else {
+        " CPU ".to_string()
+    };
     let cpu_gauge = Gauge::default()
-        .block(Block::default().borders(Borders::ALL).title(" CPU "))
+        .block(Block::default().borders(Borders::ALL).title(title))
         .gauge_style(
             Style::default()
                 .fg(Color::Rgb(200, 60, 60))

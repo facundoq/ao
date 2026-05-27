@@ -34,6 +34,9 @@ pub struct App<'a> {
     pub swap_history: Vec<(f64, f64)>,
     pub net_rx_history: Vec<(f64, f64)>,
     pub net_tx_history: Vec<(f64, f64)>,
+    #[allow(clippy::type_complexity)]
+    pub net_history_per_adapter: HashMap<String, (Vec<(f64, f64)>, Vec<(f64, f64)>)>,
+    pub global_cpu_frequency: u64,
     pub history_start: Instant,
 
     pub last_tick_time: Instant,
@@ -198,6 +201,8 @@ impl<'a> App<'a> {
             swap_history: Vec::with_capacity(61),
             net_rx_history: Vec::with_capacity(61),
             net_tx_history: Vec::with_capacity(61),
+            net_history_per_adapter: HashMap::new(),
+            global_cpu_frequency: 0,
             history_start: Instant::now(),
             last_tick_time: Instant::now(),
             prev_network_data,
@@ -393,6 +398,14 @@ impl<'a> App<'a> {
             self.cpu_history.remove(0);
         }
 
+        let mut total_freq = 0;
+        let mut cpu_count = 0;
+        for cpu in self.system_info.cpus() {
+            total_freq += cpu.frequency();
+            cpu_count += 1;
+        }
+        self.global_cpu_frequency = total_freq.checked_div(cpu_count).unwrap_or(0);
+
         let mem_total = self.system_info.total_memory() as f64;
         let mem_available = self.system_info.available_memory() as f64;
         let mem_used_actual = mem_total - mem_available;
@@ -431,6 +444,19 @@ impl<'a> App<'a> {
                     .insert(name.clone(), (rx_speed, tx_speed));
                 total_rx_speed += rx_speed as f64;
                 total_tx_speed += tx_speed as f64;
+
+                let entry = self
+                    .net_history_per_adapter
+                    .entry(name.clone())
+                    .or_insert_with(|| (Vec::with_capacity(61), Vec::with_capacity(61)));
+                entry.0.push((now_sec, rx_speed as f64));
+                entry.1.push((now_sec, tx_speed as f64));
+                if entry.0.len() > 60 {
+                    entry.0.remove(0);
+                }
+                if entry.1.len() > 60 {
+                    entry.1.remove(0);
+                }
             }
             self.prev_network_data.insert(name.clone(), (rx, tx));
         }
