@@ -9,6 +9,36 @@ use sysinfo::{
     CpuRefreshKind, Disks, MemoryRefreshKind, Networks, Process, RefreshKind, System, Users,
 };
 
+/// Read network byte counters directly from `/proc/net/dev`, exactly as `netstat` does.
+/// Returns a map of interface name -> (rx_bytes, tx_bytes).
+/// These are raw 64-bit monotonically increasing counters from the kernel — no abstraction layer.
+fn read_proc_net_dev() -> HashMap<String, (u64, u64)> {
+    let mut result = HashMap::new();
+    let Ok(content) = std::fs::read_to_string("/proc/net/dev") else {
+        return result;
+    };
+    // Format: skip 2 header lines, then each line is:
+    //   iface: rx_bytes rx_packets ... tx_bytes ...
+    // Column indices (0-based, after splitting on whitespace, with iface: as token 0):
+    //   0=iface:  1=rx_bytes  9=tx_bytes
+    for line in content.lines().skip(2) {
+        let line = line.trim();
+        let Some(colon) = line.find(':') else {
+            continue;
+        };
+        let iface = line[..colon].trim().to_string();
+        let rest = &line[colon + 1..];
+        let fields: Vec<&str> = rest.split_whitespace().collect();
+        if fields.len() < 9 {
+            continue;
+        }
+        let rx_bytes = fields[0].parse::<u64>().unwrap_or(0);
+        let tx_bytes = fields[8].parse::<u64>().unwrap_or(0);
+        result.insert(iface, (rx_bytes, tx_bytes));
+    }
+    result
+}
+
 pub struct App<'a> {
     pub system_info: System,
     pub disks: Disks,
@@ -459,12 +489,28 @@ impl<'a> App<'a> {
             self.swap_history.remove(0);
         }
 
+        // Read network counters directly from /proc/net/dev (same source as netstat).
+        // This bypasses the sysinfo abstraction layer which can introduce counter-wrap
+        // smoothing bugs that cause artificial GB/s spikes after suspend/resume.
+        let proc_counters = read_proc_net_dev();
+
+        // Sanity-check the elapsed time. If it's too short (<100ms, e.g. first tick)
+        // or too long (>60s, e.g. after suspend/resume where CLOCK_MONOTONIC paused),
+        // the delta/elapsed division would produce nonsense values — skip the speed calc.
+        let elapsed_sane = (0.1..=60.0).contains(&elapsed);
+
         let mut total_rx_speed = 0.0;
         let mut total_tx_speed = 0.0;
         for (name, network) in &self.networks {
-            let rx = network.total_received();
-            let tx = network.total_transmitted();
-            if let Some((old_rx, old_tx)) = self.prev_network_data.get(name) {
+            // Use /proc/net/dev counters if available, fall back to sysinfo.
+            let (rx, tx) = proc_counters
+                .get(name)
+                .copied()
+                .unwrap_or_else(|| (network.total_received(), network.total_transmitted()));
+
+            if let Some((old_rx, old_tx)) = self.prev_network_data.get(name)
+                && elapsed_sane
+            {
                 let rx_delta = rx.saturating_sub(*old_rx);
                 let tx_delta = tx.saturating_sub(*old_tx);
                 let rx_speed = (rx_delta as f64 / elapsed) as u64;

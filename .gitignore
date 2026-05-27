@@ -8,3 +8,7 @@
 
 # MSVC Windows objects in this folder, if any
 *.pdb
+
+.antigravitycli/
+.vscode/
+.antigravity/
