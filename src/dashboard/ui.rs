@@ -29,10 +29,12 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     let hostname = System::host_name().unwrap_or_else(|| "Unknown".to_string());
     let uptime = format_uptime(System::uptime());
-    let distro_name = if let Ok(distro) = crate::os::detector::Distro::detect() {
-        format!("{:?}", distro)
+    let os_name = System::name().unwrap_or_else(|| "Linux".to_string());
+    let os_version = System::os_version().unwrap_or_default();
+    let distro_name = if os_version.is_empty() {
+        os_name
     } else {
-        "Linux".to_string()
+        format!("{} {}", os_name, os_version)
     };
 
     let header_content = vec![Line::from(vec![

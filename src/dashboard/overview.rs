@@ -110,7 +110,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             let core_gauge = LineGauge::default()
                 .filled_style(Style::default().fg(Color::Rgb(255, 200, 150)))
                 .ratio(usage as f64 / 100.0)
-                .label(format!("{:.1}%", usage));
+                .label(format!("{:>5.1}%", usage));
             f.render_widget(core_gauge, row_chunks[1]);
         }
     }
