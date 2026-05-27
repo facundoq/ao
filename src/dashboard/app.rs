@@ -663,6 +663,9 @@ impl<'a> App<'a> {
                     .map(|u| u.name().to_string())
                     .unwrap_or_else(|| "unknown".to_string());
                 let mem = get_process_memory(p.pid());
+                let thread_count = std::fs::read_dir(format!("/proc/{}/task", p.pid().as_u32()))
+                    .map(|d| d.count())
+                    .unwrap_or(0);
                 ProcessSummary {
                     pid: p.pid(),
                     name: p.name().to_string_lossy().to_string(),
@@ -681,7 +684,7 @@ impl<'a> App<'a> {
                         .exe()
                         .map(|e| e.to_string_lossy().to_string())
                         .unwrap_or_else(|| "".to_string()),
-                    thread_count: 0,
+                    thread_count,
                     fd_count: 0,
                 }
             })
@@ -767,6 +770,8 @@ impl<'a> App<'a> {
             let mut total_virt = mem.virt;
             let mut total_shared = mem.shared;
 
+            let mut total_threads = 0;
+
             if let Some(child_pids) = tree.get(&pid) {
                 for &child_pid in child_pids {
                     let child_node = build_node(
@@ -782,6 +787,7 @@ impl<'a> App<'a> {
                     total_mem += child_node.total_mem;
                     total_virt += child_node.total_virt;
                     total_shared += child_node.total_shared;
+                    total_threads += child_node.total_threads;
                     children.push(child_node);
                 }
             }
@@ -807,6 +813,10 @@ impl<'a> App<'a> {
                 .map(|u| u.name().to_string())
                 .unwrap_or_else(|| "unknown".to_string());
 
+            let thread_count = std::fs::read_dir(format!("/proc/{}/task", pid.as_u32()))
+                .map(|d| d.count())
+                .unwrap_or(0);
+
             ProcessTreeNode {
                 pid,
                 name: process.name().to_string_lossy().to_string(),
@@ -815,7 +825,7 @@ impl<'a> App<'a> {
                 memory: mem.rss,
                 virt_mem: mem.virt,
                 shared_mem: mem.shared,
-                thread_count: 0,
+                thread_count,
                 fd_count: 0,
                 depth,
                 children,
@@ -823,7 +833,7 @@ impl<'a> App<'a> {
                 total_mem,
                 total_virt,
                 total_shared,
-                total_threads: 0,
+                total_threads: thread_count + total_threads,
                 total_fds: 0,
             }
         }
@@ -904,7 +914,11 @@ impl<'a> App<'a> {
                 mem: mem_str,
                 virt: virt_str,
                 shared: shared_str,
-                threads: "".to_string(),
+                threads: if node.thread_count > 0 {
+                    node.thread_count.to_string()
+                } else {
+                    "".to_string()
+                },
                 fds: "".to_string(),
                 name: format!("{}{}{}", indent, prefix, node.name),
                 depth: node.depth,

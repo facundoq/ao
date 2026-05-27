@@ -94,26 +94,31 @@ pub fn draw_full_details(f: &mut Frame, _app: &App, details: &ProcessDetails, ar
 
 fn draw_process_list(f: &mut Frame, app: &App, area: Rect) {
     let sort_indicator = if app.sort_descending { "▼" } else { "▲" };
-    let header_cells: Vec<Cell> = [
+    let mut header_data: Vec<(&str, bool)> = vec![
         ("PID", app.process_sort == ProcessSort::Pid),
         ("User", app.process_sort == ProcessSort::User),
         ("CPU%", app.process_sort == ProcessSort::Cpu),
         ("VIRT", false),
         ("RSS", app.process_sort == ProcessSort::Mem),
         ("SHR", false),
-        ("Name", app.process_sort == ProcessSort::Name),
-        ("Command", false),
-    ]
-    .iter()
-    .map(|(h, active)| {
-        let text = if *active {
-            format!("{} {}", h, sort_indicator)
-        } else {
-            h.to_string()
-        };
-        Cell::from(text).style(Style::default().add_modifier(Modifier::BOLD))
-    })
-    .collect();
+    ];
+    if !app.show_user_threads {
+        header_data.push(("Threads", false));
+    }
+    header_data.push(("Name", app.process_sort == ProcessSort::Name));
+    header_data.push(("Command", false));
+
+    let header_cells: Vec<Cell> = header_data
+        .iter()
+        .map(|(h, active)| {
+            let text = if *active {
+                format!("{} {}", h, sort_indicator)
+            } else {
+                h.to_string()
+            };
+            Cell::from(text).style(Style::default().add_modifier(Modifier::BOLD))
+        })
+        .collect();
 
     let header = Row::new(header_cells).height(1).bottom_margin(1);
     let items_per_page = area.height.saturating_sub(4) as usize;
@@ -136,7 +141,7 @@ fn draw_process_list(f: &mut Frame, app: &App, area: Rect) {
             } else {
                 Style::default()
             };
-            Row::new(vec![
+            let mut row_cells = vec![
                 Cell::from(p.pid.to_string()),
                 Cell::from(p.user.clone()).style(if i == app.selected_index {
                     Style::default()
@@ -147,10 +152,13 @@ fn draw_process_list(f: &mut Frame, app: &App, area: Rect) {
                 Cell::from(format_bytes(p.virt_mem)),
                 Cell::from(format_bytes(p.memory)),
                 Cell::from(format_bytes(p.shared_mem)),
-                Cell::from(p.name.clone()),
-                Cell::from(p.command.clone()),
-            ])
-            .style(style)
+            ];
+            if !app.show_user_threads {
+                row_cells.push(Cell::from(p.thread_count.to_string()));
+            }
+            row_cells.push(Cell::from(p.name.clone()));
+            row_cells.push(Cell::from(p.command.clone()));
+            Row::new(row_cells).style(style)
         });
 
     let mut title = format!(" Process List [Page {}/{}] ", current_page, total_pages);
@@ -161,45 +169,52 @@ fn draw_process_list(f: &mut Frame, app: &App, area: Rect) {
         title.push_str(" [EDITING FILTER] ");
     }
 
-    let table = Table::new(
-        rows,
-        [
-            Constraint::Length(8),
-            Constraint::Length(12),
-            Constraint::Length(8),
-            Constraint::Length(10),
-            Constraint::Length(10),
-            Constraint::Length(10),
-            Constraint::Length(20),
-            Constraint::Min(0),
-        ],
-    )
-    .header(header)
-    .block(Block::default().borders(Borders::ALL).title(title));
+    let mut widths = vec![
+        Constraint::Length(8),
+        Constraint::Length(12),
+        Constraint::Length(8),
+        Constraint::Length(10),
+        Constraint::Length(10),
+        Constraint::Length(10),
+    ];
+    if !app.show_user_threads {
+        widths.push(Constraint::Length(8));
+    }
+    widths.push(Constraint::Length(20));
+    widths.push(Constraint::Min(0));
+
+    let table = Table::new(rows, widths)
+        .header(header)
+        .block(Block::default().borders(Borders::ALL).title(title));
     f.render_widget(table, area);
 }
 
 fn draw_process_tree(f: &mut Frame, app: &App, area: Rect) {
     let sort_indicator = if app.sort_descending { "▼" } else { "▲" };
-    let header_cells: Vec<Cell> = [
+    let mut header_data: Vec<(&str, bool)> = vec![
         ("PID", app.process_sort == ProcessSort::Pid),
         ("User", app.process_sort == ProcessSort::User),
         ("CPU%", app.process_sort == ProcessSort::Cpu),
         ("VIRT", false),
         ("RSS", app.process_sort == ProcessSort::Mem),
         ("SHR", false),
-        ("Process Tree", app.process_sort == ProcessSort::Name),
-    ]
-    .iter()
-    .map(|(h, active)| {
-        let text = if *active {
-            format!("{} {}", h, sort_indicator)
-        } else {
-            h.to_string()
-        };
-        Cell::from(text).style(Style::default().add_modifier(Modifier::BOLD))
-    })
-    .collect();
+    ];
+    if !app.show_user_threads {
+        header_data.push(("Threads", false));
+    }
+    header_data.push(("Process Tree", app.process_sort == ProcessSort::Name));
+
+    let header_cells: Vec<Cell> = header_data
+        .iter()
+        .map(|(h, active)| {
+            let text = if *active {
+                format!("{} {}", h, sort_indicator)
+            } else {
+                h.to_string()
+            };
+            Cell::from(text).style(Style::default().add_modifier(Modifier::BOLD))
+        })
+        .collect();
 
     let header = Row::new(header_cells).height(1).bottom_margin(1);
     let items_per_page = area.height.saturating_sub(4) as usize;
@@ -225,7 +240,7 @@ fn draw_process_tree(f: &mut Frame, app: &App, area: Rect) {
                     .fg(Color::Black)
                     .add_modifier(Modifier::BOLD);
             }
-            Row::new(vec![
+            let mut row_cells = vec![
                 Cell::from(node.pid.clone()),
                 Cell::from(node.user.clone()).style(if i == app.selected_index {
                     Style::default()
@@ -236,9 +251,12 @@ fn draw_process_tree(f: &mut Frame, app: &App, area: Rect) {
                 Cell::from(node.virt.clone()),
                 Cell::from(node.mem.clone()),
                 Cell::from(node.shared.clone()),
-                Cell::from(node.name.clone()),
-            ])
-            .style(style)
+            ];
+            if !app.show_user_threads {
+                row_cells.push(Cell::from(node.threads.clone()));
+            }
+            row_cells.push(Cell::from(node.name.clone()));
+            Row::new(row_cells).style(style)
         });
 
     let mut title = format!(
@@ -252,19 +270,21 @@ fn draw_process_tree(f: &mut Frame, app: &App, area: Rect) {
         title.push_str(" [EDITING FILTER] ");
     }
 
-    let table = Table::new(
-        rows,
-        [
-            Constraint::Length(8),
-            Constraint::Length(12),
-            Constraint::Length(15),
-            Constraint::Length(15),
-            Constraint::Length(15),
-            Constraint::Length(15),
-            Constraint::Min(0),
-        ],
-    )
-    .header(header)
-    .block(Block::default().borders(Borders::ALL).title(title));
+    let mut widths = vec![
+        Constraint::Length(8),
+        Constraint::Length(12),
+        Constraint::Length(15),
+        Constraint::Length(15),
+        Constraint::Length(15),
+        Constraint::Length(15),
+    ];
+    if !app.show_user_threads {
+        widths.push(Constraint::Length(8));
+    }
+    widths.push(Constraint::Min(0));
+
+    let table = Table::new(rows, widths)
+        .header(header)
+        .block(Block::default().borders(Borders::ALL).title(title));
     f.render_widget(table, area);
 }
