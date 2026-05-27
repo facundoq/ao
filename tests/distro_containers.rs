@@ -1,5 +1,7 @@
 use std::process::Command;
 
+mod destructive_tests;
+
 /*
  * This test uses 'podman' (or 'docker') directly to build local test images
  * and run integration tests on them.
@@ -72,8 +74,8 @@ async fn run_test_in_image(engine: &str, distro: &str, image_name: &str) {
     println!("Diagnostics will be saved to {}", log_file_name);
 
     let test_script = format!(
-        "export RUST_BACKTRACE=1 && cargo test -- --nocapture > /ao/{} 2>&1 && bash tests/read_only_tests.sh >> /ao/{} 2>&1",
-        log_file_name, log_file_name
+        "export RUST_BACKTRACE=1 && cargo test -- --nocapture > /ao/{} 2>&1 && bash tests/read_only_tests.sh >> /ao/{} 2>&1 && cargo test --test distro_containers inner_destructive_tests -- --exact --nocapture --ignored >> /ao/{} 2>&1",
+        log_file_name, log_file_name, log_file_name
     );
 
     let output = Command::new(engine)
@@ -169,4 +171,17 @@ async fn test_distro_macos() {
     let engine = get_engine();
     let image = build_test_image(&engine, "macos").await;
     run_test_in_image(&engine, "macos", &image).await;
+}
+
+#[test]
+#[ignore]
+fn inner_destructive_tests() {
+    // Only run if we are safely inside a container
+    if !std::path::Path::new("/.dockerenv").exists() {
+        println!(
+            "Not running destructive tests outside of a sandboxed container (/.dockerenv missing)!"
+        );
+        return;
+    }
+    destructive_tests::run_all();
 }

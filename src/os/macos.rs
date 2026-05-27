@@ -120,6 +120,20 @@ impl Domain for MacOSService {
             None => self.ls(OutputFormat::Table),
         }
     }
+    fn complete(
+        &self,
+        _line: &str,
+        words: &[&str],
+        _last_word_complete: bool,
+    ) -> Result<Vec<String>> {
+        use super::linux_generic::is_completing_action;
+        for action in ["up", "down", "restart", "reload", "status"] {
+            if is_completing_action(words, self.name(), action, 1) {
+                return self.get_services();
+            }
+        }
+        Ok(vec![])
+    }
 }
 impl ServiceManager for MacOSService {
     fn ls(&self, _f: OutputFormat) -> Result<Box<dyn super::ExecutableCommand>> {
