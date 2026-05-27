@@ -90,7 +90,8 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             } else {
                 Style::default().fg(Color::White)
             };
-            Line::from(vec![Span::styled(u.clone(), style)])
+            let prefix = if *is_system { "💻 " } else { "👤 " };
+            Line::from(vec![Span::styled(format!("{}{}", prefix, u), style)])
         })
         .collect();
     f.render_widget(
