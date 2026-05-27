@@ -111,7 +111,12 @@ where
                 }
             } else {
                 match key.code {
-                    KeyCode::Char('q') => return Ok(()),
+                    KeyCode::Char('q') => {
+                        let mut config = Config::load().unwrap_or_default();
+                        config.ui.refresh_rate_ms = app.tick_rate.as_millis() as u64;
+                        let _ = config.save();
+                        return Ok(());
+                    }
                     KeyCode::Esc => {
                         app.process_details = None;
                     }
