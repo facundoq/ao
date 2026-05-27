@@ -72,7 +72,11 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let cpu_usage = app.system_info.global_cpu_usage();
     let cpu_gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL).title(" CPU "))
-        .gauge_style(Style::default().fg(Color::Red).bg(Color::DarkGray))
+        .gauge_style(
+            Style::default()
+                .fg(Color::Rgb(200, 60, 60))
+                .bg(Color::Rgb(30, 30, 30)),
+        )
         .ratio(cpu_usage as f64 / 100.0)
         .label(format!("{:.1}%", cpu_usage));
     f.render_widget(cpu_gauge, left_chunks[2]);
@@ -108,7 +112,11 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             );
 
             let core_gauge = Gauge::default()
-                .gauge_style(Style::default().fg(Color::Red).bg(Color::DarkGray))
+                .gauge_style(
+                    Style::default()
+                        .fg(Color::Rgb(200, 60, 60))
+                        .bg(Color::Rgb(30, 30, 30)),
+                )
                 .ratio(usage as f64 / 100.0)
                 .label(format!("{:>5.1}%", usage));
             f.render_widget(core_gauge, row_chunks[1]);
