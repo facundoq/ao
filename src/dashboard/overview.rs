@@ -42,7 +42,8 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     } else {
         0.0
     };
-    let ram_title = format!(" RAM ({}) ", app.ram_config);
+    let mem_total_gb = mem_total as f64 / 1_073_741_824.0;
+    let ram_title = format!(" RAM ({:.1} GB) ", mem_total_gb);
     let mem_gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL).title(ram_title))
         .gauge_style(Style::default().fg(Color::Green))
@@ -58,8 +59,10 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     } else {
         0.0
     };
+    let swap_total_gb = swap_total as f64 / 1_073_741_824.0;
+    let swap_title = format!(" Swap ({:.1} GB) ", swap_total_gb);
     let swap_gauge = Gauge::default()
-        .block(Block::default().borders(Borders::ALL).title(" Swap "))
+        .block(Block::default().borders(Borders::ALL).title(swap_title))
         .gauge_style(Style::default().fg(Color::Magenta))
         .ratio(swap_ratio)
         .label(format!("{:.1}%", swap_ratio * 100.0));
