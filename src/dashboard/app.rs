@@ -673,7 +673,7 @@ impl<'a> App<'a> {
                     memory: mem.rss,
                     virt_mem: mem.virt,
                     shared_mem: mem.shared,
-                    cpu: p.cpu_usage() / self.system_info.cpus().len() as f32,
+                    cpu: p.cpu_usage(),
                     command: p
                         .cmd()
                         .iter()
@@ -693,7 +693,7 @@ impl<'a> App<'a> {
 
     pub fn calculate_process_tree(&mut self) -> Vec<ProcessTreeNode> {
         let processes = self.system_info.processes();
-        let cpu_count = self.system_info.cpus().len() as f32;
+
         let mut filtered = HashMap::new();
         let current_uid = unsafe { libc::getuid() };
         for (pid, process) in processes {
@@ -759,13 +759,12 @@ impl<'a> App<'a> {
             processes: &HashMap<sysinfo::Pid, &Process>,
             tree: &HashMap<sysinfo::Pid, Vec<sysinfo::Pid>>,
             users: &Users,
-            cpu_count: f32,
             sort: &SortConfig,
         ) -> ProcessTreeNode {
             let process = processes[&pid];
             let mut children = Vec::new();
             let mem = get_process_memory(pid);
-            let mut total_cpu = process.cpu_usage() / cpu_count;
+            let mut total_cpu = process.cpu_usage();
             let mut total_mem = mem.rss;
             let mut total_virt = mem.virt;
             let mut total_shared = mem.shared;
@@ -774,15 +773,7 @@ impl<'a> App<'a> {
 
             if let Some(child_pids) = tree.get(&pid) {
                 for &child_pid in child_pids {
-                    let child_node = build_node(
-                        child_pid,
-                        depth + 1,
-                        processes,
-                        tree,
-                        users,
-                        cpu_count,
-                        sort,
-                    );
+                    let child_node = build_node(child_pid, depth + 1, processes, tree, users, sort);
                     total_cpu += child_node.total_cpu;
                     total_mem += child_node.total_mem;
                     total_virt += child_node.total_virt;
@@ -821,7 +812,7 @@ impl<'a> App<'a> {
                 pid,
                 name: process.name().to_string_lossy().to_string(),
                 user: user_name,
-                cpu_usage: process.cpu_usage() / cpu_count,
+                cpu_usage: process.cpu_usage(),
                 memory: mem.rss,
                 virt_mem: mem.virt,
                 shared_mem: mem.shared,
@@ -851,7 +842,6 @@ impl<'a> App<'a> {
                 &filtered,
                 &tree,
                 &self.users_list,
-                cpu_count,
                 &sort_config,
             ));
         }
