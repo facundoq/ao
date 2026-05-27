@@ -109,7 +109,14 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
-    if app.get_current_list_len() == 0 && app.tab_index != 0 && app.tab_index != 8 {
+    // For the process tab, if a filter is active and yields zero results, don't show
+    // "Loading..." — instead fall through and render the (empty) process table.
+    let is_filtered_empty = app.tab_index == 1 && !app.process_filter.is_empty();
+    if app.get_current_list_len() == 0
+        && app.tab_index != 0
+        && app.tab_index != 8
+        && !is_filtered_empty
+    {
         f.render_widget(
             Paragraph::new("Loading...")
                 .block(Block::default().borders(Borders::ALL).title(" Data ")),

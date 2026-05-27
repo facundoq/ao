@@ -9,20 +9,15 @@ use ratatui::{
 };
 
 pub fn draw(f: &mut Frame, app: &App, area: Rect) {
-    let main_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(100)])
-        .split(area);
-
-    let horizontal_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(75), Constraint::Percentage(25)])
-        .split(main_chunks[0]);
-
-    let charts_chunks = Layout::default()
+    let vertical_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(horizontal_chunks[0]);
+        .split(area);
+
+    let bottom_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(75), Constraint::Percentage(25)])
+        .split(vertical_chunks[1]);
 
     let now_sec = app.history_start.elapsed().as_secs_f64();
     let x_bounds = [now_sec - 300.0, now_sec];
@@ -82,7 +77,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             Span::raw("50"),
             Span::raw("100"),
         ]));
-    f.render_widget(system_chart, charts_chunks[0]);
+    f.render_widget(system_chart, vertical_chunks[0]);
 
     let selected_interface_name = if !app.interfaces.is_empty() {
         app.interfaces[app.selected_index.min(app.interfaces.len() - 1)]
@@ -151,7 +146,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             Span::raw(format_bytes((dynamic_max / 2.0) as u64)),
             Span::raw(format_bytes(dynamic_max as u64)),
         ]));
-    f.render_widget(network_chart, charts_chunks[1]);
+    f.render_widget(network_chart, bottom_chunks[0]);
 
     // 3. Network Adapters List
     let rows = app.interfaces.iter().enumerate().map(|(idx, i)| {
@@ -184,5 +179,5 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             .title(" Network Adapters "),
     );
 
-    f.render_widget(adapters_table, horizontal_chunks[1]);
+    f.render_widget(adapters_table, bottom_chunks[1]);
 }

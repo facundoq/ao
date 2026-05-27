@@ -436,7 +436,7 @@ The dashboard layout is divided into four primary areas:
 * **Sensors (🌡)**: Real-time hardware temperature monitoring with an in-memory session maximum tracker.
 * **Charts (📈)**: Historical data visualizations. 
     * **System Resources**: Overlays CPU, Memory, and Swap usage on a single chart using matching colors from the Overview gauges.
-    * **Network Throughput**: A unified RX/TX throughput chart with a **dynamically scaling Y-axis** that adjusts based on peak traffic observed in the rolling window.
+    * **Network Throughput**: A unified RX/TX throughput chart with a **dynamically scaling Y-axis** that adjusts based on peak traffic observed in the rolling window (excluding loopback and non-physical interfaces to avoid skewing max throughput).
 
 ### 7.4 Controls and Navigation
 

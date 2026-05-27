@@ -2,9 +2,10 @@ use crate::dashboard::app::{App, ProcessDetails, ProcessSort};
 use crate::dashboard::utils::format_bytes;
 use ratatui::{
     Frame,
-    layout::{Constraint, Rect},
+    layout::{Alignment, Constraint, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Cell, Row, Table},
+    text::Line,
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
 };
 
 fn get_user_color(user: &str, app: &App) -> Color {
@@ -24,31 +25,91 @@ fn get_user_color(user: &str, app: &App) -> Color {
 }
 
 pub fn draw(f: &mut Frame, app: &App, area: Rect) {
+    let mut main_area = area;
+
+    if app.is_filtering || !app.process_filter.is_empty() {
+        let chunks = ratatui::layout::Layout::default()
+            .direction(ratatui::layout::Direction::Vertical)
+            .constraints([
+                ratatui::layout::Constraint::Length(3),
+                ratatui::layout::Constraint::Min(0),
+            ])
+            .split(area);
+
+        let filter_title = if app.is_filtering {
+            " Filter (Editing) "
+        } else {
+            " Filter "
+        };
+        let mut filter_text = app.process_filter.clone();
+        if app.is_filtering {
+            filter_text.push('|');
+        }
+
+        let filter_block = ratatui::widgets::Paragraph::new(filter_text)
+            .style(ratatui::style::Style::default().fg(ratatui::style::Color::Red))
+            .block(
+                ratatui::widgets::Block::default()
+                    .borders(ratatui::widgets::Borders::ALL)
+                    .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Red))
+                    .title(filter_title),
+            );
+        f.render_widget(filter_block, chunks[0]);
+        main_area = chunks[1];
+    }
+
     if app.use_tree_view && app.tree_expansion_depth > 0 {
-        draw_process_tree(f, app, area);
+        draw_process_tree(f, app, main_area);
     } else {
-        draw_process_list(f, app, area);
+        draw_process_list(f, app, main_area);
     }
 }
 
 pub fn draw_full_details(f: &mut Frame, app: &App, details: &ProcessDetails, area: Rect) {
+    let mut main_area = area;
+
+    if details.is_searching || !details.filter.is_empty() {
+        let chunks = ratatui::layout::Layout::default()
+            .direction(ratatui::layout::Direction::Vertical)
+            .constraints([
+                ratatui::layout::Constraint::Length(3),
+                ratatui::layout::Constraint::Min(0),
+            ])
+            .split(area);
+
+        let filter_title = if details.is_searching {
+            " Filter (Editing) "
+        } else {
+            " Filter "
+        };
+        let mut filter_text = details.filter.clone();
+        if details.is_searching {
+            filter_text.push('|');
+        }
+
+        let filter_block = ratatui::widgets::Paragraph::new(filter_text)
+            .style(ratatui::style::Style::default().fg(ratatui::style::Color::Red))
+            .block(
+                ratatui::widgets::Block::default()
+                    .borders(ratatui::widgets::Borders::ALL)
+                    .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Red))
+                    .title(filter_title),
+            );
+        f.render_widget(filter_block, chunks[0]);
+        main_area = chunks[1];
+    }
+
     let chunks = ratatui::layout::Layout::default()
         .direction(ratatui::layout::Direction::Vertical)
         .constraints([
             ratatui::layout::Constraint::Length(4),
             ratatui::layout::Constraint::Min(0),
         ])
-        .split(area);
-
-    let search_indicator = if details.is_searching {
-        format!(" (SEARCHING: {}|)", details.filter)
-    } else {
-        format!(" (Filter: {}) ", details.filter)
-    };
+        .split(main_area);
 
     let title = format!(
-        " Process: {} (PID: {}) | [Esc: Close] [/: Search] {} ",
-        details.name, details.pid, search_indicator
+        " Process: {} (PID: {}) | [Esc: Close] [/: Search] ",
+        details.name, details.pid
     );
 
     let stats_text = format!(
@@ -193,13 +254,21 @@ fn draw_process_list(f: &mut Frame, app: &App, area: Rect) {
             Row::new(row_cells).style(style)
         });
 
-    let mut title = format!(" Process List [Page {}/{}] ", current_page, total_pages);
-    if !app.process_filter.is_empty() {
-        title.push_str(&format!("(Filter: {}) ", app.process_filter));
+    // When a filter is active but no processes match, show a clear "no results" message
+    // instead of an empty table (which looks like a broken or loading state).
+    if total_items == 0 && !app.process_filter.is_empty() {
+        let msg = format!(" No processes matching '{}'  ", app.process_filter);
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(" Process List ");
+        let para = Paragraph::new(Line::from(msg))
+            .block(block)
+            .alignment(Alignment::Center);
+        f.render_widget(para, area);
+        return;
     }
-    if app.is_filtering {
-        title.push_str(" [EDITING FILTER] ");
-    }
+
+    let title = format!(" Process List [Page {}/{}] ", current_page, total_pages);
 
     let mut widths = vec![
         Constraint::Length(7),
@@ -295,16 +364,23 @@ fn draw_process_tree(f: &mut Frame, app: &App, area: Rect) {
             Row::new(row_cells).style(style)
         });
 
-    let mut title = format!(
+    // When a filter is active but no processes match, show a clear "no results" message.
+    if total_items == 0 && !app.process_filter.is_empty() {
+        let msg = format!(" No processes matching '{}'  ", app.process_filter);
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(" Process Tree ");
+        let para = Paragraph::new(Line::from(msg))
+            .block(block)
+            .alignment(Alignment::Center);
+        f.render_widget(para, area);
+        return;
+    }
+
+    let title = format!(
         " Process Tree (Depth {}) [Page {}/{}] ",
         app.tree_expansion_depth, current_page, total_pages
     );
-    if !app.process_filter.is_empty() {
-        title.push_str(&format!("(Filter: {}) ", app.process_filter));
-    }
-    if app.is_filtering {
-        title.push_str(" [EDITING FILTER] ");
-    }
 
     let mut widths = vec![
         Constraint::Length(7),
