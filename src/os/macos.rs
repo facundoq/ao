@@ -1251,6 +1251,19 @@ impl Domain for MacOSLog {
             None => self.sys_logs(50, false),
         }
     }
+    fn complete(
+        &self,
+        _line: &str,
+        words: &[&str],
+        _last_word_complete: bool,
+    ) -> Result<Vec<String>> {
+        use super::linux_generic::is_completing_action;
+        if is_completing_action(words, self.name(), "service", 1) {
+            let system = crate::os::detector::detect_system()?;
+            return system.svc.get_services();
+        }
+        Ok(vec![])
+    }
 }
 impl LogManager for MacOSLog {
     fn auth(&self, _l: u32, _f: bool) -> Result<Box<dyn super::ExecutableCommand>> {
