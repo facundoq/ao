@@ -903,9 +903,9 @@ impl<'a> App<'a> {
             let show_total = !is_expanded && has_children;
 
             let cpu_str = if show_total {
-                format!("{:.1}%", node.total_cpu)
+                format!("{:>6.1}%", node.total_cpu)
             } else {
-                format!("{:.1}%", node.cpu_usage)
+                format!("{:>6.1}%", node.cpu_usage)
             };
             let mem_str = if show_total {
                 format_bytes(node.total_mem)

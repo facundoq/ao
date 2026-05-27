@@ -59,8 +59,8 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         [
             Constraint::Length(18),
             Constraint::Length(15),
-            Constraint::Length(12),
-            Constraint::Length(12),
+            Constraint::Length(9),
+            Constraint::Length(9),
             Constraint::Min(30),
         ],
     )

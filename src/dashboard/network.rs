@@ -99,10 +99,10 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             Constraint::Length(10),
             Constraint::Length(8),
             Constraint::Min(20),
-            Constraint::Length(12),
-            Constraint::Length(12),
-            Constraint::Length(12),
-            Constraint::Length(12),
+            Constraint::Length(11),
+            Constraint::Length(11),
+            Constraint::Length(9),
+            Constraint::Length(9),
         ],
     )
     .header(header)

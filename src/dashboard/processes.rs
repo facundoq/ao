@@ -148,7 +148,7 @@ fn draw_process_list(f: &mut Frame, app: &App, area: Rect) {
                 } else {
                     Style::default().fg(get_user_color(&p.user))
                 }),
-                Cell::from(format!("{:.1}%", p.cpu)),
+                Cell::from(format!("{:>6.1}%", p.cpu)),
                 Cell::from(format_bytes(p.virt_mem)),
                 Cell::from(format_bytes(p.memory)),
                 Cell::from(format_bytes(p.shared_mem)),
@@ -170,12 +170,12 @@ fn draw_process_list(f: &mut Frame, app: &App, area: Rect) {
     }
 
     let mut widths = vec![
+        Constraint::Length(7),
+        Constraint::Length(10),
         Constraint::Length(8),
-        Constraint::Length(12),
-        Constraint::Length(8),
-        Constraint::Length(10),
-        Constraint::Length(10),
-        Constraint::Length(10),
+        Constraint::Length(9),
+        Constraint::Length(9),
+        Constraint::Length(9),
     ];
     if !app.show_user_threads {
         widths.push(Constraint::Length(8));
@@ -271,12 +271,12 @@ fn draw_process_tree(f: &mut Frame, app: &App, area: Rect) {
     }
 
     let mut widths = vec![
+        Constraint::Length(7),
+        Constraint::Length(10),
         Constraint::Length(8),
-        Constraint::Length(12),
-        Constraint::Length(15),
-        Constraint::Length(15),
-        Constraint::Length(15),
-        Constraint::Length(15),
+        Constraint::Length(9),
+        Constraint::Length(9),
+        Constraint::Length(9),
     ];
     if !app.show_user_threads {
         widths.push(Constraint::Length(8));

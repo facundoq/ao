@@ -141,7 +141,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             Row::new(vec![
                 Cell::from(p.pid.to_string()),
                 Cell::from(p.name.clone()),
-                Cell::from(format!("{:.1}%", p.cpu)),
+                Cell::from(format!("{:>6.1}%", p.cpu)),
                 Cell::from(format_bytes(p.memory)),
                 Cell::from(p.executable.clone()),
             ])
@@ -150,10 +150,10 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let cpu_proc_table = Table::new(
         cpu_proc_rows,
         [
-            Constraint::Length(8),
+            Constraint::Length(7),
             Constraint::Length(15),
             Constraint::Length(8),
-            Constraint::Length(10),
+            Constraint::Length(9),
             Constraint::Min(20),
         ],
     )
@@ -176,7 +176,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             Row::new(vec![
                 Cell::from(p.pid.to_string()),
                 Cell::from(p.name.clone()),
-                Cell::from(format!("{:.1}%", p.cpu)),
+                Cell::from(format!("{:>6.1}%", p.cpu)),
                 Cell::from(format_bytes(p.memory)),
                 Cell::from(p.executable.clone()),
             ])
@@ -185,10 +185,10 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let mem_proc_table = Table::new(
         mem_proc_rows,
         [
-            Constraint::Length(8),
+            Constraint::Length(7),
             Constraint::Length(15),
             Constraint::Length(8),
-            Constraint::Length(10),
+            Constraint::Length(9),
             Constraint::Min(20),
         ],
     )
