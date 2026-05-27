@@ -1,7 +1,56 @@
 use crate::os::ExecutableCommand;
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use std::io::Write;
 use std::process::Command;
+use std::time::Duration;
+
+/// Run a `Command`, killing it and returning an error if it doesn't finish within `timeout`.
+/// This prevents TUI hangs when subprocesses block indefinitely (e.g. systemctl over SSH
+/// where D-Bus is unavailable, or docker when the socket is slow).
+pub fn run_with_timeout(mut cmd: Command, timeout: Duration) -> Result<std::process::Output> {
+    let mut child = cmd
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()?;
+    let start = std::time::Instant::now();
+    loop {
+        match child.try_wait()? {
+            Some(status) => {
+                let stdout = child
+                    .stdout
+                    .take()
+                    .map(|mut r| {
+                        let mut v = Vec::new();
+                        std::io::Read::read_to_end(&mut r, &mut v).ok();
+                        v
+                    })
+                    .unwrap_or_default();
+                let stderr = child
+                    .stderr
+                    .take()
+                    .map(|mut r| {
+                        let mut v = Vec::new();
+                        std::io::Read::read_to_end(&mut r, &mut v).ok();
+                        v
+                    })
+                    .unwrap_or_default();
+                return Ok(std::process::Output {
+                    status,
+                    stdout,
+                    stderr,
+                });
+            }
+            None => {
+                if start.elapsed() >= timeout {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(anyhow!("command timed out after {:?}", timeout));
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        }
+    }
+}
 
 pub struct SystemCommand {
     pub binary: String,

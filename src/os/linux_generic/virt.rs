@@ -1,9 +1,10 @@
-use super::common::{BIN_DOCKER, SystemCommand};
+use super::common::{BIN_DOCKER, SystemCommand, run_with_timeout};
 use crate::cli::{VirtualizationAction, VirtualizationArgs};
 use crate::os::{ContainerInfo, Domain, ExecutableCommand, OutputFormat, VirtManager};
 use anyhow::Result;
 use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
 use std::process::Command;
+use std::time::Duration;
 
 pub struct StandardVirt;
 
@@ -80,12 +81,12 @@ impl VirtManager for StandardVirt {
     }
 
     fn get_containers(&self) -> Result<Vec<ContainerInfo>> {
-        let output = Command::new(BIN_DOCKER)
-            .arg("ps")
+        let mut cmd = Command::new(BIN_DOCKER);
+        cmd.arg("ps")
             .arg("-a")
             .arg("--format")
-            .arg("{{.ID}}\t{{.Image}}\t{{.Command}}\t{{.CreatedAt}}\t{{.Status}}\t{{.Names}}")
-            .output()?;
+            .arg("{{.ID}}\t{{.Image}}\t{{.Command}}\t{{.CreatedAt}}\t{{.Status}}\t{{.Names}}");
+        let output = run_with_timeout(cmd, Duration::from_secs(3))?;
         let stdout = String::from_utf8_lossy(&output.stdout);
         let mut containers = Vec::new();
         for line in stdout.lines() {

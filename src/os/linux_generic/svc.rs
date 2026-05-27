@@ -1,10 +1,13 @@
-use super::common::{BIN_SYSTEMCTL, SystemCommand, command_exists, is_completing_action};
+use super::common::{
+    BIN_SYSTEMCTL, SystemCommand, command_exists, is_completing_action, run_with_timeout,
+};
 
 use crate::cli::{ServiceAction, ServiceArgs};
 use crate::os::{Domain, ExecutableCommand, OutputFormat, ServiceInfo, ServiceManager};
 use anyhow::Result;
 use clap::{ArgMatches, Args, Command as ClapCommand, FromArgMatches};
 use std::process::Command;
+use std::time::Duration;
 
 pub struct Systemd;
 
@@ -102,12 +105,12 @@ impl ServiceManager for Systemd {
         if !command_exists(BIN_SYSTEMCTL) {
             return Ok(vec![]);
         }
-        let output = Command::new(BIN_SYSTEMCTL)
-            .arg("list-units")
+        let mut cmd = Command::new(BIN_SYSTEMCTL);
+        cmd.arg("list-units")
             .arg("--type=service")
             .arg("--no-legend")
-            .arg("--no-pager")
-            .output()?;
+            .arg("--no-pager");
+        let output = run_with_timeout(cmd, Duration::from_secs(3))?;
         let stdout = String::from_utf8_lossy(&output.stdout);
         let mut services = Vec::new();
         for line in stdout.lines() {
