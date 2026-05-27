@@ -136,6 +136,9 @@ where
                     KeyCode::Char('o') => {
                         app.show_only_current_user = !app.show_only_current_user;
                         app.refresh_process_data(true);
+                        let mut config = Config::load().unwrap_or_default();
+                        config.ui.process_current_user_only = app.show_only_current_user;
+                        let _ = config.save();
                     }
                     KeyCode::Char('H') | KeyCode::Char('h') => {
                         app.show_user_threads = !app.show_user_threads;
