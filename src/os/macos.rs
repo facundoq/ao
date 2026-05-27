@@ -695,6 +695,30 @@ impl Domain for MacOSSys {
             None => self.info(OutputFormat::Table),
         }
     }
+    fn complete(
+        &self,
+        _line: &str,
+        words: &[&str],
+        _last_word_complete: bool,
+    ) -> Result<Vec<String>> {
+        use super::linux_generic::is_completing_action;
+        if is_completing_action(words, self.name(), "power", 1) {
+            return Ok(vec![
+                "reboot".to_string(),
+                "shutdown".to_string(),
+                "suspend".to_string(),
+                "hibernate".to_string(),
+            ]);
+        }
+        if is_completing_action(words, self.name(), "time", 1) {
+            return Ok(vec![
+                "sync".to_string(),
+                "set".to_string(),
+                "get".to_string(),
+            ]);
+        }
+        Ok(vec![])
+    }
 }
 impl SysManager for MacOSSys {
     fn info(&self, _f: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
