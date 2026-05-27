@@ -72,7 +72,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let cpu_usage = app.system_info.global_cpu_usage();
     let cpu_gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL).title(" CPU "))
-        .gauge_style(Style::default().fg(Color::Red).bg(Color::Gray))
+        .gauge_style(Style::default().fg(Color::Red).bg(Color::DarkGray))
         .ratio(cpu_usage as f64 / 100.0)
         .label(format!("{:.1}%", cpu_usage));
     f.render_widget(cpu_gauge, left_chunks[2]);
@@ -108,7 +108,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             );
 
             let core_gauge = Gauge::default()
-                .gauge_style(Style::default().fg(Color::Red).bg(Color::Gray))
+                .gauge_style(Style::default().fg(Color::Red).bg(Color::DarkGray))
                 .ratio(usage as f64 / 100.0)
                 .label(format!("{:>5.1}%", usage));
             f.render_widget(core_gauge, row_chunks[1]);
@@ -124,10 +124,10 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         .map(|p| {
             Row::new(vec![
                 Cell::from(p.pid.to_string()),
-                Cell::from(p.user.clone()),
-                Cell::from(p.executable.clone()),
+                Cell::from(p.name.clone()),
                 Cell::from(format!("{:.1}%", p.cpu)),
                 Cell::from(format_bytes(p.memory)),
+                Cell::from(p.executable.clone()),
             ])
         })
         .collect();
@@ -135,14 +135,14 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         cpu_proc_rows,
         [
             Constraint::Length(8),
-            Constraint::Length(12),
-            Constraint::Percentage(40),
+            Constraint::Length(15),
+            Constraint::Length(8),
             Constraint::Length(10),
-            Constraint::Length(12),
+            Constraint::Min(20),
         ],
     )
     .header(
-        Row::new(vec!["PID", "User", "Executable", "CPU%", "RSS"])
+        Row::new(vec!["PID", "Name", "CPU%", "RSS", "Executable"])
             .style(Style::default().add_modifier(Modifier::BOLD)),
     )
     .block(
@@ -159,10 +159,10 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         .map(|p| {
             Row::new(vec![
                 Cell::from(p.pid.to_string()),
-                Cell::from(p.user.clone()),
-                Cell::from(p.executable.clone()),
+                Cell::from(p.name.clone()),
                 Cell::from(format!("{:.1}%", p.cpu)),
                 Cell::from(format_bytes(p.memory)),
+                Cell::from(p.executable.clone()),
             ])
         })
         .collect();
@@ -170,14 +170,14 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         mem_proc_rows,
         [
             Constraint::Length(8),
-            Constraint::Length(12),
-            Constraint::Percentage(40),
+            Constraint::Length(15),
+            Constraint::Length(8),
             Constraint::Length(10),
-            Constraint::Length(12),
+            Constraint::Min(20),
         ],
     )
     .header(
-        Row::new(vec!["PID", "User", "Executable", "CPU%", "RSS"])
+        Row::new(vec!["PID", "Name", "CPU%", "RSS", "Executable"])
             .style(Style::default().add_modifier(Modifier::BOLD)),
     )
     .block(
