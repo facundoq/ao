@@ -82,7 +82,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let cores_inner = cores_block.inner(left_chunks[3]);
     f.render_widget(cores_block, left_chunks[3]);
 
-    let mut core_constraints = vec![Constraint::Length(2); core_count];
+    let mut core_constraints = vec![Constraint::Length(1); core_count];
     core_constraints.push(Constraint::Min(0));
     let core_chunks = Layout::default()
         .direction(Direction::Vertical)
