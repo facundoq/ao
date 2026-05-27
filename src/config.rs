@@ -23,6 +23,36 @@ pub enum ProcessSort {
     User,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ThemeConfig {
+    pub cpu_color: [u8; 3],
+    pub ram_color: [u8; 3],
+    pub swap_color: [u8; 3],
+    pub storage_color_low: [u8; 3],
+    pub storage_color_med: [u8; 3],
+    pub storage_color_high: [u8; 3],
+    #[serde(default = "default_selected_color")]
+    pub selected_color: [u8; 3],
+}
+
+fn default_selected_color() -> [u8; 3] {
+    [230, 200, 150]
+}
+
+impl Default for ThemeConfig {
+    fn default() -> Self {
+        Self {
+            cpu_color: [255, 200, 150],
+            ram_color: [170, 220, 170],
+            swap_color: [220, 170, 220],
+            storage_color_low: [170, 220, 170],
+            storage_color_med: [220, 220, 150],
+            storage_color_high: [220, 150, 150],
+            selected_color: default_selected_color(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UiConfig {
     pub preferred_format: OutputFormat,
@@ -37,9 +67,13 @@ pub struct UiConfig {
     pub process_tree_depth: u32,
     pub process_current_user_only: bool,
     pub process_filter: String,
-    pub max_rx_throughput: u64,
-    pub max_tx_throughput: u64,
+    #[serde(default)]
+    pub max_rx_throughput: std::collections::HashMap<String, u64>,
+    #[serde(default)]
+    pub max_tx_throughput: std::collections::HashMap<String, u64>,
     pub refresh_rate_ms: u64,
+    #[serde(default)]
+    pub theme: ThemeConfig,
 }
 
 impl Default for UiConfig {
@@ -57,9 +91,10 @@ impl Default for UiConfig {
             process_tree_depth: 2,
             process_current_user_only: false,
             process_filter: String::new(),
-            max_rx_throughput: 1024,
-            max_tx_throughput: 1024,
+            max_rx_throughput: std::collections::HashMap::new(),
+            max_tx_throughput: std::collections::HashMap::new(),
             refresh_rate_ms: 1000,
+            theme: ThemeConfig::default(),
         }
     }
 }

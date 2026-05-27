@@ -60,10 +60,11 @@ pub struct App<'a> {
     pub refresh_interval: Duration,
     pub max_temps: HashMap<String, f32>,
     pub process_filter: String,
-    pub max_rx_throughput: u64,
-    pub max_tx_throughput: u64,
+    pub max_rx_throughput: HashMap<String, u64>,
+    pub max_tx_throughput: HashMap<String, u64>,
     pub is_filtering: bool,
     pub tick_rate: Duration,
+    pub theme: crate::config::ThemeConfig,
 
     pub selected_process: Option<sysinfo::Pid>,
     pub process_details: Option<ProcessDetails>,
@@ -79,6 +80,11 @@ pub struct ProcessResource {
 pub struct ProcessDetails {
     pub pid: sysinfo::Pid,
     pub name: String,
+    pub exe: String,
+    pub memory: u64,
+    pub cpu: f32,
+    pub disk_read: u64,
+    pub disk_write: u64,
     pub threads: Vec<(String, String)>, // (tid, name)
     pub resources: Vec<ProcessResource>,
     pub filtered_resources: Vec<ProcessResource>,
@@ -196,11 +202,11 @@ impl<'a> App<'a> {
             sensors: Vec::new(),
             ram_config,
             ram_speed,
-            cpu_history: Vec::with_capacity(61),
-            mem_history: Vec::with_capacity(61),
-            swap_history: Vec::with_capacity(61),
-            net_rx_history: Vec::with_capacity(61),
-            net_tx_history: Vec::with_capacity(61),
+            cpu_history: Vec::with_capacity(301),
+            mem_history: Vec::with_capacity(301),
+            swap_history: Vec::with_capacity(301),
+            net_rx_history: Vec::with_capacity(301),
+            net_tx_history: Vec::with_capacity(301),
             net_history_per_adapter: HashMap::new(),
             global_cpu_frequency: 0,
             history_start: Instant::now(),
@@ -228,6 +234,7 @@ impl<'a> App<'a> {
             max_tx_throughput: config.ui.max_tx_throughput,
             is_filtering: false,
             tick_rate: Duration::from_millis(config.ui.refresh_rate_ms),
+            theme: config.ui.theme,
             selected_process: None,
             process_details: None,
         };
@@ -298,9 +305,31 @@ impl<'a> App<'a> {
                 .map(|p| p.name().to_string_lossy().to_string())
                 .unwrap_or_else(|| "unknown".to_string());
 
+            let mut exe = String::new();
+            let mut memory = 0;
+            let mut cpu = 0.0;
+            let mut disk_read = 0;
+            let mut disk_write = 0;
+
+            if let Some(p) = self.system_info.process(pid) {
+                exe = p
+                    .exe()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "Unknown".to_string());
+                memory = p.memory();
+                cpu = p.cpu_usage();
+                disk_read = p.disk_usage().read_bytes;
+                disk_write = p.disk_usage().written_bytes;
+            }
+
             let mut details = ProcessDetails {
                 pid,
                 name,
+                exe,
+                memory,
+                cpu,
+                disk_read,
+                disk_write,
                 threads,
                 resources,
                 filtered_resources: Vec::new(),
@@ -394,7 +423,7 @@ impl<'a> App<'a> {
         let now_sec = now.duration_since(self.history_start).as_secs_f64();
         self.cpu_history
             .push((now_sec, self.system_info.global_cpu_usage() as f64));
-        if self.cpu_history.len() > 60 {
+        if self.cpu_history.len() > 300 {
             self.cpu_history.remove(0);
         }
 
@@ -415,7 +444,7 @@ impl<'a> App<'a> {
             0.0
         };
         self.mem_history.push((now_sec, mem_percent));
-        if self.mem_history.len() > 60 {
+        if self.mem_history.len() > 300 {
             self.mem_history.remove(0);
         }
 
@@ -426,7 +455,7 @@ impl<'a> App<'a> {
             0.0
         };
         self.swap_history.push((now_sec, swap_percent));
-        if self.swap_history.len() > 60 {
+        if self.swap_history.len() > 300 {
             self.swap_history.remove(0);
         }
 
@@ -442,50 +471,55 @@ impl<'a> App<'a> {
                 let tx_speed = (tx_delta as f64 / elapsed) as u64;
                 self.network_speeds
                     .insert(name.clone(), (rx_speed, tx_speed));
-                total_rx_speed += rx_speed as f64;
-                total_tx_speed += tx_speed as f64;
+
+                if network.mac_address() != sysinfo::MacAddr::UNSPECIFIED {
+                    total_rx_speed += rx_speed as f64;
+                    total_tx_speed += tx_speed as f64;
+                }
 
                 let entry = self
                     .net_history_per_adapter
                     .entry(name.clone())
-                    .or_insert_with(|| (Vec::with_capacity(61), Vec::with_capacity(61)));
+                    .or_insert_with(|| (Vec::with_capacity(301), Vec::with_capacity(301)));
                 entry.0.push((now_sec, rx_speed as f64));
                 entry.1.push((now_sec, tx_speed as f64));
-                if entry.0.len() > 60 {
+                if entry.0.len() > 300 {
                     entry.0.remove(0);
                 }
-                if entry.1.len() > 60 {
+                if entry.1.len() > 300 {
                     entry.1.remove(0);
                 }
             }
             self.prev_network_data.insert(name.clone(), (rx, tx));
         }
         self.net_rx_history.push((now_sec, total_rx_speed));
-        if self.net_rx_history.len() > 60 {
+        if self.net_rx_history.len() > 300 {
             self.net_rx_history.remove(0);
         }
         self.net_tx_history.push((now_sec, total_tx_speed));
-        if self.net_tx_history.len() > 60 {
+        if self.net_tx_history.len() > 300 {
             self.net_tx_history.remove(0);
         }
 
-        let rx_val = total_rx_speed as u64;
-        let tx_val = total_tx_speed as u64;
         let mut updated = false;
 
-        if rx_val > self.max_rx_throughput {
-            self.max_rx_throughput = rx_val;
-            updated = true;
-        }
-        if tx_val > self.max_tx_throughput {
-            self.max_tx_throughput = tx_val;
-            updated = true;
+        for (name, (rx_speed, tx_speed)) in &self.network_speeds {
+            let rx_max = self.max_rx_throughput.entry(name.clone()).or_insert(0);
+            if *rx_speed > *rx_max {
+                *rx_max = *rx_speed;
+                updated = true;
+            }
+            let tx_max = self.max_tx_throughput.entry(name.clone()).or_insert(0);
+            if *tx_speed > *tx_max {
+                *tx_max = *tx_speed;
+                updated = true;
+            }
         }
 
         if updated {
             let mut config = Config::load().unwrap_or_default();
-            config.ui.max_rx_throughput = self.max_rx_throughput;
-            config.ui.max_tx_throughput = self.max_tx_throughput;
+            config.ui.max_rx_throughput = self.max_rx_throughput.clone();
+            config.ui.max_tx_throughput = self.max_tx_throughput.clone();
             let _ = config.save();
         }
 
@@ -494,9 +528,9 @@ impl<'a> App<'a> {
                 let entry = self
                     .max_temps
                     .entry(sensor.label.clone())
-                    .or_insert(sensor.temperature);
-                if sensor.temperature > *entry {
-                    *entry = sensor.temperature;
+                    .or_insert(sensor.value);
+                if sensor.value > *entry {
+                    *entry = sensor.value;
                 }
             }
             self.sensors = s;
@@ -506,7 +540,32 @@ impl<'a> App<'a> {
             s.reverse();
             self.sessions = s;
         }
-        if let Ok(i) = self.detected_system.net.get_interfaces() {
+        if let Ok(mut i) = self.detected_system.net.get_interfaces() {
+            i.sort_by_key(|iface| {
+                let state_lower = iface.state.to_lowercase();
+                let is_up = state_lower == "up";
+                let type_lower = iface.interface_type.to_lowercase();
+                let name_lower = iface.name.to_lowercase();
+                let type_score = if type_lower.contains("loopback")
+                    || name_lower == "lo"
+                    || name_lower.starts_with("lo")
+                {
+                    2
+                } else if type_lower.contains("wifi")
+                    || type_lower.contains("wlan")
+                    || type_lower.contains("ethernet")
+                    || type_lower.contains("eth")
+                    || type_lower.contains("enp")
+                    || name_lower.starts_with("en")
+                    || name_lower.starts_with("wl")
+                    || name_lower.starts_with("eth")
+                {
+                    0
+                } else {
+                    1
+                };
+                (!is_up, type_score)
+            });
             self.interfaces = i;
         }
         if let Ok(s) = self.detected_system.svc.get_all_services_info() {
@@ -538,11 +597,11 @@ impl<'a> App<'a> {
                 .partial_cmp(&a.cpu)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
-        self.top_cpu_processes = top_cpu.into_iter().take(10).collect();
+        self.top_cpu_processes = top_cpu.into_iter().take(50).collect();
 
         let mut top_mem = all_summaries;
         top_mem.sort_by_key(|p| std::cmp::Reverse(p.memory));
-        self.top_mem_processes = top_mem.into_iter().take(10).collect();
+        self.top_mem_processes = top_mem.into_iter().take(50).collect();
 
         self.sorted_processes = self.get_sorted_processes(true); // Filtered for Tab
         self.flattened_tree = self.calculate_flattened_tree();
@@ -966,7 +1025,7 @@ impl<'a> App<'a> {
             5 => self.services.len(),
             6 => self.containers.len(),
             7 => self.sensors.len(),
-            8 => 0,
+            8 => self.interfaces.len(),
             _ => 0,
         }
     }

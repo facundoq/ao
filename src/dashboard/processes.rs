@@ -7,17 +7,20 @@ use ratatui::{
     widgets::{Block, Borders, Cell, Row, Table},
 };
 
-fn get_user_color(user: &str) -> Color {
+fn get_user_color(user: &str, app: &App) -> Color {
     let hash = user.bytes().fold(0u64, |acc, b| acc.wrapping_add(b as u64));
     let colors = [
-        Color::Red,
-        Color::Green,
-        Color::Yellow,
-        Color::Blue,
-        Color::Magenta,
-        Color::Cyan,
+        app.theme.selected_color,
+        [0, 255, 0],
+        [0, 0, 255],
+        [255, 0, 255],
+        [0, 255, 255],
     ];
-    colors[(hash as usize) % colors.len()]
+    Color::Rgb(
+        colors[(hash as usize) % colors.len()][0],
+        colors[(hash as usize) % colors.len()][1],
+        colors[(hash as usize) % colors.len()][2],
+    )
 }
 
 pub fn draw(f: &mut Frame, app: &App, area: Rect) {
@@ -28,7 +31,15 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     }
 }
 
-pub fn draw_full_details(f: &mut Frame, _app: &App, details: &ProcessDetails, area: Rect) {
+pub fn draw_full_details(f: &mut Frame, app: &App, details: &ProcessDetails, area: Rect) {
+    let chunks = ratatui::layout::Layout::default()
+        .direction(ratatui::layout::Direction::Vertical)
+        .constraints([
+            ratatui::layout::Constraint::Length(4),
+            ratatui::layout::Constraint::Min(0),
+        ])
+        .split(area);
+
     let search_indicator = if details.is_searching {
         format!(" (SEARCHING: {}|)", details.filter)
     } else {
@@ -36,11 +47,24 @@ pub fn draw_full_details(f: &mut Frame, _app: &App, details: &ProcessDetails, ar
     };
 
     let title = format!(
-        " Process: {} (PID: {}) | Files & Sockets [Esc: Close] [/: Search] {} ",
+        " Process: {} (PID: {}) | [Esc: Close] [/: Search] {} ",
         details.name, details.pid, search_indicator
     );
 
-    let items_per_page = area.height.saturating_sub(4) as usize;
+    let stats_text = format!(
+        "Executable: {}\nCPU: {:.1}% | Memory: {} | Disk Read: {}/s | Disk Write: {}/s",
+        details.exe,
+        details.cpu,
+        crate::dashboard::utils::format_bytes(details.memory),
+        crate::dashboard::utils::format_bytes(details.disk_read),
+        crate::dashboard::utils::format_bytes(details.disk_write),
+    );
+
+    let stats_block = ratatui::widgets::Paragraph::new(stats_text)
+        .block(Block::default().borders(Borders::ALL).title(title));
+    f.render_widget(stats_block, chunks[0]);
+
+    let items_per_page = chunks[1].height.saturating_sub(4) as usize;
     let total_items = details.filtered_resources.len();
     let total_pages = (total_items + items_per_page - 1).max(1) / items_per_page;
     let current_page = if total_items > 0 {
@@ -70,7 +94,11 @@ pub fn draw_full_details(f: &mut Frame, _app: &App, details: &ProcessDetails, ar
 
             if i + details.scroll_offset == details.selected_index {
                 style = style
-                    .bg(Color::Yellow)
+                    .bg(Color::Rgb(
+                        app.theme.selected_color[0],
+                        app.theme.selected_color[1],
+                        app.theme.selected_color[2],
+                    ))
                     .fg(Color::Black)
                     .add_modifier(Modifier::BOLD);
             }
@@ -82,14 +110,14 @@ pub fn draw_full_details(f: &mut Frame, _app: &App, details: &ProcessDetails, ar
             .style(style)
         });
 
-    let table_title = format!("{} [Page {}/{}]", title, current_page, total_pages);
+    let table_title = format!("Files & Sockets [Page {}/{}]", current_page, total_pages);
 
     let table = Table::new(rows, [Constraint::Length(10), Constraint::Min(0)])
         .header(header)
         .block(Block::default().borders(Borders::ALL).title(table_title))
         .widths([Constraint::Length(10), Constraint::Min(0)]);
 
-    f.render_widget(table, area);
+    f.render_widget(table, chunks[1]);
 }
 
 fn draw_process_list(f: &mut Frame, app: &App, area: Rect) {
@@ -135,7 +163,11 @@ fn draw_process_list(f: &mut Frame, app: &App, area: Rect) {
         .map(|(i, p)| {
             let style = if i == app.selected_index {
                 Style::default()
-                    .bg(Color::Yellow)
+                    .bg(Color::Rgb(
+                        app.theme.selected_color[0],
+                        app.theme.selected_color[1],
+                        app.theme.selected_color[2],
+                    ))
                     .fg(Color::Black)
                     .add_modifier(Modifier::BOLD)
             } else {
@@ -146,7 +178,7 @@ fn draw_process_list(f: &mut Frame, app: &App, area: Rect) {
                 Cell::from(p.user.clone()).style(if i == app.selected_index {
                     Style::default()
                 } else {
-                    Style::default().fg(get_user_color(&p.user))
+                    Style::default().fg(get_user_color(&p.user, app))
                 }),
                 Cell::from(format!("{:>6.1}%", p.cpu)),
                 Cell::from(format_bytes(p.virt_mem)),
@@ -236,7 +268,11 @@ fn draw_process_tree(f: &mut Frame, app: &App, area: Rect) {
             };
             if i == app.selected_index {
                 style = style
-                    .bg(Color::Yellow)
+                    .bg(Color::Rgb(
+                        app.theme.selected_color[0],
+                        app.theme.selected_color[1],
+                        app.theme.selected_color[2],
+                    ))
                     .fg(Color::Black)
                     .add_modifier(Modifier::BOLD);
             }
@@ -245,7 +281,7 @@ fn draw_process_tree(f: &mut Frame, app: &App, area: Rect) {
                 Cell::from(node.user.clone()).style(if i == app.selected_index {
                     Style::default()
                 } else {
-                    Style::default().fg(get_user_color(&node.user))
+                    Style::default().fg(get_user_color(&node.user, app))
                 }),
                 Cell::from(node.cpu.clone()),
                 Cell::from(node.virt.clone()),

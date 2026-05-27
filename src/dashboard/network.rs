@@ -42,23 +42,27 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
             if idx == app.selected_index {
                 style = style
-                    .bg(Color::Yellow)
+                    .bg(Color::Rgb(
+                        app.theme.selected_color[0],
+                        app.theme.selected_color[1],
+                        app.theme.selected_color[2],
+                    ))
                     .fg(Color::Black)
                     .add_modifier(Modifier::BOLD);
             }
 
             let type_lower = i.interface_type.to_lowercase();
             let icon = if type_lower.contains("wifi") || type_lower.contains("wlan") {
-                "📡"
+                "🛜"
             } else if type_lower.contains("ethernet")
                 || type_lower.contains("eth")
                 || type_lower.contains("enp")
             {
-                "🔗"
+                "🔌"
             } else if type_lower.contains("loopback") || type_lower.contains("lo") {
                 "🔄"
             } else {
-                "🌐"
+                "🥽"
             }; // Virtual or other
 
             let (rx_speed, tx_speed) = app.network_speeds.get(&i.name).cloned().unwrap_or((0, 0));

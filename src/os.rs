@@ -534,7 +534,8 @@ pub struct OverviewEntry {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SensorInfo {
     pub label: String,
-    pub temperature: f32,
+    pub value: f32,
+    pub unit: String,
     pub critical: Option<f32>,
     pub max: Option<f32>,
 }

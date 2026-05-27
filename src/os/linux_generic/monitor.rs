@@ -31,15 +31,53 @@ impl OverviewManager for StandardMonitor {
 
     fn get_sensors(&self) -> Result<Vec<SensorInfo>> {
         let components = Components::new_with_refreshed_list();
-        let sensors = components
+        let mut sensors: Vec<SensorInfo> = components
             .iter()
             .map(|c| SensorInfo {
                 label: c.label().to_string(),
-                temperature: c.temperature().unwrap_or(0.0),
+                value: c.temperature().unwrap_or(0.0),
+                unit: "°C".to_string(),
                 critical: c.critical(),
                 max: c.max(),
             })
             .collect();
+
+        if let Ok(entries) = std::fs::read_dir("/sys/class/hwmon/") {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if let Ok(name) = std::fs::read_to_string(path.join("name")) {
+                    let name = name.trim();
+                    if let Ok(hwmon_entries) = std::fs::read_dir(&path) {
+                        for hwmon_entry in hwmon_entries.flatten() {
+                            let file_name = hwmon_entry.file_name();
+                            let file_name_str = file_name.to_string_lossy();
+                            if file_name_str.starts_with("fan") && file_name_str.ends_with("_input")
+                            {
+                                #[allow(clippy::collapsible_if)]
+                                if let Ok(val_str) = std::fs::read_to_string(hwmon_entry.path()) {
+                                    if let Ok(val) = val_str.trim().parse::<f32>() {
+                                        let label = format!(
+                                            "{} Fan {}",
+                                            name,
+                                            &file_name_str
+                                                [3..file_name_str.len().saturating_sub(6)]
+                                        );
+                                        sensors.push(SensorInfo {
+                                            label,
+                                            value: val,
+                                            unit: "RPM".to_string(),
+                                            critical: None,
+                                            max: None,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(sensors)
     }
 }

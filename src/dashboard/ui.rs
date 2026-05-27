@@ -93,7 +93,11 @@ fn draw_tabs(f: &mut Frame, app: &App, area: Rect) {
         .style(Style::default().fg(Color::White))
         .highlight_style(
             Style::default()
-                .fg(Color::Yellow)
+                .fg(Color::Rgb(
+                    app.theme.selected_color[0],
+                    app.theme.selected_color[1],
+                    app.theme.selected_color[2],
+                ))
                 .add_modifier(Modifier::BOLD),
         );
     f.render_widget(tabs, area);

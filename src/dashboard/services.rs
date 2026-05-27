@@ -34,7 +34,11 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
             if i == app.selected_index {
                 style = style
-                    .bg(Color::Yellow)
+                    .bg(Color::Rgb(
+                        app.theme.selected_color[0],
+                        app.theme.selected_color[1],
+                        app.theme.selected_color[2],
+                    ))
                     .fg(Color::Black)
                     .add_modifier(Modifier::BOLD);
             }

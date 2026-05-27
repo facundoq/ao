@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 pub fn draw(f: &mut Frame, app: &App, area: Rect) {
-    let header_cells = ["Device/Label", "Temperature", "Max", "Critical"]
+    let header_cells = ["Device/Label", "Value", "Max", "Critical"]
         .iter()
         .map(|h| Cell::from(*h).style(Style::default().add_modifier(Modifier::BOLD)));
     let header = Row::new(header_cells).height(1).bottom_margin(1);
@@ -45,15 +45,11 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
                 "🧩"
             };
 
-            let max_temp = app
-                .max_temps
-                .get(&s.label)
-                .copied()
-                .unwrap_or(s.temperature);
+            let max_temp = app.max_temps.get(&s.label).copied().unwrap_or(s.value);
             let mut temp_style = if let Some(crit) = s.critical {
-                if s.temperature >= crit {
+                if s.value >= crit {
                     Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
-                } else if s.temperature >= crit * 0.8 {
+                } else if s.value >= crit * 0.8 {
                     Style::default().fg(Color::Yellow)
                 } else {
                     Style::default().fg(Color::Green)
@@ -68,7 +64,11 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
             let style = if i == app.selected_index {
                 Style::default()
-                    .bg(Color::Yellow)
+                    .bg(Color::Rgb(
+                        app.theme.selected_color[0],
+                        app.theme.selected_color[1],
+                        app.theme.selected_color[2],
+                    ))
                     .fg(Color::Black)
                     .add_modifier(Modifier::BOLD)
             } else {
@@ -77,11 +77,11 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
             Row::new(vec![
                 Cell::from(format!("{} {}", icon, s.label)),
-                Cell::from(format!("{:.1}°C", s.temperature)).style(temp_style),
-                Cell::from(format!("{:.1}°C", max_temp)),
+                Cell::from(format!("{:.1} {}", s.value, s.unit)).style(temp_style),
+                Cell::from(format!("{:.1} {}", max_temp, s.unit)),
                 Cell::from(
                     s.critical
-                        .map(|c| format!("{:.1}°C", c))
+                        .map(|c| format!("{:.1} {}", c, s.unit))
                         .unwrap_or_else(|| "N/A".to_string()),
                 ),
             ])

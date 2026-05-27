@@ -1071,7 +1071,8 @@ impl OverviewManager for MacOSOverview {
                 if val > 0.0 {
                     sensors.push(SensorInfo {
                         label: s.to_string(),
-                        temperature: val,
+                        value: val,
+                        unit: "°C".to_string(),
                         critical: Some(100.0),
                         max: Some(90.0),
                     });

@@ -43,10 +43,18 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         0.0
     };
     let mem_total_gb = mem_total as f64 / 1_073_741_824.0;
-    let ram_title = format!(" RAM ({:.1} GB) ", mem_total_gb);
     let mem_gauge = Gauge::default()
-        .block(Block::default().borders(Borders::ALL).title(ram_title))
-        .gauge_style(Style::default().fg(Color::Green))
+        .block(
+            Block::default().borders(Borders::ALL).title(" RAM ").title(
+                ratatui::text::Line::from(format!(" {:.1} GB ", mem_total_gb))
+                    .alignment(ratatui::layout::Alignment::Right),
+            ),
+        )
+        .gauge_style(Style::default().fg(Color::Rgb(
+            app.theme.ram_color[0],
+            app.theme.ram_color[1],
+            app.theme.ram_color[2],
+        )))
         .ratio(mem_ratio)
         .label(format!("{:.1}%", mem_ratio * 100.0));
     f.render_widget(mem_gauge, left_chunks[0]);
@@ -60,10 +68,21 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         0.0
     };
     let swap_total_gb = swap_total as f64 / 1_073_741_824.0;
-    let swap_title = format!(" Swap ({:.1} GB) ", swap_total_gb);
     let swap_gauge = Gauge::default()
-        .block(Block::default().borders(Borders::ALL).title(swap_title))
-        .gauge_style(Style::default().fg(Color::Magenta))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Swap ")
+                .title(
+                    ratatui::text::Line::from(format!(" {:.1} GB ", swap_total_gb))
+                        .alignment(ratatui::layout::Alignment::Right),
+                ),
+        )
+        .gauge_style(Style::default().fg(Color::Rgb(
+            app.theme.swap_color[0],
+            app.theme.swap_color[1],
+            app.theme.swap_color[2],
+        )))
         .ratio(swap_ratio)
         .label(format!("{:.1}%", swap_ratio * 100.0));
     f.render_widget(swap_gauge, left_chunks[1]);
@@ -82,7 +101,11 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         .block(Block::default().borders(Borders::ALL).title(title))
         .gauge_style(
             Style::default()
-                .fg(Color::Rgb(200, 60, 60))
+                .fg(Color::Rgb(
+                    app.theme.cpu_color[0],
+                    app.theme.cpu_color[1],
+                    app.theme.cpu_color[2],
+                ))
                 .bg(Color::Rgb(30, 30, 30)),
         )
         .ratio(cpu_usage as f64 / 100.0)
@@ -122,7 +145,11 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             let core_gauge = Gauge::default()
                 .gauge_style(
                     Style::default()
-                        .fg(Color::Rgb(200, 60, 60))
+                        .fg(Color::Rgb(
+                            app.theme.cpu_color[0],
+                            app.theme.cpu_color[1],
+                            app.theme.cpu_color[2],
+                        ))
                         .bg(Color::Rgb(30, 30, 30)),
                 )
                 .ratio(usage as f64 / 100.0)
@@ -164,7 +191,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     .block(
         Block::default()
             .borders(Borders::ALL)
-            .title(" Top 10 CPU Processes "),
+            .title(" Top CPU Processes "),
     );
     f.render_widget(cpu_proc_table, right_chunks[0]);
 
@@ -199,7 +226,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     .block(
         Block::default()
             .borders(Borders::ALL)
-            .title(" Top 10 Mem Processes "),
+            .title(" Top Mem Processes "),
     );
     f.render_widget(mem_proc_table, right_chunks[1]);
 }

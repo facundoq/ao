@@ -25,28 +25,40 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         .split(horizontal_chunks[0]);
 
     let now_sec = app.history_start.elapsed().as_secs_f64();
-    let x_bounds = [now_sec.max(60.0) - 60.0, now_sec.max(60.0)];
+    let x_bounds = [now_sec - 300.0, now_sec];
 
     // 1. Unified System Resources Chart (CPU, MEM, SWAP)
     let cpu_dataset = Dataset::default()
         .name("CPU")
         .marker(ratatui::symbols::Marker::Braille)
         .graph_type(GraphType::Line)
-        .style(Style::default().fg(Color::Rgb(255, 200, 150)))
+        .style(Style::default().fg(Color::Rgb(
+            app.theme.cpu_color[0],
+            app.theme.cpu_color[1],
+            app.theme.cpu_color[2],
+        )))
         .data(&app.cpu_history);
 
     let mem_dataset = Dataset::default()
         .name("Memory")
         .marker(ratatui::symbols::Marker::Braille)
         .graph_type(GraphType::Line)
-        .style(Style::default().fg(Color::Green))
+        .style(Style::default().fg(Color::Rgb(
+            app.theme.ram_color[0],
+            app.theme.ram_color[1],
+            app.theme.ram_color[2],
+        )))
         .data(&app.mem_history);
 
     let swap_dataset = Dataset::default()
         .name("Swap")
         .marker(ratatui::symbols::Marker::Braille)
         .graph_type(GraphType::Line)
-        .style(Style::default().fg(Color::Magenta))
+        .style(Style::default().fg(Color::Rgb(
+            app.theme.swap_color[0],
+            app.theme.swap_color[1],
+            app.theme.swap_color[2],
+        )))
         .data(&app.swap_history);
 
     let system_chart = Chart::new(vec![cpu_dataset, mem_dataset, swap_dataset])
@@ -57,7 +69,14 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         )
         .legend_position(Some(LegendPosition::TopRight))
         .hidden_legend_constraints((Constraint::Min(0), Constraint::Min(0)))
-        .x_axis(Axis::default().bounds(x_bounds))
+        .x_axis(Axis::default().bounds(x_bounds).labels(vec![
+            Span::raw("-5m"),
+            Span::raw("-4m"),
+            Span::raw("-3m"),
+            Span::raw("-2m"),
+            Span::raw("-1m"),
+            Span::raw("0"),
+        ]))
         .y_axis(Axis::default().bounds([0.0, 100.0]).labels(vec![
             Span::raw("0"),
             Span::raw("50"),
@@ -82,10 +101,20 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     // 2. Unified Network Chart (RX, TX)
     let max_rx = rx_history.iter().map(|(_, v)| *v).fold(0.0, f64::max);
     let max_tx = tx_history.iter().map(|(_, v)| *v).fold(0.0, f64::max);
+    let max_rx_remembered = app
+        .max_rx_throughput
+        .get(&selected_interface_name)
+        .copied()
+        .unwrap_or(0);
+    let max_tx_remembered = app
+        .max_tx_throughput
+        .get(&selected_interface_name)
+        .copied()
+        .unwrap_or(0);
     let dynamic_max = max_rx
         .max(max_tx)
-        .max(app.max_rx_throughput as f64)
-        .max(app.max_tx_throughput as f64); // Remembered peaks
+        .max(max_rx_remembered as f64)
+        .max(max_tx_remembered as f64); // Remembered peaks
 
     let rx_dataset = Dataset::default()
         .name("RX")
@@ -109,7 +138,14 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         )))
         .legend_position(Some(LegendPosition::TopRight))
         .hidden_legend_constraints((Constraint::Min(0), Constraint::Min(0)))
-        .x_axis(Axis::default().bounds(x_bounds))
+        .x_axis(Axis::default().bounds(x_bounds).labels(vec![
+            Span::raw("-5m"),
+            Span::raw("-4m"),
+            Span::raw("-3m"),
+            Span::raw("-2m"),
+            Span::raw("-1m"),
+            Span::raw("0"),
+        ]))
         .y_axis(Axis::default().bounds([0.0, dynamic_max]).labels(vec![
             Span::raw("0"),
             Span::raw(format_bytes((dynamic_max / 2.0) as u64)),
