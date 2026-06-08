@@ -435,8 +435,8 @@ The dashboard layout is divided into four primary areas:
 * **Network (🌐)**: Monitors all network interfaces with real-time RX/TX speeds. Interfaces are categorized by type (📡 for Wifi, 🔗 for Ethernet, 🔄 for Loopback).
 * **Sensors (🌡)**: Real-time hardware temperature monitoring with an in-memory session maximum tracker.
 * **Charts (📈)**: Historical data visualizations. 
-    * **System Resources**: Overlays CPU, Memory, and Swap usage on a single chart using matching colors from the Overview gauges.
-    * **Network Throughput**: A unified RX/TX throughput chart with a **dynamically scaling Y-axis** that adjusts based on peak traffic observed in the rolling window (excluding loopback and non-physical interfaces to avoid skewing max throughput).
+    * **System Resources**: Overlays CPU, Memory (RAM), and Swap usage on a single chart using matching colors from the Overview gauges. The dataset names (legend labels) dynamically display their current percentage values.
+    * **Network Throughput**: A unified RX/TX throughput chart with a **dynamically scaling Y-axis** that adjusts based on peak traffic observed in the rolling window (excluding loopback and non-physical interfaces to avoid skewing max throughput). The dataset names (legend labels) dynamically display the current RX and TX speeds.
 
 ### 7.4 Controls and Navigation
 

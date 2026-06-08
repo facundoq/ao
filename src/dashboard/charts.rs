@@ -23,8 +23,16 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let x_bounds = [now_sec - 300.0, now_sec];
 
     // 1. Unified System Resources Chart (CPU, MEM, SWAP)
+    let current_cpu = app.cpu_history.last().map(|(_, v)| *v).unwrap_or(0.0);
+    let current_mem = app.mem_history.last().map(|(_, v)| *v).unwrap_or(0.0);
+    let current_swap = app.swap_history.last().map(|(_, v)| *v).unwrap_or(0.0);
+
+    let cpu_label = format!("CPU:  ({:>4.1}%)", current_cpu);
+    let ram_label = format!("RAM:  ({:>4.1}%)", current_mem);
+    let swap_label = format!("Swap: ({:>4.1}%)", current_swap);
+
     let cpu_dataset = Dataset::default()
-        .name("CPU")
+        .name(cpu_label)
         .marker(ratatui::symbols::Marker::Braille)
         .graph_type(GraphType::Line)
         .style(Style::default().fg(Color::Rgb(
@@ -35,7 +43,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         .data(&app.cpu_history);
 
     let mem_dataset = Dataset::default()
-        .name("Memory")
+        .name(ram_label)
         .marker(ratatui::symbols::Marker::Braille)
         .graph_type(GraphType::Line)
         .style(Style::default().fg(Color::Rgb(
@@ -46,7 +54,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         .data(&app.mem_history);
 
     let swap_dataset = Dataset::default()
-        .name("Swap")
+        .name(swap_label)
         .marker(ratatui::symbols::Marker::Braille)
         .graph_type(GraphType::Line)
         .style(Style::default().fg(Color::Rgb(
@@ -111,15 +119,24 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         .max(max_rx_remembered as f64)
         .max(max_tx_remembered as f64); // Remembered peaks
 
+    let (rx_speed, tx_speed) = app
+        .network_speeds
+        .get(&selected_interface_name)
+        .copied()
+        .unwrap_or((0, 0));
+
+    let rx_label = format!("RX: {:>12}/s", format_bytes(rx_speed).trim());
+    let tx_label = format!("TX: {:>12}/s", format_bytes(tx_speed).trim());
+
     let rx_dataset = Dataset::default()
-        .name("RX")
+        .name(rx_label)
         .marker(ratatui::symbols::Marker::Braille)
         .graph_type(GraphType::Line)
         .style(Style::default().fg(Color::Yellow))
         .data(rx_history);
 
     let tx_dataset = Dataset::default()
-        .name("TX")
+        .name(tx_label)
         .marker(ratatui::symbols::Marker::Braille)
         .graph_type(GraphType::Line)
         .style(Style::default().fg(Color::Blue))
