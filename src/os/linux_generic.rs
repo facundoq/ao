@@ -19,7 +19,7 @@ pub mod virt;
 pub use boot::StandardBoot;
 pub use common::{
     BIN_DOCKER, BIN_IP, BIN_LSBLK, BIN_NMCLI, BIN_SYSTEMCTL, BIN_UFW, CompoundCommand, NoopCommand,
-    SystemCommand, is_completing_action, is_completing_arg,
+    SystemCommand, escape_shell_arg, is_completing_action, is_completing_arg,
 };
 pub use dev::StandardDev;
 pub use disk::StandardDisk;

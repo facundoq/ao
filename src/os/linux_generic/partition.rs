@@ -24,7 +24,7 @@ impl Domain for StandardPartition {
     ) -> Result<Box<dyn ExecutableCommand>> {
         let args = PartitionArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(PartitionAction::List { format }) => self.ls(*format),
+            Some(PartitionAction::List { format, show_loop }) => self.ls(*format, *show_loop),
             Some(PartitionAction::Mount {
                 device,
                 path,
@@ -37,7 +37,7 @@ impl Domain for StandardPartition {
                 force,
             }) => self.unmount(target, *lazy, *force),
             Some(PartitionAction::Usage { path, depth }) => self.usage(path, *depth),
-            None => self.ls(OutputFormat::Table),
+            None => self.ls(OutputFormat::Table, false),
         }
     }
     fn complete(
@@ -72,11 +72,15 @@ impl Domain for StandardPartition {
 }
 
 impl PartitionManager for StandardPartition {
-    fn ls(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>> {
+    fn ls(&self, format: OutputFormat, show_loop: bool) -> Result<Box<dyn ExecutableCommand>> {
         if matches!(format, OutputFormat::Original) {
-            return Ok(Box::new(SystemCommand::new(BIN_LSBLK)));
+            let mut cmd = SystemCommand::new(BIN_LSBLK);
+            if !show_loop {
+                cmd = cmd.arg("-e").arg("7");
+            }
+            return Ok(Box::new(cmd));
         }
-        Ok(Box::new(PartitionListCommand { format }))
+        Ok(Box::new(PartitionListCommand { format, show_loop }))
     }
     fn mount(
         &self,
@@ -127,14 +131,18 @@ impl PartitionManager for StandardPartition {
 
 pub struct PartitionListCommand {
     pub format: OutputFormat,
+    pub show_loop: bool,
 }
 impl ExecutableCommand for PartitionListCommand {
     fn execute(&self) -> Result<()> {
-        let output = Command::new(BIN_LSBLK)
-            .arg("--json")
+        let mut cmd = Command::new(BIN_LSBLK);
+        cmd.arg("--json")
             .arg("-o")
-            .arg("NAME,PATH,SIZE,MOUNTPOINT,FSTYPE,TYPE,ROTA,TRAN")
-            .output()?;
+            .arg("NAME,PATH,SIZE,MOUNTPOINT,FSTYPE,TYPE,ROTA,TRAN");
+        if !self.show_loop {
+            cmd.arg("-e").arg("7");
+        }
+        let output = cmd.output()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
 
         #[derive(serde::Deserialize)]
@@ -163,6 +171,9 @@ impl ExecutableCommand for PartitionListCommand {
         let mut partitions: Vec<_> = disks
             .into_iter()
             .filter(|d| {
+                if !self.show_loop && d.device_type == "loop" {
+                    return false;
+                }
                 d.device_type == "part"
                     || d.device_type == "crypt"
                     || d.device_type == "lvm"
@@ -173,6 +184,28 @@ impl ExecutableCommand for PartitionListCommand {
 
         partitions.sort_by(|a, b| a.name.cmp(&b.name));
 
+        let sys_disks = sysinfo::Disks::new_with_refreshed_list();
+        for d in &mut partitions {
+            if let Some(disk) = d.mountpoint.as_ref().and_then(|mp| {
+                sys_disks
+                    .iter()
+                    .find(|disk| disk.mount_point() == std::path::Path::new(mp))
+            }) {
+                let total = disk.total_space();
+                let available = disk.available_space();
+                let used = total.saturating_sub(available);
+                d.used_space = Some(super::common::format_bytes(used));
+                let pct = if total > 0 {
+                    (used as f64 / total as f64) * 100.0
+                } else {
+                    0.0
+                };
+                d.usage_pct = Some(format!("{:.1}%", pct));
+            }
+        }
+
+        let config = crate::config::Config::load().unwrap_or_default();
+
         match self.format {
             OutputFormat::Table => {
                 let mut table = comfy_table::Table::new();
@@ -180,17 +213,46 @@ impl ExecutableCommand for PartitionListCommand {
                     "",
                     "Name",
                     "Path",
+                    "Used",
                     "Size",
+                    "Usage %",
                     "Type",
                     "Mountpoint",
                     "FSType",
                 ]);
                 for d in partitions {
+                    let usage_str = d.usage_pct.clone().unwrap_or_default();
+                    let displayed_usage = if config.ui.use_colors && !usage_str.is_empty() {
+                        use colored::Colorize;
+                        if let Some(pct) = usage_str
+                            .strip_suffix('%')
+                            .and_then(|s| s.parse::<f64>().ok())
+                        {
+                            let theme = &config.ui.theme;
+                            let color = if pct >= 90.0 {
+                                theme.storage_color_high
+                            } else if pct >= 50.0 {
+                                theme.storage_color_med
+                            } else {
+                                theme.storage_color_low
+                            };
+                            usage_str
+                                .truecolor(color[0], color[1], color[2])
+                                .to_string()
+                        } else {
+                            usage_str
+                        }
+                    } else {
+                        usage_str
+                    };
+
                     table.add_row(vec![
                         Emoji::Disk.get().to_string(),
                         d.name,
                         d.path,
+                        d.used_space.clone().unwrap_or_default(),
                         d.size,
+                        displayed_usage,
                         d.device_type,
                         d.mountpoint.unwrap_or_default(),
                         d.fstype.unwrap_or_default(),
@@ -209,7 +271,11 @@ impl ExecutableCommand for PartitionListCommand {
         Ok(())
     }
     fn as_string(&self) -> String {
-        "lsblk --json".to_string()
+        if self.show_loop {
+            "lsblk --json".to_string()
+        } else {
+            "lsblk --json -e 7".to_string()
+        }
     }
     fn is_structured(&self) -> bool {
         matches!(

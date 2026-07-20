@@ -52,6 +52,28 @@ pub fn run_with_timeout(mut cmd: Command, timeout: Duration) -> Result<std::proc
     }
 }
 
+pub fn escape_shell_arg(s: &str) -> String {
+    if s.is_empty() {
+        return "''".to_string();
+    }
+    if s.chars().all(|c| {
+        c.is_ascii_alphanumeric()
+            || c == '-'
+            || c == '_'
+            || c == '/'
+            || c == '.'
+            || c == ','
+            || c == ':'
+            || c == '@'
+            || c == '='
+            || c == '+'
+    }) {
+        s.to_string()
+    } else {
+        format!("'{}'", s.replace('\'', "'\\''"))
+    }
+}
+
 pub struct SystemCommand {
     pub binary: String,
     pub args: Vec<String>,
@@ -125,7 +147,11 @@ impl ExecutableCommand for SystemCommand {
     }
 
     fn as_string(&self) -> String {
-        format!("{} {}", self.binary, self.args.join(" "))
+        let mut parts = vec![escape_shell_arg(&self.binary)];
+        for arg in &self.args {
+            parts.push(escape_shell_arg(arg));
+        }
+        parts.join(" ")
     }
 }
 

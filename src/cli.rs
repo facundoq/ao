@@ -299,6 +299,9 @@ pub enum PartitionAction {
         /// The output format
         #[arg(long, short, default_value = "table")]
         format: OutputFormat,
+        /// Show loop devices
+        #[arg(long = "loop", short = 'l')]
+        show_loop: bool,
     },
     /// Mounts a block device to a directory
     Mount {

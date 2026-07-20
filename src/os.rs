@@ -256,6 +256,10 @@ pub struct DiskInfo {
     pub rota: bool,
     pub tran: Option<String>,
     pub children: Option<Vec<DiskInfo>>,
+    #[serde(skip_deserializing, skip_serializing_if = "Option::is_none")]
+    pub used_space: Option<String>,
+    #[serde(skip_deserializing, skip_serializing_if = "Option::is_none")]
+    pub usage_pct: Option<String>,
 }
 
 /// Abstracts system disk management operations.
@@ -266,7 +270,7 @@ pub trait DiskManager: Domain {
 
 /// Abstracts system partition management operations.
 pub trait PartitionManager: Domain {
-    fn ls(&self, format: OutputFormat) -> Result<Box<dyn ExecutableCommand>>;
+    fn ls(&self, format: OutputFormat, show_loop: bool) -> Result<Box<dyn ExecutableCommand>>;
     fn mount(
         &self,
         device: &str,

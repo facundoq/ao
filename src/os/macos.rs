@@ -1150,7 +1150,7 @@ impl Domain for MacOSPartition {
         use clap::FromArgMatches;
         let args = PartitionArgs::from_arg_matches(matches)?;
         match &args.action {
-            Some(PartitionAction::List { format }) => self.ls(*format),
+            Some(PartitionAction::List { format, show_loop }) => self.ls(*format, *show_loop),
             Some(PartitionAction::Mount {
                 device,
                 path,
@@ -1163,12 +1163,12 @@ impl Domain for MacOSPartition {
                 force,
             }) => self.unmount(target, *lazy, *force),
             Some(PartitionAction::Usage { path, depth }) => self.usage(path, *depth),
-            None => self.ls(OutputFormat::Table),
+            None => self.ls(OutputFormat::Table, false),
         }
     }
 }
 impl PartitionManager for MacOSPartition {
-    fn ls(&self, _f: OutputFormat) -> Result<Box<dyn super::ExecutableCommand>> {
+    fn ls(&self, _f: OutputFormat, _show_loop: bool) -> Result<Box<dyn super::ExecutableCommand>> {
         Ok(Box::new(SystemCommand::new("df").arg("-h")))
     }
     fn mount(

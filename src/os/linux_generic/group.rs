@@ -1,4 +1,4 @@
-use super::common::{SystemCommand, is_completing_action};
+use super::common::{SystemCommand, escape_shell_arg, is_completing_action};
 use crate::cli::{GroupAction, GroupArgs};
 use crate::os::{Domain, ExecutableCommand, GroupInfo, GroupManager, OutputFormat};
 use anyhow::Result;
@@ -159,7 +159,7 @@ impl ExecutableCommand for GroupAddCommand {
             .execute()
     }
     fn as_string(&self) -> String {
-        format!("groupadd -- {}", self.groupname)
+        format!("groupadd -- {}", escape_shell_arg(&self.groupname))
     }
 }
 
@@ -174,7 +174,7 @@ impl ExecutableCommand for GroupDelCommand {
             .execute()
     }
     fn as_string(&self) -> String {
-        format!("groupdel -- {}", self.groupname)
+        format!("groupdel -- {}", escape_shell_arg(&self.groupname))
     }
 }
 
@@ -192,6 +192,10 @@ impl ExecutableCommand for GroupModCommand {
             .execute()
     }
     fn as_string(&self) -> String {
-        format!("groupmod --gid {} -- {}", self.gid, self.groupname)
+        format!(
+            "groupmod --gid {} -- {}",
+            self.gid,
+            escape_shell_arg(&self.groupname)
+        )
     }
 }

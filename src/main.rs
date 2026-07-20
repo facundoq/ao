@@ -341,9 +341,16 @@ fn run_interactive(domains: &[&dyn Domain]) -> Result<()> {
             continue;
         }
 
-        println!("\nExecuting: {}\n", args_vec.join(" "));
+        let escaped_args: Vec<String> = args_vec
+            .iter()
+            .map(|s| ao_cli::os::linux_generic::common::escape_shell_arg(s))
+            .collect();
+        println!("\nExecuting: {}\n", escaped_args.join(" "));
 
-        let app = Cli::command();
+        let mut app = Cli::command();
+        for domain in domains {
+            app = app.subcommand(domain.command());
+        }
         match app.try_get_matches_from(&args_vec) {
             Ok(matches) => {
                 let (subcommand_name, subcommand_matches) = matches.subcommand().unwrap();

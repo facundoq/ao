@@ -1,4 +1,4 @@
-use super::common::{SystemCommand, is_completing_action};
+use super::common::{SystemCommand, escape_shell_arg, is_completing_action};
 use crate::cli::{UserAction, UserArgs};
 use crate::os::{Domain, ExecutableCommand, OutputFormat, UserInfo, UserManager, UserSessionInfo};
 use anyhow::Result;
@@ -426,10 +426,10 @@ impl ExecutableCommand for UserAddCommand {
             s.push_str(" --system");
         }
         if let Some(ref sh) = self.shell {
-            s.push_str(&format!(" --shell {}", sh));
+            s.push_str(&format!(" --shell {}", escape_shell_arg(sh)));
         }
         if let Some(ref g) = self.groups {
-            s.push_str(&format!(" --groups {}", g));
+            s.push_str(&format!(" --groups {}", escape_shell_arg(g)));
         }
 
         let mut comment = Vec::new();
@@ -440,10 +440,10 @@ impl ExecutableCommand for UserAddCommand {
             comment.push(format!("<{}>", e));
         }
         if !comment.is_empty() {
-            s.push_str(&format!(" -c \"{}\"", comment.join(" ")));
+            s.push_str(&format!(" -c {}", escape_shell_arg(&comment.join(" "))));
         }
 
-        s.push_str(&format!(" -- {}", self.username));
+        s.push_str(&format!(" -- {}", escape_shell_arg(&self.username)));
         s
     }
 }
@@ -462,9 +462,9 @@ impl ExecutableCommand for UserDelCommand {
     }
     fn as_string(&self) -> String {
         if self.purge {
-            format!("userdel -r -- {}", self.username)
+            format!("userdel -r -- {}", escape_shell_arg(&self.username))
         } else {
-            format!("userdel -- {}", self.username)
+            format!("userdel -- {}", escape_shell_arg(&self.username))
         }
     }
 }
@@ -507,11 +507,30 @@ impl ExecutableCommand for UserModCommand {
     }
     fn as_string(&self) -> String {
         match self.action.as_str() {
-            "add-group" => format!("usermod -aG {} -- {}", self.value, self.username),
-            "del-group" => format!("gpasswd -d {} -- {}", self.username, self.value),
-            "shell" => format!("usermod -s {} -- {}", self.value, self.username),
-            "home" => format!("usermod -d {} -m -- {}", self.value, self.username),
-            _ => format!("usermod (invalid action) -- {}", self.username),
+            "add-group" => format!(
+                "usermod -aG {} -- {}",
+                escape_shell_arg(&self.value),
+                escape_shell_arg(&self.username)
+            ),
+            "del-group" => format!(
+                "gpasswd -d {} -- {}",
+                escape_shell_arg(&self.username),
+                escape_shell_arg(&self.value)
+            ),
+            "shell" => format!(
+                "usermod -s {} -- {}",
+                escape_shell_arg(&self.value),
+                escape_shell_arg(&self.username)
+            ),
+            "home" => format!(
+                "usermod -d {} -m -- {}",
+                escape_shell_arg(&self.value),
+                escape_shell_arg(&self.username)
+            ),
+            _ => format!(
+                "usermod (invalid action) -- {}",
+                escape_shell_arg(&self.username)
+            ),
         }
     }
 }
