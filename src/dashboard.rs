@@ -159,7 +159,7 @@ where
                     KeyCode::PageUp => app.on_page_up(),
                     KeyCode::PageDown => app.on_page_down(),
 
-                    KeyCode::Char('i') => {
+                    KeyCode::Char('p') => {
                         app.process_sort = app::ProcessSort::Pid;
                         app.sort_descending = !app.sort_descending;
                         app.refresh_process_data(true);
@@ -169,7 +169,7 @@ where
                         app.sort_descending = !app.sort_descending;
                         app.refresh_process_data(true);
                     }
-                    KeyCode::Char('m') => {
+                    KeyCode::Char('r') => {
                         app.process_sort = app::ProcessSort::Mem;
                         app.sort_descending = !app.sort_descending;
                         app.refresh_process_data(true);

@@ -443,9 +443,9 @@ The dashboard layout is divided into four primary areas:
 * **Global**: `q` to quit, `Tab`/`Arrows` to switch tabs, `+/-` to change polling frequency.
 * **Navigation**: `Up`/`Down` for selection, `PgUp`/`PgDn` for faster scrolling.
 * **Process Contextual**: 
-    * `i`: Sort by PID
+    * `p`: Sort by PID
     * `c`: Sort by CPU Usage
-    * `m`: Sort by Memory (RSS)
+    * `r`: Sort by Memory (RSS)
     * `n`: Sort by Name
     * `u`: Sort by User
     * `/`: Enter/Edit Substring Filter

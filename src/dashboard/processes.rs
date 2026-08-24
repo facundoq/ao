@@ -4,7 +4,7 @@ use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Rect},
     style::{Color, Modifier, Style},
-    text::Line,
+    text::{Line, Span},
     widgets::{Block, Borders, Cell, Paragraph, Row, Table},
 };
 
@@ -181,32 +181,60 @@ pub fn draw_full_details(f: &mut Frame, app: &App, details: &ProcessDetails, are
     f.render_widget(table, chunks[1]);
 }
 
+fn make_header_cell(
+    label: &str,
+    active: bool,
+    sortable: bool,
+    sort_indicator: &str,
+) -> Cell<'static> {
+    if sortable && !label.is_empty() {
+        let first_char = label.chars().next().unwrap().to_string();
+        let rest: String = label.chars().skip(1).collect();
+        let mut spans = vec![
+            Span::styled(
+                first_char,
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(rest, Style::default().add_modifier(Modifier::BOLD)),
+        ];
+        if active {
+            spans.push(Span::styled(
+                format!(" {}", sort_indicator),
+                Style::default().add_modifier(Modifier::BOLD),
+            ));
+        }
+        Cell::from(Line::from(spans))
+    } else {
+        let text = if active {
+            format!("{} {}", label, sort_indicator)
+        } else {
+            label.to_string()
+        };
+        Cell::from(text).style(Style::default().add_modifier(Modifier::BOLD))
+    }
+}
+
 fn draw_process_list(f: &mut Frame, app: &App, area: Rect) {
     let sort_indicator = if app.sort_descending { "▼" } else { "▲" };
-    let mut header_data: Vec<(&str, bool)> = vec![
-        ("PID", app.process_sort == ProcessSort::Pid),
-        ("User", app.process_sort == ProcessSort::User),
-        ("CPU%", app.process_sort == ProcessSort::Cpu),
-        ("VIRT", false),
-        ("RSS", app.process_sort == ProcessSort::Mem),
-        ("SHR", false),
+    let mut header_data = vec![
+        ("PID", app.process_sort == ProcessSort::Pid, true),
+        ("User", app.process_sort == ProcessSort::User, true),
+        ("CPU%", app.process_sort == ProcessSort::Cpu, true),
+        ("VIRT", false, false),
+        ("RSS", app.process_sort == ProcessSort::Mem, true),
+        ("SHR", false, false),
     ];
     if !app.show_user_threads {
-        header_data.push(("Threads", false));
+        header_data.push(("Threads", false, false));
     }
-    header_data.push(("Name", app.process_sort == ProcessSort::Name));
-    header_data.push(("Command", false));
+    header_data.push(("Name", app.process_sort == ProcessSort::Name, true));
+    header_data.push(("Command", false, false));
 
     let header_cells: Vec<Cell> = header_data
         .iter()
-        .map(|(h, active)| {
-            let text = if *active {
-                format!("{} {}", h, sort_indicator)
-            } else {
-                h.to_string()
-            };
-            Cell::from(text).style(Style::default().add_modifier(Modifier::BOLD))
-        })
+        .map(|(h, active, sortable)| make_header_cell(h, *active, *sortable, sort_indicator))
         .collect();
 
     let header = Row::new(header_cells).height(1).bottom_margin(1);
@@ -292,29 +320,22 @@ fn draw_process_list(f: &mut Frame, app: &App, area: Rect) {
 
 fn draw_process_tree(f: &mut Frame, app: &App, area: Rect) {
     let sort_indicator = if app.sort_descending { "▼" } else { "▲" };
-    let mut header_data: Vec<(&str, bool)> = vec![
-        ("PID", app.process_sort == ProcessSort::Pid),
-        ("User", app.process_sort == ProcessSort::User),
-        ("CPU%", app.process_sort == ProcessSort::Cpu),
-        ("VIRT", false),
-        ("RSS", app.process_sort == ProcessSort::Mem),
-        ("SHR", false),
+    let mut header_data = vec![
+        ("PID", app.process_sort == ProcessSort::Pid, true),
+        ("User", app.process_sort == ProcessSort::User, true),
+        ("CPU%", app.process_sort == ProcessSort::Cpu, true),
+        ("VIRT", false, false),
+        ("RSS", app.process_sort == ProcessSort::Mem, true),
+        ("SHR", false, false),
     ];
     if !app.show_user_threads {
-        header_data.push(("Threads", false));
+        header_data.push(("Threads", false, false));
     }
-    header_data.push(("Process Tree", app.process_sort == ProcessSort::Name));
+    header_data.push(("Name", app.process_sort == ProcessSort::Name, true));
 
     let header_cells: Vec<Cell> = header_data
         .iter()
-        .map(|(h, active)| {
-            let text = if *active {
-                format!("{} {}", h, sort_indicator)
-            } else {
-                h.to_string()
-            };
-            Cell::from(text).style(Style::default().add_modifier(Modifier::BOLD))
-        })
+        .map(|(h, active, sortable)| make_header_cell(h, *active, *sortable, sort_indicator))
         .collect();
 
     let header = Row::new(header_cells).height(1).bottom_margin(1);
