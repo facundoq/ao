@@ -329,3 +329,18 @@ impl Emoji {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_command_exists_true() {
+        assert!(command_exists("ls"));
+    }
+
+    #[test]
+    fn test_command_exists_false() {
+        assert!(!command_exists("this_command_definitely_does_not_exist_12345"));
+    }
+}
