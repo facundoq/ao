@@ -406,7 +406,7 @@ fn handle_dynamic_completion(domains: &[&dyn Domain], app: &clap::Command) -> Re
         return Ok(false);
     }
 
-    if let Some(shell_val) = ao_complete {
+    if let Some(_shell_val) = ao_complete {
         let args: Vec<String> = std::env::args().collect();
         if let Some(dash_dash_idx) = args.iter().position(|a| a == "--") {
             let mut user_words: Vec<String> =
@@ -436,11 +436,10 @@ fn handle_dynamic_completion(domains: &[&dyn Domain], app: &clap::Command) -> Re
         // Handover to clap if manual logic didn't match.
         // We MUST have an index to get suggestions instead of the script.
         if clap_complete_index.is_some() {
-            unsafe {
-                std::env::set_var("COMPLETE", shell_val);
-            }
             let app_clone = app.clone();
-            clap_complete::env::CompleteEnv::with_factory(move || app_clone.clone()).complete();
+            clap_complete::env::CompleteEnv::with_factory(move || app_clone.clone())
+                .var("AO_COMPLETE")
+                .complete();
             return Ok(true);
         }
     }
