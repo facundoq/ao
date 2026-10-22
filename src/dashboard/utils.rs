@@ -62,3 +62,41 @@ pub fn get_user_color(user: &str) -> Color {
     ];
     colors[(hash as usize) % colors.len()]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_user_color_determinism() {
+        assert_eq!(get_user_color("root"), get_user_color("root"));
+        assert_eq!(get_user_color("admin"), get_user_color("admin"));
+        assert_eq!(get_user_color(""), get_user_color(""));
+    }
+
+    #[test]
+    fn test_get_user_color_mapping() {
+        // empty string: sum = 0, 0 % 6 = 0 -> Red
+        assert_eq!(get_user_color(""), Color::Red);
+
+        // '1': sum = 49, 49 % 6 = 1 -> Green
+        assert_eq!(get_user_color("1"), Color::Green);
+
+        // "root": sum = 114+111+111+116 = 452, 452 % 6 = 2 -> Yellow
+        assert_eq!(get_user_color("root"), Color::Yellow);
+
+        // "user": sum = 117+115+101+114 = 447, 447 % 6 = 3 -> Blue
+        assert_eq!(get_user_color("user"), Color::Blue);
+
+        // 'x': sum = 120, 120 % 6 = 0 -> Red (we need a Magenta test)
+        // Magenta is index 4. So sum % 6 = 4.
+        // 'v' is 118, 118 % 6 = 4 -> Magenta
+        assert_eq!(get_user_color("v"), Color::Magenta);
+
+        // "admin": sum = 97+100+109+105+110 = 521, 521 % 6 = 5 -> Cyan
+        assert_eq!(get_user_color("admin"), Color::Cyan);
+
+        // "guest": sum = 103+117+101+115+116 = 552, 552 % 6 = 0 -> Red
+        assert_eq!(get_user_color("guest"), Color::Red);
+    }
+}
