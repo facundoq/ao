@@ -167,10 +167,10 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         .map(|p| {
             Row::new(vec![
                 Cell::from(p.pid.to_string()),
-                Cell::from(p.name.clone()),
+                Cell::from(p.name.as_str()),
                 Cell::from(format!("{:>6.1}%", p.cpu)),
                 Cell::from(format_bytes(p.memory)),
-                Cell::from(p.executable.clone()),
+                Cell::from(p.executable.as_str()),
             ])
         })
         .collect();
@@ -202,10 +202,10 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         .map(|p| {
             Row::new(vec![
                 Cell::from(p.pid.to_string()),
-                Cell::from(p.name.clone()),
+                Cell::from(p.name.as_str()),
                 Cell::from(format!("{:>6.1}%", p.cpu)),
                 Cell::from(format_bytes(p.memory)),
-                Cell::from(p.executable.clone()),
+                Cell::from(p.executable.as_str()),
             ])
         })
         .collect();
