@@ -83,8 +83,11 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn run_interactive(domains: &[&dyn Domain]) -> Result<()> {
-    use dialoguer::{Confirm, Input, Select, theme::ColorfulTheme};
+fn select_domain<'a>(
+    domains: &[&'a dyn Domain],
+    theme: &dialoguer::theme::ColorfulTheme,
+) -> Result<Option<&'a dyn Domain>> {
+    use dialoguer::Select;
 
     let mut domain_list = domains.to_vec();
     domain_list.sort_by_key(|d| d.name());
@@ -92,295 +95,332 @@ fn run_interactive(domains: &[&dyn Domain]) -> Result<()> {
     let mut domain_names: Vec<String> = domain_list.iter().map(|d| d.name().to_string()).collect();
     domain_names.push("exit".to_string());
 
-    let theme = ColorfulTheme::default();
+    let selection = Select::with_theme(theme)
+        .with_prompt("Select a domain")
+        .items(&domain_names)
+        .default(0)
+        .interact()?;
+
+    if domain_names[selection] == "exit" {
+        return Ok(None);
+    }
+
+    Ok(Some(domain_list[selection]))
+}
+
+fn select_subcommand(
+    theme: &dialoguer::theme::ColorfulTheme,
+    mut cmd: clap::Command,
+    args_vec: &mut Vec<String>,
+) -> Result<Option<clap::Command>> {
+    use dialoguer::Select;
 
     loop {
-        let selection = Select::with_theme(&theme)
-            .with_prompt("Select a domain")
-            .items(&domain_names)
+        let subcommands: Vec<_> = cmd.get_subcommands().collect();
+        if subcommands.is_empty() {
+            return Ok(Some(cmd)); // leaf node
+        }
+
+        let mut sub_names: Vec<String> = subcommands
+            .iter()
+            .filter(|s| s.get_name() != "help")
+            .map(|s| s.get_name().to_string())
+            .collect();
+
+        if sub_names.is_empty() {
+            return Ok(Some(cmd));
+        }
+
+        sub_names.push("<back>".to_string());
+
+        let selection = Select::with_theme(theme)
+            .with_prompt(format!("Select action for {}", cmd.get_name()))
+            .items(&sub_names)
             .default(0)
             .interact()?;
 
-        if domain_names[selection] == "exit" {
-            break;
+        let selected_name = &sub_names[selection];
+        if selected_name == "<back>" {
+            return Ok(None);
         }
 
-        let domain = domain_list[selection];
-        let mut cmd = domain.command();
-        let mut args_vec = vec!["ao".to_string(), domain.name().to_string()];
+        args_vec.push(selected_name.to_string());
+        cmd = subcommands
+            .into_iter()
+            .find(|s| s.get_name() == selected_name)
+            .unwrap()
+            .clone();
+    }
+}
 
-        let mut aborted = false;
+fn split_args(cmd: &clap::Command) -> (Vec<&clap::Arg>, Vec<&clap::Arg>) {
+    let mut positional_args = Vec::new();
+    let mut option_args = Vec::new();
 
-        loop {
-            let subcommands: Vec<_> = cmd.get_subcommands().collect();
-            if subcommands.is_empty() {
-                break; // leaf node
-            }
-
-            let mut sub_names: Vec<String> = subcommands
-                .iter()
-                .filter(|s| s.get_name() != "help")
-                .map(|s| s.get_name().to_string())
-                .collect();
-
-            if sub_names.is_empty() {
-                break;
-            }
-
-            sub_names.push("<back>".to_string());
-
-            let selection = Select::with_theme(&theme)
-                .with_prompt(format!("Select action for {}", cmd.get_name()))
-                .items(&sub_names)
-                .default(0)
-                .interact()?;
-
-            let selected_name = &sub_names[selection];
-            if selected_name == "<back>" {
-                aborted = true;
-                break;
-            }
-
-            args_vec.push(selected_name.to_string());
-            cmd = subcommands
-                .into_iter()
-                .find(|s| s.get_name() == selected_name)
-                .unwrap()
-                .clone();
-        }
-
-        if aborted {
+    for arg in cmd.get_arguments() {
+        if arg.get_id() == "help" || arg.get_id() == "version" {
             continue;
         }
-
-        // Special handling for some commands to provide better prompts
-        let is_user_add = args_vec.len() == 3 && args_vec[1] == "user" && args_vec[2] == "add";
-
-        let mut positional_args = Vec::new();
-        let mut option_args = Vec::new();
-
-        for arg in cmd.get_arguments() {
-            if arg.get_id() == "help" || arg.get_id() == "version" {
-                continue;
-            }
-            if arg.is_positional() {
-                positional_args.push(arg);
-            } else {
-                option_args.push(arg);
-            }
+        if arg.is_positional() {
+            positional_args.push(arg);
+        } else {
+            option_args.push(arg);
         }
+    }
+    (positional_args, option_args)
+}
 
-        let mut user_aborted = false;
+fn handle_positional_args(
+    theme: &dialoguer::theme::ColorfulTheme,
+    args_vec: &mut Vec<String>,
+    positional_args: Vec<&clap::Arg>,
+    is_user_add: bool,
+) -> Result<bool> {
+    use dialoguer::Input;
 
-        for arg in positional_args {
-            let help_str;
-            let prompt = if is_user_add && arg.get_id() == "username" {
-                "Enter the unique system username"
-            } else {
-                help_str = arg
-                    .get_help()
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| arg.get_id().to_string());
-                &help_str
-            };
+    for arg in positional_args {
+        let help_str;
+        let prompt = if is_user_add && arg.get_id() == "username" {
+            "Enter the unique system username"
+        } else {
+            help_str = arg
+                .get_help()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| arg.get_id().to_string());
+            &help_str
+        };
 
-            let val: String = if is_user_add && arg.get_id() == "username" {
-                Input::<String>::with_theme(&theme)
-                    .with_prompt(prompt)
-                    .allow_empty(!arg.is_required_set())
-                    .validate_with(|s: &String| -> Result<(), &str> {
-                        if s.is_empty() {
-                            return Err("Username cannot be empty");
-                        }
-                        if s.chars()
-                            .any(|c| !c.is_alphanumeric() && c != '_' && c != '-')
-                        {
-                            return Err("Username contains invalid characters");
-                        }
-                        Ok(())
-                    })
-                    .interact_text()?
-            } else {
-                Input::<String>::with_theme(&theme)
-                    .with_prompt(prompt)
-                    .allow_empty(!arg.is_required_set())
-                    .interact_text()?
-            };
-
-            if matches!(arg.get_action(), clap::ArgAction::Append) {
-                if !val.is_empty() {
-                    for v in val.split(',') {
-                        args_vec.push(v.trim().to_string());
+        let val: String = if is_user_add && arg.get_id() == "username" {
+            Input::<String>::with_theme(theme)
+                .with_prompt(prompt)
+                .allow_empty(!arg.is_required_set())
+                .validate_with(|s: &String| -> Result<(), &str> {
+                    if s.is_empty() {
+                        return Err("Username cannot be empty");
                     }
-                } else if arg.is_required_set() {
-                    println!("Argument is required, aborting.");
-                    user_aborted = true;
-                    break;
+                    if s.chars()
+                        .any(|c| !c.is_alphanumeric() && c != '_' && c != '-')
+                    {
+                        return Err("Username contains invalid characters");
+                    }
+                    Ok(())
+                })
+                .interact_text()?
+        } else {
+            Input::<String>::with_theme(theme)
+                .with_prompt(prompt)
+                .allow_empty(!arg.is_required_set())
+                .interact_text()?
+        };
+
+        if matches!(arg.get_action(), clap::ArgAction::Append) {
+            if !val.is_empty() {
+                for v in val.split(',') {
+                    args_vec.push(v.trim().to_string());
                 }
-            } else if !val.is_empty() {
-                args_vec.push(val);
             } else if arg.is_required_set() {
                 println!("Argument is required, aborting.");
-                user_aborted = true;
-                break;
+                return Ok(true);
             }
+        } else if !val.is_empty() {
+            args_vec.push(val);
+        } else if arg.is_required_set() {
+            println!("Argument is required, aborting.");
+            return Ok(true);
         }
+    }
+    Ok(false)
+}
 
-        if user_aborted {
+fn handle_option_args(
+    theme: &dialoguer::theme::ColorfulTheme,
+    args_vec: &mut Vec<String>,
+    option_args: Vec<&clap::Arg>,
+    is_user_add: bool,
+) -> Result<bool> {
+    use dialoguer::{Confirm, Input};
+
+    for arg in option_args {
+        if arg.get_id() == "format" {
+            if let Some(long) = arg.get_long() {
+                args_vec.push(format!("--{}", long));
+            } else if let Some(short) = arg.get_short() {
+                args_vec.push(format!("-{}", short));
+            }
+            args_vec.push("table".to_string());
             continue;
         }
 
-        for arg in option_args {
-            if arg.get_id() == "format" {
+        let help_str;
+        let prompt = if is_user_add && arg.get_id() == "name" {
+            "User's full name"
+        } else if is_user_add && arg.get_id() == "email" {
+            "User's email address"
+        } else if is_user_add && arg.get_id() == "no_create_home" {
+            "Should the home directory be created?" // We'll invert this for the prompt
+        } else {
+            help_str = arg
+                .get_help()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| arg.get_id().to_string());
+            &help_str
+        };
+
+        if matches!(arg.get_action(), clap::ArgAction::SetTrue) {
+            let enable = if is_user_add && arg.get_id() == "no_create_home" {
+                // Invert for "Should create home?"
+                let create = Confirm::with_theme(theme)
+                    .with_prompt(prompt)
+                    .default(true)
+                    .interact()?;
+                !create
+            } else {
+                Confirm::with_theme(theme)
+                    .with_prompt(prompt)
+                    .default(false)
+                    .interact()?
+            };
+
+            if enable {
                 if let Some(long) = arg.get_long() {
                     args_vec.push(format!("--{}", long));
                 } else if let Some(short) = arg.get_short() {
                     args_vec.push(format!("-{}", short));
                 }
-                args_vec.push("table".to_string());
-                continue;
+            }
+        } else if matches!(arg.get_action(), clap::ArgAction::Set) {
+            let mut extra_prompt = String::new();
+            let possible_vals: Vec<_> = arg
+                .get_possible_values()
+                .iter()
+                .map(|v| v.get_name().to_string())
+                .collect();
+            if !possible_vals.is_empty() {
+                extra_prompt = format!(" [{}]", possible_vals.join(", "));
             }
 
-            let help_str;
-            let prompt = if is_user_add && arg.get_id() == "name" {
-                "User's full name"
-            } else if is_user_add && arg.get_id() == "email" {
-                "User's email address"
-            } else if is_user_add && arg.get_id() == "no_create_home" {
-                "Should the home directory be created?" // We'll invert this for the prompt
+            let mut default_val = String::new();
+            if arg.get_id() == "format" {
+                default_val = "table".to_string();
+            }
+
+            let val: String = if is_user_add && arg.get_id() == "email" {
+                let input = Input::<String>::with_theme(theme);
+                let input = input.with_prompt(format!("{}{}", prompt, extra_prompt));
+                let input = if !default_val.is_empty() {
+                    input.with_initial_text(default_val)
+                } else {
+                    input
+                };
+                input
+                    .allow_empty(!arg.is_required_set())
+                    .validate_with(|s: &String| -> Result<(), &str> {
+                        if !s.is_empty() && !s.contains('@') {
+                            return Err("Invalid email format");
+                        }
+                        Ok(())
+                    })
+                    .interact_text()?
             } else {
-                help_str = arg
-                    .get_help()
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| arg.get_id().to_string());
-                &help_str
+                let input = Input::<String>::with_theme(theme);
+                let input = input.with_prompt(format!("{}{}", prompt, extra_prompt));
+                let input = if !default_val.is_empty() {
+                    input.with_initial_text(default_val)
+                } else {
+                    input
+                };
+                input.allow_empty(!arg.is_required_set()).interact_text()?
             };
 
-            if matches!(arg.get_action(), clap::ArgAction::SetTrue) {
-                let enable = if is_user_add && arg.get_id() == "no_create_home" {
-                    // Invert for "Should create home?"
-                    let create = Confirm::with_theme(&theme)
-                        .with_prompt(prompt)
-                        .default(true)
-                        .interact()?;
-                    !create
-                } else {
-                    Confirm::with_theme(&theme)
-                        .with_prompt(prompt)
-                        .default(false)
-                        .interact()?
-                };
-
-                if enable {
-                    if let Some(long) = arg.get_long() {
-                        args_vec.push(format!("--{}", long));
-                    } else if let Some(short) = arg.get_short() {
-                        args_vec.push(format!("-{}", short));
-                    }
+            if !val.is_empty() {
+                if let Some(long) = arg.get_long() {
+                    args_vec.push(format!("--{}", long));
+                } else if let Some(short) = arg.get_short() {
+                    args_vec.push(format!("-{}", short));
                 }
-            } else if matches!(arg.get_action(), clap::ArgAction::Set) {
-                let mut extra_prompt = String::new();
-                let possible_vals: Vec<_> = arg
-                    .get_possible_values()
-                    .iter()
-                    .map(|v| v.get_name().to_string())
-                    .collect();
-                if !possible_vals.is_empty() {
-                    extra_prompt = format!(" [{}]", possible_vals.join(", "));
-                }
-
-                let mut default_val = String::new();
-                if arg.get_id() == "format" {
-                    default_val = "table".to_string();
-                }
-
-                let val: String = if is_user_add && arg.get_id() == "email" {
-                    let input = Input::<String>::with_theme(&theme);
-                    let input = input.with_prompt(format!("{}{}", prompt, extra_prompt));
-                    let input = if !default_val.is_empty() {
-                        input.with_initial_text(default_val)
-                    } else {
-                        input
-                    };
-                    input
-                        .allow_empty(!arg.is_required_set())
-                        .validate_with(|s: &String| -> Result<(), &str> {
-                            if !s.is_empty() && !s.contains('@') {
-                                return Err("Invalid email format");
-                            }
-                            Ok(())
-                        })
-                        .interact_text()?
-                } else {
-                    let input = Input::<String>::with_theme(&theme);
-                    let input = input.with_prompt(format!("{}{}", prompt, extra_prompt));
-                    let input = if !default_val.is_empty() {
-                        input.with_initial_text(default_val)
-                    } else {
-                        input
-                    };
-                    input.allow_empty(!arg.is_required_set()).interact_text()?
-                };
-
-                if !val.is_empty() {
-                    if let Some(long) = arg.get_long() {
-                        args_vec.push(format!("--{}", long));
-                    } else if let Some(short) = arg.get_short() {
-                        args_vec.push(format!("-{}", short));
-                    }
-                    args_vec.push(val);
-                } else if arg.is_required_set() {
-                    println!("Argument is required, aborting.");
-                    user_aborted = true;
-                    break;
-                }
+                args_vec.push(val);
+            } else if arg.is_required_set() {
+                println!("Argument is required, aborting.");
+                return Ok(true);
             }
         }
+    }
+    Ok(false)
+}
 
-        if user_aborted {
+fn execute_generated_command(domains: &[&dyn Domain], args_vec: &[String]) -> Result<()> {
+    let escaped_args: Vec<String> = args_vec
+        .iter()
+        .map(|s| ao_cli::os::linux_generic::common::escape_shell_arg(s))
+        .collect();
+    println!("\nExecuting: {}\n", escaped_args.join(" "));
+
+    let mut app = Cli::command();
+    for domain in domains {
+        app = app.subcommand(domain.command());
+    }
+    match app.try_get_matches_from(args_vec) {
+        Ok(matches) => {
+            let (subcommand_name, subcommand_matches) = matches.subcommand().unwrap();
+            let domain = domains
+                .iter()
+                .find(|d| d.name() == subcommand_name)
+                .unwrap();
+
+            match domain.execute(subcommand_matches, &Cli::command()) {
+                Ok(executable) => {
+                    let config = crate::config::Config::load().unwrap_or_default();
+                    if config.ui.show_command && !executable.is_structured() {
+                        use colored::Colorize;
+                        println!(
+                            "{} {}",
+                            ">".blue().bold(),
+                            executable.as_string().bright_black().italic()
+                        );
+                    }
+                    if let Err(e) = executable.execute() {
+                        eprintln!("Error executing command: {}", e);
+                    }
+                }
+                Err(e) => eprintln!("Error preparing command: {}", e),
+            }
+        }
+        Err(e) => {
+            eprintln!("Error parsing generated command: {}", e);
+        }
+    }
+    Ok(())
+}
+
+fn run_interactive(domains: &[&dyn Domain]) -> Result<()> {
+    use dialoguer::theme::ColorfulTheme;
+    let theme = ColorfulTheme::default();
+
+    loop {
+        let domain = match select_domain(domains, &theme)? {
+            Some(d) => d,
+            None => break,
+        };
+
+        let mut args_vec = vec!["ao".to_string(), domain.name().to_string()];
+
+        let cmd = match select_subcommand(&theme, domain.command(), &mut args_vec)? {
+            Some(c) => c,
+            None => continue,
+        };
+
+        let is_user_add = args_vec.len() == 3 && args_vec[1] == "user" && args_vec[2] == "add";
+        let (positional_args, option_args) = split_args(&cmd);
+
+        if handle_positional_args(&theme, &mut args_vec, positional_args, is_user_add)? {
             continue;
         }
 
-        let escaped_args: Vec<String> = args_vec
-            .iter()
-            .map(|s| ao_cli::os::linux_generic::common::escape_shell_arg(s))
-            .collect();
-        println!("\nExecuting: {}\n", escaped_args.join(" "));
-
-        let mut app = Cli::command();
-        for domain in domains {
-            app = app.subcommand(domain.command());
+        if handle_option_args(&theme, &mut args_vec, option_args, is_user_add)? {
+            continue;
         }
-        match app.try_get_matches_from(&args_vec) {
-            Ok(matches) => {
-                let (subcommand_name, subcommand_matches) = matches.subcommand().unwrap();
-                let domain = domains
-                    .iter()
-                    .find(|d| d.name() == subcommand_name)
-                    .unwrap();
 
-                match domain.execute(subcommand_matches, &Cli::command()) {
-                    Ok(executable) => {
-                        let config = crate::config::Config::load().unwrap_or_default();
-                        if config.ui.show_command && !executable.is_structured() {
-                            use colored::Colorize;
-                            println!(
-                                "{} {}",
-                                ">".blue().bold(),
-                                executable.as_string().bright_black().italic()
-                            );
-                        }
-                        if let Err(e) = executable.execute() {
-                            eprintln!("Error executing command: {}", e);
-                        }
-                    }
-                    Err(e) => eprintln!("Error preparing command: {}", e),
-                }
-            }
-            Err(e) => {
-                eprintln!("Error parsing generated command: {}", e);
-            }
-        }
+        execute_generated_command(domains, &args_vec)?;
         println!();
     }
 
