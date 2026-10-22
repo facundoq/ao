@@ -165,8 +165,8 @@ pub fn draw_full_details(f: &mut Frame, app: &App, details: &ProcessDetails, are
             }
 
             Row::new(vec![
-                Cell::from(r.resource_type.clone()),
-                Cell::from(r.name.clone()),
+                Cell::from(r.resource_type.as_str()),
+                Cell::from(r.name.as_str()),
             ])
             .style(style)
         });
@@ -264,7 +264,7 @@ fn draw_process_list(f: &mut Frame, app: &App, area: Rect) {
             };
             let mut row_cells = vec![
                 Cell::from(p.pid.to_string()),
-                Cell::from(p.user.clone()).style(if i == app.selected_index {
+                Cell::from(p.user.as_str()).style(if i == app.selected_index {
                     Style::default()
                 } else {
                     Style::default().fg(get_user_color(&p.user, app))
@@ -277,8 +277,8 @@ fn draw_process_list(f: &mut Frame, app: &App, area: Rect) {
             if !app.show_user_threads {
                 row_cells.push(Cell::from(p.thread_count.to_string()));
             }
-            row_cells.push(Cell::from(p.name.clone()));
-            row_cells.push(Cell::from(p.command.clone()));
+            row_cells.push(Cell::from(p.name.as_str()));
+            row_cells.push(Cell::from(p.command.as_str()));
             Row::new(row_cells).style(style)
         });
 
@@ -367,21 +367,21 @@ fn draw_process_tree(f: &mut Frame, app: &App, area: Rect) {
                     .add_modifier(Modifier::BOLD);
             }
             let mut row_cells = vec![
-                Cell::from(node.pid.clone()),
-                Cell::from(node.user.clone()).style(if i == app.selected_index {
+                Cell::from(node.pid.as_str()),
+                Cell::from(node.user.as_str()).style(if i == app.selected_index {
                     Style::default()
                 } else {
                     Style::default().fg(get_user_color(&node.user, app))
                 }),
-                Cell::from(node.cpu.clone()),
-                Cell::from(node.virt.clone()),
-                Cell::from(node.mem.clone()),
-                Cell::from(node.shared.clone()),
+                Cell::from(node.cpu.as_str()),
+                Cell::from(node.virt.as_str()),
+                Cell::from(node.mem.as_str()),
+                Cell::from(node.shared.as_str()),
             ];
             if !app.show_user_threads {
-                row_cells.push(Cell::from(node.threads.clone()));
+                row_cells.push(Cell::from(node.threads.as_str()));
             }
-            row_cells.push(Cell::from(node.name.clone()));
+            row_cells.push(Cell::from(node.name.as_str()));
             Row::new(row_cells).style(style)
         });
 
