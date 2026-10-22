@@ -329,3 +329,31 @@ impl Emoji {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_completing_arg() {
+        // Happy paths
+        assert!(is_completing_arg(&["ao", "sys", "info"], &["ao", "sys", "info"], 0, false));
+        assert!(is_completing_arg(&["ao", "sys", "info", "a"], &["ao", "sys", "info"], 1, false));
+        assert!(is_completing_arg(&["ao", "sys", "info", "a", "b"], &["ao", "sys", "info"], 2, false));
+
+        // Negative cases
+        // Words shorter than cmd_parts
+        assert!(!is_completing_arg(&["ao", "sys"], &["ao", "sys", "info"], 0, false));
+        assert!(!is_completing_arg(&["ao"], &["ao", "sys", "info"], 0, false));
+        assert!(!is_completing_arg(&[], &["ao", "sys", "info"], 0, false));
+
+        // Words that don't start with cmd_parts
+        assert!(!is_completing_arg(&["ao", "pkg", "info"], &["ao", "sys", "info"], 0, false));
+        assert!(!is_completing_arg(&["foo", "bar"], &["ao", "sys", "info"], 0, false));
+
+        // Argument positions that don't match the number of additional words
+        assert!(!is_completing_arg(&["ao", "sys", "info"], &["ao", "sys", "info"], 1, false));
+        assert!(!is_completing_arg(&["ao", "sys", "info", "a"], &["ao", "sys", "info"], 0, false));
+        assert!(!is_completing_arg(&["ao", "sys", "info", "a"], &["ao", "sys", "info"], 2, false));
+    }
+}
