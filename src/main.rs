@@ -142,11 +142,17 @@ fn run_interactive(domains: &[&dyn Domain]) -> Result<()> {
             }
 
             args_vec.push(selected_name.to_string());
-            cmd = subcommands
+            cmd = match subcommands
                 .into_iter()
                 .find(|s| s.get_name() == selected_name)
-                .unwrap()
-                .clone();
+            {
+                Some(sub) => sub.clone(),
+                None => {
+                    eprintln!("Error: Subcommand '{}' not found.", selected_name);
+                    aborted = true;
+                    break;
+                }
+            };
         }
 
         if aborted {
@@ -353,11 +359,20 @@ fn run_interactive(domains: &[&dyn Domain]) -> Result<()> {
         }
         match app.try_get_matches_from(&args_vec) {
             Ok(matches) => {
-                let (subcommand_name, subcommand_matches) = matches.subcommand().unwrap();
-                let domain = domains
-                    .iter()
-                    .find(|d| d.name() == subcommand_name)
-                    .unwrap();
+                let (subcommand_name, subcommand_matches) = match matches.subcommand() {
+                    Some(m) => m,
+                    None => {
+                        eprintln!("Error: No subcommand provided in generated command.");
+                        continue;
+                    }
+                };
+                let domain = match domains.iter().find(|d| d.name() == subcommand_name) {
+                    Some(d) => d,
+                    None => {
+                        eprintln!("Error: Domain '{}' not found.", subcommand_name);
+                        continue;
+                    }
+                };
 
                 match domain.execute(subcommand_matches, &Cli::command()) {
                     Ok(executable) => {
