@@ -353,11 +353,20 @@ fn run_interactive(domains: &[&dyn Domain]) -> Result<()> {
         }
         match app.try_get_matches_from(&args_vec) {
             Ok(matches) => {
-                let (subcommand_name, subcommand_matches) = matches.subcommand().unwrap();
-                let domain = domains
-                    .iter()
-                    .find(|d| d.name() == subcommand_name)
-                    .unwrap();
+                let (subcommand_name, subcommand_matches) = match matches.subcommand() {
+                    Some(s) => s,
+                    None => {
+                        eprintln!("Error: No subcommand provided");
+                        continue;
+                    }
+                };
+                let domain = match domains.iter().find(|d| d.name() == subcommand_name) {
+                    Some(d) => d,
+                    None => {
+                        eprintln!("Error: Unknown subcommand '{}'", subcommand_name);
+                        continue;
+                    }
+                };
 
                 match domain.execute(subcommand_matches, &Cli::command()) {
                     Ok(executable) => {
