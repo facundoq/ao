@@ -108,7 +108,7 @@ pub struct SystemConfig {
 
 impl Config {
     pub fn save(&self) -> Result<()> {
-        let home = std::env::var("HOME").context("Failed to find HOME directory")?;
+        let home = home::home_dir().context("Failed to find HOME directory")?;
         let config_path = PathBuf::from(&home).join(".config/ao/config.toml");
         if let Some(parent) = config_path.parent() {
             fs::create_dir_all(parent)?;
@@ -119,7 +119,7 @@ impl Config {
     }
 
     pub fn load() -> Result<Self> {
-        let home = std::env::var("HOME").context("Failed to find HOME directory")?;
+        let home = home::home_dir().context("Failed to find HOME directory")?;
         // Prompt requested ~/.config/main (odd but following instructions)
         // I'll check both ~/.config/main and ~/.config/ao/config.toml
         let paths = vec![
