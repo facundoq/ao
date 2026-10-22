@@ -62,3 +62,21 @@ pub fn get_user_color(user: &str) -> Color {
     ];
     colors[(hash as usize) % colors.len()]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_uptime() {
+        assert_eq!(format_uptime(0), "0m");
+        assert_eq!(format_uptime(59), "0m");
+        assert_eq!(format_uptime(60), "1m");
+        assert_eq!(format_uptime(3599), "59m");
+        assert_eq!(format_uptime(3600), "1h 0m");
+        assert_eq!(format_uptime(3660), "1h 1m");
+        assert_eq!(format_uptime(86399), "23h 59m");
+        assert_eq!(format_uptime(86400), "1d 0h 0m");
+        assert_eq!(format_uptime(90060), "1d 1h 1m");
+    }
+}
