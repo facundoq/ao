@@ -44,11 +44,11 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             }
 
             Row::new(vec![
-                Cell::from(s.name.clone()),
-                Cell::from(s.loaded.clone()),
-                Cell::from(s.active.clone()),
-                Cell::from(s.status.clone()),
-                Cell::from(s.description.clone()),
+                Cell::from(s.name.as_str()),
+                Cell::from(s.loaded.as_str()),
+                Cell::from(s.active.as_str()),
+                Cell::from(s.status.as_str()),
+                Cell::from(s.description.as_str()),
             ])
             .style(style)
         });
