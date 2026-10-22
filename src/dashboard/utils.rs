@@ -62,3 +62,39 @@ pub fn get_user_color(user: &str) -> Color {
     ];
     colors[(hash as usize) % colors.len()]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_make_bar_empty() {
+        assert_eq!(make_bar(0, 10), "[          ]");
+    }
+
+    #[test]
+    fn test_make_bar_full() {
+        assert_eq!(make_bar(100, 10), "[██████████]");
+    }
+
+    #[test]
+    fn test_make_bar_half() {
+        assert_eq!(make_bar(50, 10), "[█████     ]");
+    }
+
+    #[test]
+    fn test_make_bar_over_100() {
+        assert_eq!(make_bar(150, 10), "[██████████]");
+    }
+
+    #[test]
+    fn test_make_bar_rounding() {
+        assert_eq!(make_bar(25, 10), "[███       ]");
+        assert_eq!(make_bar(24, 10), "[██        ]");
+    }
+
+    #[test]
+    fn test_make_bar_zero_width() {
+        assert_eq!(make_bar(50, 0), "[]");
+    }
+}
