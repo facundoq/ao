@@ -52,6 +52,30 @@ pub fn run_with_timeout(mut cmd: Command, timeout: Duration) -> Result<std::proc
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_duration() {
+        assert_eq!(format_duration(0), "0s");
+        assert_eq!(format_duration(45), "45s");
+        assert_eq!(format_duration(60), "1m");
+        assert_eq!(format_duration(120), "2m");
+        assert_eq!(format_duration(3600), "1h");
+        assert_eq!(format_duration(7200), "2h");
+        assert_eq!(format_duration(86400), "1d");
+        assert_eq!(format_duration(172800), "2d");
+
+        // Combinations
+        assert_eq!(format_duration(93784), "1d 2h 3m 4s");
+        assert_eq!(format_duration(86404), "1d 4s");
+        assert_eq!(format_duration(61), "1m 1s");
+        assert_eq!(format_duration(3661), "1h 1m 1s");
+        assert_eq!(format_duration(90000), "1d 1h");
+    }
+}
+
 pub fn escape_shell_arg(s: &str) -> String {
     if s.is_empty() {
         return "''".to_string();
@@ -327,6 +351,21 @@ impl Emoji {
             Emoji::Hdd => "💾",
             Emoji::Printer => "🖨️",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_command_exists_true() {
+        assert!(command_exists("ls"));
+    }
+
+    #[test]
+    fn test_command_exists_false() {
+        assert!(!command_exists("this_command_definitely_does_not_exist_12345"));
     }
 }
 

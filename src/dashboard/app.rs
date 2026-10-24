@@ -4,40 +4,10 @@ use crate::dashboard::rss::{get_process_memory, get_rss};
 use crate::os::detector::DetectedSystem;
 use crate::os::{ContainerInfo, NetInterfaceInfo, SensorInfo, ServiceInfo, UserSessionInfo};
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 use sysinfo::{
     CpuRefreshKind, Disks, MemoryRefreshKind, Networks, Process, RefreshKind, System, Users,
 };
-
-/// Read network byte counters directly from `/proc/net/dev`, exactly as `netstat` does.
-/// Returns a map of interface name -> (rx_bytes, tx_bytes).
-/// These are raw 64-bit monotonically increasing counters from the kernel — no abstraction layer.
-fn read_proc_net_dev() -> HashMap<String, (u64, u64)> {
-    let mut result = HashMap::new();
-    let Ok(content) = std::fs::read_to_string("/proc/net/dev") else {
-        return result;
-    };
-    // Format: skip 2 header lines, then each line is:
-    //   iface: rx_bytes rx_packets ... tx_bytes ...
-    // Column indices (0-based, after splitting on whitespace, with iface: as token 0):
-    //   0=iface:  1=rx_bytes  9=tx_bytes
-    for line in content.lines().skip(2) {
-        let line = line.trim();
-        let Some(colon) = line.find(':') else {
-            continue;
-        };
-        let iface = line[..colon].trim().to_string();
-        let rest = &line[colon + 1..];
-        let fields: Vec<&str> = rest.split_whitespace().collect();
-        if fields.len() < 9 {
-            continue;
-        }
-        let rx_bytes = fields[0].parse::<u64>().unwrap_or(0);
-        let tx_bytes = fields[8].parse::<u64>().unwrap_or(0);
-        result.insert(iface, (rx_bytes, tx_bytes));
-    }
-    result
-}
 
 pub struct App<'a> {
     pub system_info: System,
@@ -70,6 +40,7 @@ pub struct App<'a> {
     pub history_start: Instant,
 
     pub last_tick_time: Instant,
+    pub last_sys_time: SystemTime,
     pub prev_network_data: HashMap<String, (u64, u64)>,
     pub network_speeds: HashMap<String, (u64, u64)>,
 
@@ -241,6 +212,7 @@ impl<'a> App<'a> {
             global_cpu_frequency: 0,
             history_start: Instant::now(),
             last_tick_time: Instant::now(),
+            last_sys_time: SystemTime::now(),
             prev_network_data,
             network_speeds: HashMap::new(),
             process_sort: config.ui.process_sort,
@@ -439,6 +411,13 @@ impl<'a> App<'a> {
         let elapsed = now.duration_since(self.last_tick_time).as_secs_f64();
         self.last_tick_time = now;
 
+        let sys_now = SystemTime::now();
+        let sys_elapsed = sys_now
+            .duration_since(self.last_sys_time)
+            .unwrap_or(Duration::ZERO)
+            .as_secs_f64();
+        self.last_sys_time = sys_now;
+
         self.system_info.refresh_memory();
         self.system_info.refresh_cpu_all();
         self.system_info.refresh_processes_specifics(
@@ -489,24 +468,24 @@ impl<'a> App<'a> {
             self.swap_history.remove(0);
         }
 
-        // Read network counters directly from /proc/net/dev (same source as netstat).
-        // This bypasses the sysinfo abstraction layer which can introduce counter-wrap
-        // smoothing bugs that cause artificial GB/s spikes after suspend/resume.
-        let proc_counters = read_proc_net_dev();
-
         // Sanity-check the elapsed time. If it's too short (<100ms, e.g. first tick)
-        // or too long (>60s, e.g. after suspend/resume where CLOCK_MONOTONIC paused),
-        // the delta/elapsed division would produce nonsense values — skip the speed calc.
-        let elapsed_sane = (0.1..=60.0).contains(&elapsed);
+        // or too long (>60s, e.g. after suspend/resume), the delta/elapsed division
+        // would produce nonsense values — skip the speed calc.
+        // We use both Instant (CLOCK_MONOTONIC) and SystemTime (CLOCK_REALTIME) because:
+        // - On Linux, CLOCK_MONOTONIC pauses during suspend, so `elapsed` misses the sleep time.
+        // - SystemTime correctly jumps forward after resume, catching the suspend boundary.
+        // By checking if the difference between SystemTime elapsed and Instant elapsed is large,
+        // we can detect suspends of any length. This causes `elapsed_sane` to correctly become
+        // false right after resume, allowing us to safely absorb sysinfo's artificial wrap-around
+        // spikes into `prev_network_data` without polluting the UI with multi-GB/s speed artifacts.
+        let elapsed_sane =
+            (0.1..=60.0).contains(&elapsed) && (sys_elapsed - elapsed).abs() < 2.0;
 
         let mut total_rx_speed = 0.0;
         let mut total_tx_speed = 0.0;
         for (name, network) in &self.networks {
-            // Use /proc/net/dev counters if available, fall back to sysinfo.
-            let (rx, tx) = proc_counters
-                .get(name)
-                .copied()
-                .unwrap_or_else(|| (network.total_received(), network.total_transmitted()));
+            let rx = network.total_received();
+            let tx = network.total_transmitted();
 
             if let Some((old_rx, old_tx)) = self.prev_network_data.get(name)
                 && elapsed_sane
