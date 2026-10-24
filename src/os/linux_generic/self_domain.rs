@@ -135,7 +135,8 @@ impl SelfManager for StandardSelf {
         use anyhow::Context;
         use std::fs::OpenOptions;
 
-        let home = std::env::var("HOME").context("Failed to find HOME directory")?;
+        let home = home::home_dir().context("Failed to find HOME directory")?;
+        let home = home.to_string_lossy();
         let (config_path, source_cmd) = match shell {
             Shell::Bash => (
                 format!("{}/.bashrc", home),
