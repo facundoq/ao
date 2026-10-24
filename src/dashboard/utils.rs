@@ -68,6 +68,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_format_bytes() {
+        assert_eq!(format_bytes(0), "    0  B");
+        assert_eq!(format_bytes(512), "  512  B");
+        assert_eq!(format_bytes(1023), " 1023  B");
+        assert_eq!(format_bytes(1024), "  1.0 KB");
+        assert_eq!(format_bytes(1536), "  1.5 KB");
+        assert_eq!(format_bytes(1024 * 1024 - 1), "1024.0 KB");
+        assert_eq!(format_bytes(1024 * 1024), "  1.0 MB");
+        assert_eq!(format_bytes(1024 * 1024 * 1024), "  1.0 GB");
+        assert_eq!(format_bytes(1024 * 1024 * 1024 * 1024), "  1.0 TB");
+        assert_eq!(format_bytes(1024 * 1024 * 1024 * 1024 * 1024), "  1.0 PB");
+        assert_eq!(format_bytes(1024 * 1024 * 1024 * 1024 * 1024 * 2), "  2.0 PB");
+    }
+
+    #[test]
     fn test_format_uptime() {
         assert_eq!(format_uptime(0), "0m");
         assert_eq!(format_uptime(59), "0m");

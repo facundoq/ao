@@ -51,11 +51,11 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             }
 
             Row::new(vec![
-                Cell::from(s.username.clone()),
-                Cell::from(s.line.clone()),
-                Cell::from(s.host.clone()),
-                Cell::from(s.start.clone()),
-                Cell::from(s.end.clone()),
+                Cell::from(s.username.as_str()),
+                Cell::from(s.line.as_str()),
+                Cell::from(s.host.as_str()),
+                Cell::from(s.start.as_str()),
+                Cell::from(s.end.as_str()),
             ])
             .style(style)
         });

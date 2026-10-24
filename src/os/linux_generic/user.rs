@@ -241,9 +241,13 @@ impl UserManager for StandardUser {
             let start_time = parts[start_idx].to_string();
 
             // Host is between TTY and start time
-            let tty_pos = line.find(&tty).unwrap() + tty.len();
-            let start_pos = line.find(&start_time).unwrap();
-            let host = line[tty_pos..start_pos].trim().to_string();
+            let mut host = String::new();
+            if let (Some(tty_start), Some(start_pos)) = (line.find(&tty), line.find(&start_time)) {
+                let tty_pos = tty_start + tty.len();
+                if tty_pos <= start_pos {
+                    host = line[tty_pos..start_pos].trim().to_string();
+                }
+            }
 
             let mut end_time = String::new();
             let mut duration = String::new();
